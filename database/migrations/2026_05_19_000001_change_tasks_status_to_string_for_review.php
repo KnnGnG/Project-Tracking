@@ -26,6 +26,10 @@ return new class extends Migration
             ->where('status', 'review')
             ->update(['status' => 'in_progress']);
 
+        DB::table('tasks')
+            ->whereNotIn('status', ['pending', 'in_progress', 'done'])
+            ->update(['status' => 'pending']);
+
         Schema::table('tasks', function (Blueprint $table) {
             $table->enum('status', ['pending', 'in_progress', 'done'])->default('pending')->change();
         });

@@ -110,22 +110,23 @@ class TeamLeadDashboard extends Component
 
         $project = $this->currentProject();
 
-        $payload = [
+        $basePayload = [
             'title' => $data['eventTitle'],
             'description' => $data['eventDescription'],
             'event_date' => $data['eventDate'],
             'type' => $data['eventType'],
-            'project_id' => $project->id,
-            'created_by' => auth()->id(),
         ];
 
         if ($this->editingEventId) {
             $event = ProjectEvent::findOrFail($this->editingEventId);
             $this->authorizeEvent($event);
-            $event->update($payload);
+            $event->update($basePayload);
             session()->flash('event_success', 'Event updated.');
         } else {
-            ProjectEvent::create($payload);
+            ProjectEvent::create($basePayload + [
+                'project_id' => $project->id,
+                'created_by' => auth()->id(),
+            ]);
             session()->flash('event_success', 'Event added to timeline.');
         }
 

@@ -17,25 +17,33 @@ class UserManager extends Component
     // ── Filters ───────────────────────────────────────────────────────────────
     #[Url(as: 'role')]
     public string $filterRole = '';
-    public string $search     = '';
+
+    public string $search = '';
 
     // ── Create / Edit form ────────────────────────────────────────────────────
-    public bool   $showForm   = false;
-    public ?int   $editingId  = null;
-    public string $name       = '';
-    public string $email      = '';
-    public string $role       = 'member';
-    public string $password   = '';
+    public bool $showForm = false;
+
+    public ?int $editingId = null;
+
+    public string $name = '';
+
+    public string $email = '';
+
+    public string $role = 'member';
+
+    public string $password = '';
 
     public bool $confirmingDelete = false;
+
     public ?int $deleteId = null;
+
     public string $deleteName = '';
 
     // ── Role change confirmation ───────────────────────────────────────────────
     public function openCreate(): void
     {
         $this->resetForm();
-        $this->showForm  = true;
+        $this->showForm = true;
         $this->editingId = null;
     }
 
@@ -44,11 +52,11 @@ class UserManager extends Component
         $user = User::findOrFail($id);
 
         $this->editingId = $id;
-        $this->name      = $user->name;
-        $this->email     = $user->email;
-        $this->role      = $user->role;
-        $this->password  = '';
-        $this->showForm  = true;
+        $this->name = $user->name;
+        $this->email = $user->email;
+        $this->role = $user->role;
+        $this->password = '';
+        $this->showForm = true;
     }
 
     public function cancelForm(): void
@@ -60,9 +68,9 @@ class UserManager extends Component
     public function save(): void
     {
         $rules = [
-            'name'  => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->editingId)],
-            'role'  => 'required|in:admin,client,team_lead,member',
+            'role' => 'required|in:admin,client,team_lead,member',
         ];
 
         if (! $this->editingId) {
@@ -74,9 +82,9 @@ class UserManager extends Component
         $data = $this->validate($rules);
 
         $payload = [
-            'name'  => $data['name'],
+            'name' => $data['name'],
             'email' => $data['email'],
-            'role'  => $data['role'],
+            'role' => $data['role'],
         ];
 
         if (! $this->editingId || $this->password !== '') {
@@ -139,10 +147,10 @@ class UserManager extends Component
     private function resetForm(): void
     {
         $this->editingId = null;
-        $this->name      = '';
-        $this->email     = '';
-        $this->role      = 'member';
-        $this->password  = '';
+        $this->name = '';
+        $this->email = '';
+        $this->role = 'member';
+        $this->password = '';
         $this->resetValidation();
     }
 
@@ -152,18 +160,18 @@ class UserManager extends Component
             ->when($this->filterRole, fn ($q) => $q->where('role', $this->filterRole))
             ->when($this->search, fn ($q) => $q->where(function ($q) {
                 $q->where('name', 'like', "%{$this->search}%")
-                  ->orWhere('email', 'like', "%{$this->search}%");
+                    ->orWhere('email', 'like', "%{$this->search}%");
             }))
-            ->orderByRaw("FIELD(role, 'admin', 'team_lead', 'member', 'client')")
+            ->orderByRaw("CASE WHEN role = 'admin' THEN 0 WHEN role = 'team_lead' THEN 1 WHEN role = 'member' THEN 2 WHEN role = 'client' THEN 3 ELSE 4 END")
             ->orderBy('name')
             ->get();
 
         $roleCounts = [
-            'all'       => User::count(),
-            'admin'     => User::where('role', 'admin')->count(),
+            'all' => User::count(),
+            'admin' => User::where('role', 'admin')->count(),
             'team_lead' => User::where('role', 'team_lead')->count(),
-            'member'    => User::where('role', 'member')->count(),
-            'client'    => User::where('role', 'client')->count(),
+            'member' => User::where('role', 'member')->count(),
+            'client' => User::where('role', 'client')->count(),
         ];
 
         return view('livewire.admin.user-manager', compact('users', 'roleCounts'));

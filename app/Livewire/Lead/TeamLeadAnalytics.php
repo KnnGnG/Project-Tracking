@@ -266,6 +266,13 @@ class TeamLeadAnalytics extends Component
         $overdueProblem = 0;
 
         foreach ($tasks as $task) {
+            if (is_null($task->due_date)) {
+                // Cannot compare completion to a deadline; treat as neutral (not late vs a missing date).
+                $onTime++;
+
+                continue;
+            }
+
             if ($task->status === 'done') {
                 $closed = Carbon::parse($task->updated_at)->toDateString();
                 if ($closed <= $task->due_date->toDateString()) {

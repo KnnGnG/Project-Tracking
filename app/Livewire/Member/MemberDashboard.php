@@ -188,10 +188,10 @@ class MemberDashboard extends Component
 
         // ── Apply sort ───────────────────────────────────────────────────────────
         if ($this->sortBy === 'priority') {
-            // high → medium → low (custom ordering via FIELD)
+            // high → medium → low (portable CASE; replaces MySQL FIELD)
             $dir = $this->sortDir === 'asc' ? 'asc' : 'desc';
             $tabQuery->orderByRaw(
-                "FIELD(priority, 'high', 'medium', 'low') ".($dir === 'asc' ? 'ASC' : 'DESC')
+                "CASE WHEN priority = 'high' THEN 0 WHEN priority = 'medium' THEN 1 WHEN priority = 'low' THEN 2 ELSE 3 END ".($dir === 'asc' ? 'ASC' : 'DESC')
             );
         } elseif ($this->sortBy === 'title') {
             $tabQuery->orderBy('title', $this->sortDir);

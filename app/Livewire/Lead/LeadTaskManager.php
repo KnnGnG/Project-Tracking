@@ -240,7 +240,7 @@ class LeadTaskManager extends Component
             ->whereIn('team_id', $leadTeams->pluck('id'))
             ->when($this->filterTeamId, fn ($q) => $q->where('team_id', $this->filterTeamId))
             ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))
-            ->orderByRaw("FIELD(status, 'in_progress', 'review', 'pending', 'done')")
+            ->orderByRaw("CASE WHEN status = 'in_progress' THEN 0 WHEN status = 'review' THEN 1 WHEN status = 'pending' THEN 2 WHEN status = 'done' THEN 3 ELSE 4 END")
             ->orderBy('due_date')
             ->get();
 
