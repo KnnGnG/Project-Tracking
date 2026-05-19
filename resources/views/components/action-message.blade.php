@@ -11,7 +11,12 @@
          x-transition:leave-start="opacity-100 translate-y-0 sm:translate-x-0"
          x-transition:leave-end="opacity-0 translate-y-2 sm:translate-y-0 sm:translate-x-4"
          style="display: none;"
-         {{ $attributes->merge(['class' => 'pointer-events-auto flex items-center justify-between gap-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 shadow-lg']) }}>
+         {{ $attributes->merge([
+             'role' => 'status',
+             'aria-live' => 'polite',
+             'aria-atomic' => 'true',
+             'class' => 'pointer-events-auto flex items-center justify-between gap-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 shadow-lg',
+         ]) }}>
         <span class="leading-5">{{ $slot->isEmpty() ? 'Saved.' : $slot }}</span>
         <button type="button"
                 @click="shown = false"

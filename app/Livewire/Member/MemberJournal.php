@@ -4,6 +4,7 @@ namespace App\Livewire\Member;
 
 use App\Models\JournalLog;
 use App\Models\Task;
+use Carbon\Carbon;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -14,6 +15,10 @@ use Livewire\Component;
 #[Title('Logs and Journal')]
 class MemberJournal extends Component
 {
+    private const MIN_TIMER_SECONDS = 1;
+
+    private const MAX_TIMER_SECONDS = 86400;
+
     #[Url(as: 'date')]
     public string $logDate = '';
 
@@ -33,19 +38,26 @@ class MemberJournal extends Component
 
     public function mount(): void
     {
-        if ($this->logDate === '') {
-            $this->logDate = now()->toDateString();
-        }
+        $this->normalizeLogDate();
     }
 
-    public function addTimerMinutes(int $seconds): void
+    public function updatedLogDate(): void
     {
-        $this->minutes += max(1, (int) ceil($seconds / 60));
+        $this->normalizeLogDate();
+    }
+
+    public function addTimerMinutes($seconds): void
+    {
+        $seconds = $this->clampTimerSeconds($seconds);
+        $this->minutes += (int) ceil($seconds / 60);
         $this->normalizeDuration();
     }
 
-    public function saveTimerSession(int $seconds): void
+    public function saveTimerSession($seconds): void
     {
+        $seconds = $this->clampTimerSeconds($seconds);
+        $this->normalizeLogDate();
+
         $validated = $this->validate([
             'logDate' => ['required', 'date'],
             'selectedTaskId' => [
@@ -55,7 +67,7 @@ class MemberJournal extends Component
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $totalMinutes = max(1, (int) ceil($seconds / 60));
+        $totalMinutes = (int) ceil($seconds / 60);
 
         JournalLog::create([
             'user_id' => auth()->id(),
@@ -71,6 +83,7 @@ class MemberJournal extends Component
 
     public function save(): void
     {
+        $this->normalizeLogDate();
         $this->normalizeDuration();
 
         $validated = $this->validate([
@@ -149,8 +162,41 @@ class MemberJournal extends Component
         }
     }
 
+    private function clampTimerSeconds($seconds): int
+    {
+        return min(self::MAX_TIMER_SECONDS, max(self::MIN_TIMER_SECONDS, (int) $seconds));
+    }
+
+    private function normalizeLogDate(): void
+    {
+        if ($this->logDate === '') {
+            $this->logDate = now()->toDateString();
+            return;
+        }
+
+        try {
+            $date = Carbon::createFromFormat('Y-m-d', $this->logDate);
+            $errors = Carbon::getLastErrors();
+
+            if (! $date || ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))) {
+                throw new \InvalidArgumentException('Invalid date.');
+            }
+        } catch (\Throwable) {
+            try {
+                $date = Carbon::parse($this->logDate);
+            } catch (\Throwable) {
+                $this->logDate = now()->toDateString();
+                return;
+            }
+        }
+
+        $this->logDate = $date->toDateString();
+    }
+
     public function render()
     {
+        $this->normalizeLogDate();
+
         $userId = auth()->id();
 
         $tasks = Task::with('project')

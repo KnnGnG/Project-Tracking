@@ -33,7 +33,6 @@
 
         <button type="button"
                 @click="show = false"
-                @if($dismiss) wire:click="{{ $dismiss }}" @endif
                 class="{{ $buttonStyles }} transition"
                 aria-label="Dismiss notification">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

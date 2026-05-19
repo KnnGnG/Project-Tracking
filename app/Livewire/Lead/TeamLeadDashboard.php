@@ -35,6 +35,10 @@ class TeamLeadDashboard extends Component
 
     public function selectTeam(int $id): void
     {
+        if (! auth()->user()->ledTeams()->whereKey($id)->exists()) {
+            return;
+        }
+
         $this->selectedTeamId = $id;
         $this->cancelEventForm();
         $this->closeMemberTasksModal();
@@ -124,7 +128,12 @@ class TeamLeadDashboard extends Component
 
     public function deleteEvent(int $id): void
     {
-        $event = ProjectEvent::findOrFail($id);
+        $event = ProjectEvent::find($id);
+
+        if (! $event) {
+            return;
+        }
+
         $this->authorizeEvent($event);
         $event->delete();
         session()->flash('event_success', 'Event removed.');
@@ -195,7 +204,7 @@ class TeamLeadDashboard extends Component
     /** Returns the Project for the currently selected team. */
     private function currentProject()
     {
-        return Team::findOrFail($this->selectedTeamId)->project;
+        return auth()->user()->ledTeams()->findOrFail($this->selectedTeamId)->project;
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -218,7 +227,7 @@ class TeamLeadDashboard extends Component
         $progressPct     = 0;
 
         if ($this->selectedTeamId) {
-            $selectedTeam = Team::with([
+            $selectedTeam = auth()->user()->ledTeams()->with([
                 'project.events',
                 'members',
                 'tasks.assignee',
