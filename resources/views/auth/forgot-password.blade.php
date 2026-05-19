@@ -9,9 +9,7 @@
         </div>
 
         @session('status')
-            <div class="mb-4 font-medium text-sm text-green-600">
-                {{ $value }}
-            </div>
+            <x-floating-notification :message="$value" />
         @endsession
 
         <x-validation-errors class="mb-4" />

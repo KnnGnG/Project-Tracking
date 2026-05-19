@@ -2,9 +2,7 @@
 
     {{-- Flash --}}
     @if(session('success'))
-        <div class="px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
-            {{ session('success') }}
-        </div>
+        <x-floating-notification :message="session('success')" />
     @endif
 
     {{-- ── Site-wide stat cards ─────────────────────────────────────────────── --}}

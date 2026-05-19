@@ -75,9 +75,7 @@
                 </p>
 
                 @if ($this->verificationLinkSent)
-                    <p class="mt-2 font-medium text-sm text-green-600">
-                        {{ __('A new verification link has been sent to your email address.') }}
-                    </p>
+                    <x-floating-notification :message="__('A new verification link has been sent to your email address.')" />
                 @endif
             @endif
         </div>

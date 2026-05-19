@@ -27,6 +27,10 @@ class UserManager extends Component
     public string $role       = 'member';
     public string $password   = '';
 
+    public bool $confirmingDelete = false;
+    public ?int $deleteId = null;
+    public string $deleteName = '';
+
     // ── Role change confirmation ───────────────────────────────────────────────
     public function openCreate(): void
     {
@@ -104,6 +108,32 @@ class UserManager extends Component
         abort_if($id === auth()->id(), 403, 'You cannot delete your own account.');
         User::findOrFail($id)->delete();
         session()->flash('success', 'User deleted.');
+    }
+
+    public function confirmDelete(int $id): void
+    {
+        abort_if($id === auth()->id(), 403, 'You cannot delete your own account.');
+
+        $user = User::findOrFail($id);
+        $this->deleteId = $user->id;
+        $this->deleteName = $user->name;
+        $this->confirmingDelete = true;
+    }
+
+    public function deleteConfirmed(): void
+    {
+        if ($this->deleteId) {
+            $this->delete($this->deleteId);
+        }
+
+        $this->cancelDelete();
+    }
+
+    public function cancelDelete(): void
+    {
+        $this->confirmingDelete = false;
+        $this->deleteId = null;
+        $this->deleteName = '';
     }
 
     private function resetForm(): void

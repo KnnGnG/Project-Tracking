@@ -10,6 +10,7 @@ use App\Livewire\Client\ClientDashboard;
 use App\Livewire\Lead\LeadTaskManager;
 use App\Livewire\Lead\TeamLeadDashboard;
 use App\Livewire\Member\MemberDashboard;
+use App\Livewire\Member\MemberJournal;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -88,5 +89,6 @@ Route::middleware(['auth', 'throttle:300,1'])->group(function () {
         ->name('member.')
         ->group(function () {
             Route::get('/dashboard', MemberDashboard::class)->name('dashboard');
+            Route::get('/logs',      MemberJournal::class)->name('logs');
         });
 });

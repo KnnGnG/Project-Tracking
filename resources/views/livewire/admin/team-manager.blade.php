@@ -1,9 +1,7 @@
 <div>
     {{-- Flash message --}}
     @if(session('success'))
-        <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
-            {{ session('success') }}
-        </div>
+        <x-floating-notification :message="session('success')" />
     @endif
 
     {{-- Header row --}}
@@ -111,8 +109,7 @@
                                 class="text-gray-600 hover:text-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 transition">
                             Edit
                         </button>
-                        <button wire:click="delete({{ $team->id }})"
-                                wire:confirm="Delete this team? All its tasks will also be removed."
+                        <button wire:click="confirmDelete({{ $team->id }})"
                                 class="text-red-500 hover:text-red-700 px-3 py-1.5 rounded-lg border border-red-200 transition">
                             Delete
                         </button>
@@ -162,4 +159,24 @@
             </div>
         @endforelse
     </div>
+
+    <x-confirmation-modal wire:model="confirmingDelete" maxWidth="md">
+        <x-slot name="title">
+            Delete team?
+        </x-slot>
+
+        <x-slot name="content">
+            This will remove the team and all of its tasks.
+        </x-slot>
+
+        <x-slot name="footer">
+            <x-secondary-button wire:click="cancelDelete" wire:loading.attr="disabled">
+                Cancel
+            </x-secondary-button>
+
+            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled">
+                Delete
+            </x-danger-button>
+        </x-slot>
+    </x-confirmation-modal>
 </div>

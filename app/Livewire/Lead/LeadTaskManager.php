@@ -28,6 +28,9 @@ class LeadTaskManager extends Component
     public string $status         = 'pending';
     public string $priority       = 'medium';
 
+    public bool $confirmingDelete = false;
+    public ?int $deleteId = null;
+
     public function mount(): void
     {
         // Default filter to first led team
@@ -123,6 +126,28 @@ class LeadTaskManager extends Component
     {
         $this->ownedTask($id)->delete();
         session()->flash('success', 'Task deleted.');
+    }
+
+    public function confirmDelete(int $id): void
+    {
+        $this->ownedTask($id);
+        $this->deleteId = $id;
+        $this->confirmingDelete = true;
+    }
+
+    public function deleteConfirmed(): void
+    {
+        if ($this->deleteId) {
+            $this->delete($this->deleteId);
+        }
+
+        $this->cancelDelete();
+    }
+
+    public function cancelDelete(): void
+    {
+        $this->confirmingDelete = false;
+        $this->deleteId = null;
     }
 
     public function updateStatus(int $id, string $status): void

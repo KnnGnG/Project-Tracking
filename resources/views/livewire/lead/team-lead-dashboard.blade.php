@@ -2,9 +2,7 @@
 
     {{-- Flash message --}}
     @if(session('event_success'))
-        <div class="px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
-            {{ session('event_success') }}
-        </div>
+        <x-floating-notification :message="session('event_success')" />
     @endif
 
     {{-- ── Team tabs ─────────────────────────────────────────────────────── --}}
@@ -343,8 +341,7 @@
                                                         class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition">
                                                     Edit
                                                 </button>
-                                                <button wire:click="deleteEvent({{ $event->id }})"
-                                                        wire:confirm="Remove this event from the timeline?"
+                                                <button wire:click="confirmDeleteEvent({{ $event->id }})"
                                                         class="text-xs text-red-500 hover:text-red-700 font-medium transition">
                                                     Delete
                                                 </button>
@@ -552,9 +549,8 @@
                         @endforeach
                     </ul>
                 </div>
-            @endif
+    @endif
 
-        </div>
     </div>
 
     {{-- Member assigned tasks modal --}}
@@ -628,6 +624,26 @@
             </div>
         </div>
     @endif
+
+    <x-confirmation-modal wire:model="confirmingDeleteEvent" maxWidth="md">
+        <x-slot name="title">
+            Remove timeline event?
+        </x-slot>
+
+        <x-slot name="content">
+            This event will be removed from the project timeline.
+        </x-slot>
+
+        <x-slot name="footer">
+            <x-secondary-button wire:click="cancelDeleteEvent" wire:loading.attr="disabled">
+                Cancel
+            </x-secondary-button>
+
+            <x-danger-button class="ms-3" wire:click="deleteEventConfirmed" wire:loading.attr="disabled">
+                Remove
+            </x-danger-button>
+        </x-slot>
+    </x-confirmation-modal>
 
     @endif
 </div>

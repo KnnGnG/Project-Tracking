@@ -25,6 +25,9 @@ class TeamManager extends Component
     public ?int $managingTeamId = null;
     public ?int $memberToAdd    = null;
 
+    public bool $confirmingDelete = false;
+    public ?int $deleteId = null;
+
     protected function rules(): array
     {
         return [
@@ -81,6 +84,27 @@ class TeamManager extends Component
             $this->managingTeamId = null;
         }
         session()->flash('success', 'Team deleted.');
+    }
+
+    public function confirmDelete(int $id): void
+    {
+        $this->deleteId = $id;
+        $this->confirmingDelete = true;
+    }
+
+    public function deleteConfirmed(): void
+    {
+        if ($this->deleteId) {
+            $this->delete($this->deleteId);
+        }
+
+        $this->cancelDelete();
+    }
+
+    public function cancelDelete(): void
+    {
+        $this->confirmingDelete = false;
+        $this->deleteId = null;
     }
 
     public function cancelForm(): void

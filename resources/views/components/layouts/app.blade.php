@@ -111,6 +111,15 @@
                         </svg>
                         My Tasks
                     </a>
+                    <a href="{{ route('member.logs') }}"
+                       class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
+                              {{ request()->routeIs('member.logs') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M8 6h8M8 10h8M8 14h5M5 4h14a1 1 0 011 1v14l-4-2-4 2-4-2-4 2V5a1 1 0 011-1z"/>
+                        </svg>
+                        Logs and Journal
+                    </a>
                 @endif
             @endauth
         </nav>

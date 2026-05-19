@@ -2,9 +2,7 @@
 
     {{-- Flash --}}
     @if(session('success'))
-        <div class="px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
-            {{ session('success') }}
-        </div>
+        <x-floating-notification :message="session('success')" />
     @endif
 
     {{-- ── Role filter tabs + search + new user ─────────────────────────────── --}}
@@ -206,8 +204,7 @@
                                     Edit
                                 </button>
                                 @if($user->id !== auth()->id())
-                                    <button wire:click="delete({{ $user->id }})"
-                                            wire:confirm="Delete {{ $user->name }}? This cannot be undone."
+                                    <button wire:click="confirmDelete({{ $user->id }})"
                                             class="text-red-500 hover:text-red-700 text-xs font-medium transition">
                                         Delete
                                     </button>
@@ -219,5 +216,25 @@
             </table>
         @endif
     </div>
+
+    <x-confirmation-modal wire:model="confirmingDelete" maxWidth="md">
+        <x-slot name="title">
+            Delete user?
+        </x-slot>
+
+        <x-slot name="content">
+            Delete {{ $deleteName ?: 'this user' }}? This cannot be undone.
+        </x-slot>
+
+        <x-slot name="footer">
+            <x-secondary-button wire:click="cancelDelete" wire:loading.attr="disabled">
+                Cancel
+            </x-secondary-button>
+
+            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled">
+                Delete
+            </x-danger-button>
+        </x-slot>
+    </x-confirmation-modal>
 
 </div>

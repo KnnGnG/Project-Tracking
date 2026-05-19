@@ -2,9 +2,7 @@
 
     {{-- Flash --}}
     @if(session('success'))
-        <div class="px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
-            {{ session('success') }}
-        </div>
+        <x-floating-notification :message="session('success')" />
     @endif
 
     {{-- ── Filters + New Task button ────────────────────────────────────────── --}}
@@ -243,8 +241,7 @@
                                         class="text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-3 transition">
                                     Edit
                                 </button>
-                                <button wire:click="delete({{ $task->id }})"
-                                        wire:confirm="Delete this task?"
+                                <button wire:click="confirmDelete({{ $task->id }})"
                                         class="text-red-500 hover:text-red-700 text-xs font-medium transition">
                                     Delete
                                 </button>
@@ -255,5 +252,25 @@
             </table>
         @endif
     </div>
+
+    <x-confirmation-modal wire:model="confirmingDelete" maxWidth="md">
+        <x-slot name="title">
+            Delete task?
+        </x-slot>
+
+        <x-slot name="content">
+            This task will be permanently removed from the project.
+        </x-slot>
+
+        <x-slot name="footer">
+            <x-secondary-button wire:click="cancelDelete" wire:loading.attr="disabled">
+                Cancel
+            </x-secondary-button>
+
+            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled">
+                Delete
+            </x-danger-button>
+        </x-slot>
+    </x-confirmation-modal>
 
 </div>

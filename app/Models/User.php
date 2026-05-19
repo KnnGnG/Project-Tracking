@@ -128,4 +128,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Task::class, 'created_by');
     }
+
+    public function journalLogs(): HasMany
+    {
+        return $this->hasMany(JournalLog::class);
+    }
 }

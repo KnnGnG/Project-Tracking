@@ -22,6 +22,9 @@ class TeamLeadDashboard extends Component
     public string $eventDate        = '';
     public string $eventType        = 'update';
 
+    public bool $confirmingDeleteEvent = false;
+    public ?int $deleteEventId = null;
+
     public function mount(): void
     {
         $first = auth()->user()->ledTeams()->first();
@@ -125,6 +128,30 @@ class TeamLeadDashboard extends Component
         $this->authorizeEvent($event);
         $event->delete();
         session()->flash('event_success', 'Event removed.');
+    }
+
+    public function confirmDeleteEvent(int $id): void
+    {
+        $event = ProjectEvent::findOrFail($id);
+        $this->authorizeEvent($event);
+
+        $this->deleteEventId = $id;
+        $this->confirmingDeleteEvent = true;
+    }
+
+    public function deleteEventConfirmed(): void
+    {
+        if ($this->deleteEventId) {
+            $this->deleteEvent($this->deleteEventId);
+        }
+
+        $this->cancelDeleteEvent();
+    }
+
+    public function cancelDeleteEvent(): void
+    {
+        $this->confirmingDeleteEvent = false;
+        $this->deleteEventId = null;
     }
 
     public function cancelEventForm(): void

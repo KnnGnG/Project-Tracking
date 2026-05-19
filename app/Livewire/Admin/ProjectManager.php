@@ -23,6 +23,9 @@ class ProjectManager extends Component
     public ?int $editingId   = null;
     public string $search    = '';
 
+    public bool $confirmingDelete = false;
+    public ?int $deleteId = null;
+
     protected function rules(): array
     {
         return [
@@ -85,6 +88,27 @@ class ProjectManager extends Component
     {
         Project::findOrFail($id)->delete();
         session()->flash('success', 'Project deleted.');
+    }
+
+    public function confirmDelete(int $id): void
+    {
+        $this->deleteId = $id;
+        $this->confirmingDelete = true;
+    }
+
+    public function deleteConfirmed(): void
+    {
+        if ($this->deleteId) {
+            $this->delete($this->deleteId);
+        }
+
+        $this->cancelDelete();
+    }
+
+    public function cancelDelete(): void
+    {
+        $this->confirmingDelete = false;
+        $this->deleteId = null;
     }
 
     public function cancelForm(): void

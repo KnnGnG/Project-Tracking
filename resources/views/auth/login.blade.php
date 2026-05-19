@@ -93,9 +93,7 @@
 
             {{-- Status message (e.g. password reset) --}}
             @session('status')
-                <div class="mb-5 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
-                    {{ $value }}
-                </div>
+                <x-floating-notification :message="$value" />
             @endsession
 
             <form method="POST" action="{{ route('login') }}" class="space-y-5">
