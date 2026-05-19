@@ -115,9 +115,12 @@ class MemberDashboard extends Component
         $today  = now()->toDateString();
 
         // ── Gather projects this member has tasks in (for filter dropdown) ──────
-        $projects = Project::whereHas('tasks', fn ($q) => $q
-            ->where('assigned_to', $userId)
-            ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+        $projects = Project::whereHas('tasks', function ($q) use ($userId) {
+            $q->where(function ($inner) use ($userId) {
+                $inner->where('assigned_to', $userId)
+                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId));
+            });
+        })
             ->orderBy('name')
             ->get(['id', 'name']);
 

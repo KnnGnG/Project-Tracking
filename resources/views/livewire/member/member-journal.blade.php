@@ -1,4 +1,4 @@
-<div class="space-y-6">
+<div class="space-y-6" wire:poll.visible.15s>
 
     @if($flash)
         <x-floating-notification :message="$flash" dismiss="dismissFlash" />
@@ -152,7 +152,7 @@
             </form>
         </section>
 
-        <aside class="bg-white border border-gray-200 rounded-lg shadow-sm" wire:poll.visible.15s>
+        <aside class="bg-white border border-gray-200 rounded-lg shadow-sm">
             <div class="px-5 py-4 border-b border-gray-100">
                 <p class="text-sm font-medium text-gray-500">Total for {{ \Illuminate\Support\Carbon::parse($logDate)->format('M d, Y') }}</p>
                 <p class="mt-1 text-3xl font-extrabold text-gray-900">
@@ -201,7 +201,7 @@
         </aside>
     </div>
 
-    <section class="bg-white border border-gray-200 rounded-lg shadow-sm" wire:poll.visible.15s>
+    <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
         <div class="px-6 py-4 border-b border-gray-100">
             <h2 class="text-lg font-semibold text-gray-900">Recent journal logs</h2>
         </div>

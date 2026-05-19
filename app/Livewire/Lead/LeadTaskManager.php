@@ -4,6 +4,7 @@ namespace App\Livewire\Lead;
 
 use App\Models\Task;
 use App\Models\Team;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -58,10 +59,13 @@ class LeadTaskManager extends Component
         $this->title       = $task->title;
         $this->description = $task->description ?? '';
         $this->teamId      = $task->team_id;
-        $this->assignedTo  = $task->assignees()->pluck('users.id')->map(fn ($id) => (string) $id)->all();
-        if ($this->assignedTo === [] && $task->assigned_to) {
-            $this->assignedTo = [(string) $task->assigned_to];
-        }
+        $this->assignedTo = collect([$task->assigned_to])
+            ->filter()
+            ->merge($task->assignees()->orderBy('users.name')->pluck('users.id'))
+            ->unique()
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
         $this->startDate   = $task->start_date?->toDateString() ?? '';
         $this->dueDate     = $task->due_date->toDateString();
         $this->status      = $task->status;
@@ -125,13 +129,19 @@ class LeadTaskManager extends Component
         ];
 
         if ($this->editingId) {
-            $task = $this->ownedTask($this->editingId);
-            $task->update($payload);
-            $task->assignees()->sync($assigneeIds->all());
+            DB::transaction(function () use ($payload, $assigneeIds) {
+                $task = $this->ownedTask($this->editingId);
+                $task->update($payload);
+                $task->assignees()->sync($assigneeIds->all());
+            });
+
             session()->flash('success', 'Task updated.');
         } else {
-            $task = Task::create(array_merge($payload, ['created_by' => auth()->id()]));
-            $task->assignees()->sync($assigneeIds->all());
+            DB::transaction(function () use ($payload, $assigneeIds) {
+                $task = Task::create(array_merge($payload, ['created_by' => auth()->id()]));
+                $task->assignees()->sync($assigneeIds->all());
+            });
+
             session()->flash('success', 'Task created and assigned.');
         }
 
