@@ -201,7 +201,7 @@ class MemberJournal extends Component
 
         $tasks = Task::with('project')
             ->where('assigned_to', $userId)
-            ->whereIn('status', ['pending', 'in_progress'])
+            ->where('status', 'in_progress')
             ->orderBy('title')
             ->get();
 
