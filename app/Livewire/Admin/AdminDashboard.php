@@ -21,24 +21,25 @@ class AdminDashboard extends Component
 
         User::findOrFail($userId)->update(['role' => $role]);
 
-        session()->flash('success', 'User role updated to ' . ucfirst(str_replace('_', ' ', $role)) . '.');
+        session()->flash('success', 'User role updated to '.ucfirst(str_replace('_', ' ', $role)).'.');
     }
 
     public function render()
     {
         // ── Site-wide stats ───────────────────────────────────────────────────
         $stats = [
-            'users'    => User::count(),
+            'users' => User::count(),
             'projects' => Project::count(),
-            'teams'    => Team::count(),
-            'tasks'    => Task::count(),
+            'teams' => Team::count(),
+            'tasks' => Task::count(),
         ];
 
         $taskStats = [
-            'done'        => Task::where('status', 'done')->count(),
+            'done' => Task::where('status', 'done')->count(),
             'in_progress' => Task::where('status', 'in_progress')->count(),
-            'pending'     => Task::where('status', 'pending')->count(),
-            'overdue'     => Task::whereIn('status', ['pending', 'in_progress'])
+            'review' => Task::where('status', 'review')->count(),
+            'pending' => Task::where('status', 'pending')->count(),
+            'overdue' => Task::whereIn('status', ['pending', 'in_progress', 'review'])
                 ->where('due_date', '<', now()->toDateString())
                 ->count(),
         ];

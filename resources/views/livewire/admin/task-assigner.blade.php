@@ -19,6 +19,7 @@
                 <option value="">All statuses</option>
                 <option value="pending">Pending</option>
                 <option value="in_progress">In progress</option>
+                <option value="review">Review</option>
                 <option value="done">Done</option>
             </select>
         </div>
@@ -127,6 +128,7 @@
                                         $statusBadge = match($task->status) {
                                             'pending'     => 'bg-gray-100 text-gray-600',
                                             'in_progress' => 'bg-blue-100 text-blue-700',
+                                            'review' => 'bg-amber-100 text-amber-800',
                                             'done'        => 'bg-green-100 text-green-700',
                                             default       => 'bg-gray-100 text-gray-600',
                                         };

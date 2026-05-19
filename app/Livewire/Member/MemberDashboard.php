@@ -13,7 +13,7 @@ use Livewire\Component;
 #[Title('My Tasks')]
 class MemberDashboard extends Component
 {
-    /** Active tab: pending | in_progress | exceeded | done */
+    /** Active tab: pending | in_progress | review | exceeded | done */
     #[Url(as: 'tab')]
     public string $activeTab = 'pending';
 
@@ -37,7 +37,7 @@ class MemberDashboard extends Component
 
     public function setTab(string $tab): void
     {
-        $this->activeTab     = $tab;
+        $this->activeTab = $tab;
         $this->expandedTaskId = null;
     }
 
@@ -51,7 +51,7 @@ class MemberDashboard extends Component
         if ($this->sortBy === $field) {
             $this->sortDir = $this->sortDir === 'asc' ? 'desc' : 'asc';
         } else {
-            $this->sortBy  = $field;
+            $this->sortBy = $field;
             $this->sortDir = 'asc';
         }
     }
@@ -65,20 +65,20 @@ class MemberDashboard extends Component
      */
     public function setStatus(int $id, string $newStatus): void
     {
-        $allowed = ['pending', 'in_progress', 'done'];
-        if (!in_array($newStatus, $allowed, true)) {
+        $allowed = ['pending', 'in_progress', 'review', 'done'];
+        if (! in_array($newStatus, $allowed, true)) {
             return;
         }
 
         $task = $this->ownedTask($id);
-        if (!$task) {
+        if (! $task) {
             return;
         }
 
         $updates = ['status' => $newStatus];
 
         // Capture the real start moment: first time a member moves task to in progress.
-        if ($newStatus === 'in_progress' && !$task->start_date) {
+        if ($newStatus === 'in_progress' && ! $task->start_date) {
             $updates['start_date'] = now()->toDateString();
         }
 
@@ -86,9 +86,10 @@ class MemberDashboard extends Component
 
         $this->flash = match ($newStatus) {
             'in_progress' => 'Task marked as In Progress.',
-            'done'        => 'Task marked as Done. Great work!',
-            'pending'     => 'Task moved back to Pending.',
-            default       => 'Task updated.',
+            'review' => 'Task submitted for review.',
+            'done' => 'Task marked as Done. Great work!',
+            'pending' => 'Task moved back to Pending.',
+            default => 'Task updated.',
         };
 
         // If the task moved out of the current tab, close the detail panel
@@ -112,7 +113,7 @@ class MemberDashboard extends Component
     public function render()
     {
         $userId = auth()->id();
-        $today  = now()->toDateString();
+        $today = now()->toDateString();
 
         // ── Gather projects this member has tasks in (for filter dropdown) ──────
         $projects = Project::whereHas('tasks', function ($q) use ($userId) {
@@ -146,8 +147,13 @@ class MemberDashboard extends Component
                 ->where(fn ($q) => $q->whereNull('due_date')->orWhere('due_date', '>=', $today))
                 ->count(),
 
+            'review' => (clone $base)
+                ->where('status', 'review')
+                ->where(fn ($q) => $q->whereNull('due_date')->orWhere('due_date', '>=', $today))
+                ->count(),
+
             'exceeded' => (clone $base)
-                ->whereIn('status', ['pending', 'in_progress'])
+                ->whereIn('status', ['pending', 'in_progress', 'review'])
                 ->where('due_date', '<', $today)
                 ->count(),
 
@@ -166,8 +172,12 @@ class MemberDashboard extends Component
                 ->where('status', 'in_progress')
                 ->where(fn ($q) => $q->whereNull('due_date')->orWhere('due_date', '>=', $today)),
 
+            'review' => (clone $base)
+                ->where('status', 'review')
+                ->where(fn ($q) => $q->whereNull('due_date')->orWhere('due_date', '>=', $today)),
+
             'exceeded' => (clone $base)
-                ->whereIn('status', ['pending', 'in_progress'])
+                ->whereIn('status', ['pending', 'in_progress', 'review'])
                 ->where('due_date', '<', $today),
 
             'done' => (clone $base)
@@ -178,10 +188,10 @@ class MemberDashboard extends Component
 
         // ── Apply sort ───────────────────────────────────────────────────────────
         if ($this->sortBy === 'priority') {
-            // high → medium → low (custom ordering via FIELD)
+            // high → medium → low (portable CASE; replaces MySQL FIELD)
             $dir = $this->sortDir === 'asc' ? 'asc' : 'desc';
             $tabQuery->orderByRaw(
-                "FIELD(priority, 'high', 'medium', 'low') " . ($dir === 'asc' ? 'ASC' : 'DESC')
+                "CASE WHEN priority = 'high' THEN 0 WHEN priority = 'medium' THEN 1 WHEN priority = 'low' THEN 2 ELSE 3 END ".($dir === 'asc' ? 'ASC' : 'DESC')
             );
         } elseif ($this->sortBy === 'title') {
             $tabQuery->orderBy('title', $this->sortDir);

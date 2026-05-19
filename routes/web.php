@@ -8,6 +8,7 @@ use App\Livewire\Admin\TeamManager;
 use App\Livewire\Admin\UserManager;
 use App\Livewire\Client\ClientDashboard;
 use App\Livewire\Lead\LeadTaskManager;
+use App\Livewire\Lead\TeamLeadAnalytics;
 use App\Livewire\Lead\TeamLeadDashboard;
 use App\Livewire\Member\MemberDashboard;
 use App\Livewire\Member\MemberJournal;
@@ -48,10 +49,10 @@ Route::middleware(['auth', 'throttle:300,1'])->group(function () {
         ->name('admin.')
         ->group(function () {
             Route::get('/dashboard', AdminDashboard::class)->name('dashboard');
-            Route::get('/users',    UserManager::class)->name('users');
+            Route::get('/users', UserManager::class)->name('users');
             Route::get('/projects', ProjectManager::class)->name('projects');
-            Route::get('/teams',    TeamManager::class)->name('teams');
-            Route::get('/tasks',    TaskAssigner::class)->name('tasks');
+            Route::get('/teams', TeamManager::class)->name('teams');
+            Route::get('/tasks', TaskAssigner::class)->name('tasks');
         });
 
     /*
@@ -76,7 +77,8 @@ Route::middleware(['auth', 'throttle:300,1'])->group(function () {
         ->name('lead.')
         ->group(function () {
             Route::get('/dashboard', TeamLeadDashboard::class)->name('dashboard');
-            Route::get('/tasks',     LeadTaskManager::class)->name('tasks');
+            Route::get('/analytics', TeamLeadAnalytics::class)->name('analytics');
+            Route::get('/tasks', LeadTaskManager::class)->name('tasks');
         });
 
     /*
@@ -89,6 +91,6 @@ Route::middleware(['auth', 'throttle:300,1'])->group(function () {
         ->name('member.')
         ->group(function () {
             Route::get('/dashboard', MemberDashboard::class)->name('dashboard');
-            Route::get('/logs',      MemberJournal::class)->name('logs');
+            Route::get('/logs', MemberJournal::class)->name('logs');
         });
 });

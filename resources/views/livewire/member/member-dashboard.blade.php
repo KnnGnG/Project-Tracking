@@ -6,7 +6,7 @@
     @endif
 
     {{-- ── Summary stat cards ─────────────────────────────────────────────────── --}}
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
 
         {{-- Pending --}}
         <button wire:click="setTab('pending')"
@@ -33,6 +33,20 @@
             </p>
             <p class="text-xs mt-0.5 font-medium {{ $activeTab === 'in_progress' ? 'text-blue-100' : 'text-gray-400' }}">
                 In Progress
+            </p>
+        </button>
+
+        {{-- Review --}}
+        <button wire:click="setTab('review')"
+                class="rounded-xl border px-5 py-4 text-left transition
+                       {{ $activeTab === 'review'
+                          ? 'bg-amber-500 border-amber-600 shadow-sm'
+                          : 'bg-white border-gray-200 hover:border-amber-300' }}">
+            <p class="text-2xl font-extrabold {{ $activeTab === 'review' ? 'text-white' : 'text-amber-800' }}">
+                {{ $counts['review'] }}
+            </p>
+            <p class="text-xs mt-0.5 font-medium {{ $activeTab === 'review' ? 'text-amber-50' : 'text-gray-400' }}">
+                In Review
             </p>
         </button>
 
@@ -115,6 +129,7 @@
             $tabs = [
                 'pending'     => ['label' => 'Pending',           'active' => 'border-gray-700 text-gray-800'],
                 'in_progress' => ['label' => 'In Progress',       'active' => 'border-blue-600 text-blue-700'],
+                'review'      => ['label' => 'Review',            'active' => 'border-amber-600 text-amber-800'],
                 'exceeded'    => ['label' => 'Exceeded Deadline', 'active' => 'border-red-600 text-red-700'],
                 'done'        => ['label' => 'Done',              'active' => 'border-green-600 text-green-700'],
             ];
@@ -150,6 +165,7 @@
                     $emptyMsg = match($activeTab) {
                         'pending'     => 'No pending tasks. You\'re all caught up!',
                         'in_progress' => 'Nothing in progress right now.',
+                        'review'      => 'No tasks awaiting review.',
                         'exceeded'    => 'No overdue tasks. Great work!',
                         'done'        => 'No completed tasks yet.',
                         default       => 'No tasks here.',
@@ -266,30 +282,54 @@
                                         @endif
 
                                         {{-- Quick-action buttons (compact, always visible) --}}
-                                        <div class="flex items-center gap-1.5">
-                                            @if($task->status !== 'in_progress')
-                                                <button wire:click="setStatus({{ $task->id }}, 'in_progress')"
-                                                        title="Mark In Progress"
-                                                        class="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition">
-                                                    {{ $task->status === 'done' ? 'Reopen' : 'Start' }}
-                                                </button>
-                                            @endif
-
+                                        <div class="flex flex-wrap items-center justify-end gap-1.5">
                                             @if($task->status !== 'done')
+                                                @if(! in_array($task->status, ['in_progress', 'review'], true))
+                                                    <button wire:click="setStatus({{ $task->id }}, 'in_progress')"
+                                                            title="Mark In Progress"
+                                                            class="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition">
+                                                        {{ $task->status === 'pending' ? 'Start' : 'Resume' }}
+                                                    </button>
+                                                @endif
+
+                                                @if($task->status === 'in_progress')
+                                                    <button wire:click="setStatus({{ $task->id }}, 'review')"
+                                                            title="Send for Review"
+                                                            class="px-2.5 py-1 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition">
+                                                        Review
+                                                    </button>
+                                                @endif
+
+                                                @if($task->status === 'review')
+                                                    <button wire:click="setStatus({{ $task->id }}, 'in_progress')"
+                                                            title="Back to In Progress"
+                                                            class="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition">
+                                                        Revise
+                                                    </button>
+                                                @endif
+
                                                 <button wire:click="setStatus({{ $task->id }}, 'done')"
                                                         title="Mark Done"
                                                         class="px-2.5 py-1 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition">
                                                     Done
                                                 </button>
                                             @else
-                                                <span class="inline-flex items-center gap-1 text-xs font-medium text-green-600">
-                                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fill-rule="evenodd"
-                                                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                              clip-rule="evenodd"/>
-                                                    </svg>
-                                                    Completed
-                                                </span>
+                                                <div class="flex flex-wrap items-center justify-end gap-1.5">
+                                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-green-600">
+                                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fill-rule="evenodd"
+                                                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                                                  clip-rule="evenodd"/>
+                                                        </svg>
+                                                        Completed
+                                                    </span>
+                                                    <button wire:click="setStatus({{ $task->id }}, 'pending')"
+                                                            type="button"
+                                                            title="Move back to backlog"
+                                                            class="px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition">
+                                                        Reopen
+                                                    </button>
+                                                </div>
                                             @endif
                                         </div>
 
@@ -337,6 +377,16 @@
                                                         ])
                                                         @disabled($task->status === 'in_progress')>
                                                     In Progress
+                                                </button>
+
+                                                <button wire:click="setStatus({{ $task->id }}, 'review')"
+                                                        @class([
+                                                            'px-3 py-1.5 text-xs font-medium rounded-lg border transition',
+                                                            'bg-amber-500 border-amber-500 text-white cursor-default' => $task->status === 'review',
+                                                            'bg-white border-amber-200 text-amber-800 hover:bg-amber-50' => $task->status !== 'review',
+                                                        ])
+                                                        @disabled($task->status === 'review')>
+                                                    Review
                                                 </button>
 
                                                 <button wire:click="setStatus({{ $task->id }}, 'done')"
@@ -393,12 +443,14 @@
                                                         $statusBadge = match($task->status) {
                                                             'pending'     => 'bg-gray-100 text-gray-600',
                                                             'in_progress' => 'bg-blue-100 text-blue-700',
+                                                            'review'      => 'bg-amber-100 text-amber-800',
                                                             'done'        => 'bg-green-100 text-green-700',
                                                             default       => 'bg-gray-100 text-gray-500',
                                                         };
                                                         $statusLabel = match($task->status) {
                                                             'pending'     => 'Pending',
                                                             'in_progress' => 'In Progress',
+                                                            'review'      => 'Review',
                                                             'done'        => 'Done',
                                                             default       => ucfirst($task->status),
                                                         };

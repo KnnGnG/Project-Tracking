@@ -91,6 +91,15 @@
                         </svg>
                         Dashboard
                     </a>
+                    <a href="{{ route('lead.analytics') }}"
+                       class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
+                              {{ request()->routeIs('lead.analytics') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M9 17v-6m3 10v-4m6 2V7M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                        </svg>
+                        Analytics
+                    </a>
                     <a href="{{ route('lead.tasks') }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
                               {{ request()->routeIs('lead.tasks') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
@@ -162,5 +171,6 @@
 </div>
 
 @livewireScripts
+@stack('scripts')
 </body>
 </html>

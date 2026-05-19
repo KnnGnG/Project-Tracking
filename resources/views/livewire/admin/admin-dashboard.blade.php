@@ -79,6 +79,7 @@
                 <div class="flex items-center gap-4 text-xs text-gray-500">
                     <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>Done ({{ $taskStats['done'] }})</span>
                     <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span>In Progress ({{ $taskStats['in_progress'] }})</span>
+                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>Review ({{ $taskStats['review'] }})</span>
                     <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-gray-200 border border-gray-300"></span>Pending ({{ $taskStats['pending'] }})</span>
                     @if($taskStats['overdue'] > 0)
                         <span class="flex items-center gap-1.5 text-red-500 font-medium">
@@ -93,6 +94,9 @@
                 @endif
                 @if($taskStats['in_progress'] > 0)
                     <div class="bg-blue-400" style="width: {{ round(($taskStats['in_progress'] / $stats['tasks']) * 100) }}%"></div>
+                @endif
+                @if($taskStats['review'] > 0)
+                    <div class="bg-amber-400" style="width: {{ round(($taskStats['review'] / $stats['tasks']) * 100) }}%"></div>
                 @endif
                 @if($taskStats['pending'] > 0)
                     <div class="bg-gray-200" style="width: {{ round(($taskStats['pending'] / $stats['tasks']) * 100) }}%"></div>

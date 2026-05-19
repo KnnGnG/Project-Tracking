@@ -23,6 +23,7 @@
                 <option value="">All Statuses</option>
                 <option value="pending">Pending</option>
                 <option value="in_progress">In Progress</option>
+                <option value="review">Review</option>
                 <option value="done">Done</option>
             </select>
         </div>
@@ -152,6 +153,7 @@
                                 class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <option value="pending">Pending</option>
                             <option value="in_progress">In Progress</option>
+                            <option value="review">Review</option>
                             <option value="done">Done</option>
                         </select>
                     </div>
@@ -226,11 +228,13 @@
                             $statusOptions = [
                                 'pending'     => 'Pending',
                                 'in_progress' => 'In Progress',
+                                'review'      => 'Review',
                                 'done'        => 'Done',
                             ];
-                            $statusColor = match($task->status) {
+                            $statusColor = match ($task->status) {
                                 'pending'     => 'bg-gray-100 text-gray-600',
                                 'in_progress' => 'bg-blue-100 text-blue-700',
+                                'review'      => 'bg-amber-100 text-amber-800',
                                 'done'        => 'bg-green-100 text-green-700',
                                 default       => 'bg-gray-100 text-gray-500',
                             };

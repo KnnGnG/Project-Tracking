@@ -4,6 +4,7 @@ namespace App\Livewire\Client;
 
 use App\Models\Project;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -17,13 +18,15 @@ class ClientDashboard extends Component
     private const int UPCOMING_SIDEBAR_LIMIT = 5;
 
     public ?int $selectedProjectId = null;
-    public int  $month;
-    public int  $year;
+
+    public int $month;
+
+    public int $year;
 
     public function mount(): void
     {
         $this->month = now()->month;
-        $this->year  = now()->year;
+        $this->year = now()->year;
 
         // Pre-select the first available project
         $first = $this->clientProjects()->first();
@@ -45,26 +48,26 @@ class ClientDashboard extends Component
     {
         $date = Carbon::create($this->year, $this->month, 1)->subMonth();
         $this->month = $date->month;
-        $this->year  = $date->year;
+        $this->year = $date->year;
     }
 
     public function nextMonth(): void
     {
         $date = Carbon::create($this->year, $this->month, 1)->addMonth();
         $this->month = $date->month;
-        $this->year  = $date->year;
+        $this->year = $date->year;
     }
 
     public function goToToday(): void
     {
         $this->month = now()->month;
-        $this->year  = now()->year;
+        $this->year = now()->year;
     }
 
     // -------------------------------------------------------------------------
 
     /** Projects that belong to the authenticated client. */
-    private function clientProjects(): \Illuminate\Database\Eloquent\Builder
+    private function clientProjects(): Builder
     {
         return Project::where('client_id', auth()->id())->orderBy('name');
     }
@@ -118,9 +121,9 @@ class ClientDashboard extends Component
         foreach ($monthEvents as $event) {
             $day = $event->event_date->day;
             $byDay[$day] = ($byDay[$day] ?? collect())->push([
-                'kind'  => 'event',
+                'kind' => 'event',
                 'title' => $event->title,
-                'type'  => $event->type,
+                'type' => $event->type,
             ]);
         }
 
@@ -145,20 +148,20 @@ class ClientDashboard extends Component
             if ($dueInMonth) {
                 $day = $task->due_date->day;
                 $byDay[$day] = ($byDay[$day] ?? collect())->push([
-                    'kind'    => 'task',
-                    'title'   => $sameDay ? $task->title : $task->title.' (due)',
+                    'kind' => 'task',
+                    'title' => $sameDay ? $task->title : $task->title.' (due)',
                     'variant' => 'task_due',
-                    'status'  => $task->status,
+                    'status' => $task->status,
                 ]);
             }
 
             if ($startInMonth && ! $sameDay) {
                 $day = $task->start_date->day;
                 $byDay[$day] = ($byDay[$day] ?? collect())->push([
-                    'kind'    => 'task',
-                    'title'   => $task->title.' (start)',
+                    'kind' => 'task',
+                    'title' => $task->title.' (start)',
                     'variant' => 'task_start',
-                    'status'  => $task->status,
+                    'status' => $task->status,
                 ]);
             }
         }
@@ -169,14 +172,14 @@ class ClientDashboard extends Component
     /** Build the 6×7 calendar grid for the current month/year. */
     private function buildCalendarGrid(Collection $itemsByDay): array
     {
-        $firstDay   = Carbon::create($this->year, $this->month, 1);
+        $firstDay = Carbon::create($this->year, $this->month, 1);
         $daysInMonth = $firstDay->daysInMonth;
 
         // Day-of-week of the 1st (0=Sun … 6=Sat)
         $startOffset = $firstDay->dayOfWeek;
 
         $grid = [];
-        $day  = 1;
+        $day = 1;
 
         for ($row = 0; $row < 6; $row++) {
             $week = [];
@@ -187,12 +190,12 @@ class ClientDashboard extends Component
                     $week[] = null;
                 } else {
                     $week[] = [
-                        'day'    => $day,
-                        'date'   => Carbon::create($this->year, $this->month, $day)->toDateString(),
-                        'today'  => now()->year === $this->year
+                        'day' => $day,
+                        'date' => Carbon::create($this->year, $this->month, $day)->toDateString(),
+                        'today' => now()->year === $this->year
                                     && now()->month === $this->month
                                     && now()->day === $day,
-                        'items'  => $itemsByDay->get($day, collect()),
+                        'items' => $itemsByDay->get($day, collect()),
                     ];
                     $day++;
                 }
@@ -213,12 +216,12 @@ class ClientDashboard extends Component
 
         $selectedProject = $this->resolveSelectedProject();
 
-        $itemsByDay      = collect();
-        $upcomingItems   = collect();
+        $itemsByDay = collect();
+        $upcomingItems = collect();
 
         if ($selectedProject) {
             $monthStart = Carbon::create($this->year, $this->month, 1)->startOfDay();
-            $monthEnd   = $monthStart->copy()->endOfMonth();
+            $monthEnd = $monthStart->copy()->endOfMonth();
 
             $itemsByDay = $this->calendarItemsByDay($selectedProject, $monthStart, $monthEnd);
 
@@ -226,7 +229,7 @@ class ClientDashboard extends Component
             // Each source is limited to N rows (sorted ascending): the global top N cannot need
             // an (N+1)th row from either list without one of the first N from the other being earlier.
             $today = now()->startOfDay();
-            $n     = self::UPCOMING_SIDEBAR_LIMIT;
+            $n = self::UPCOMING_SIDEBAR_LIMIT;
 
             $upcomingItems = $selectedProject->events()
                 ->where('event_date', '>=', $today)
@@ -244,7 +247,7 @@ class ClientDashboard extends Component
             $upcomingTasks = $selectedProject->tasks()
                 ->whereNotNull('due_date')
                 ->where('due_date', '>=', $today)
-                ->whereIn('status', ['pending', 'in_progress'])
+                ->whereIn('status', ['pending', 'in_progress', 'review'])
                 ->orderBy('due_date')
                 ->limit($n)
                 ->get()
@@ -268,22 +271,22 @@ class ClientDashboard extends Component
         // Stats for selected project
         $stats = null;
         if ($selectedProject) {
-            $tasks       = $selectedProject->tasks;
-            $totalTasks  = $tasks->count();
-            $doneTasks   = $tasks->where('status', 'done')->count();
-            $pendingTasks = $tasks->whereIn('status', ['pending', 'in_progress'])->count();
+            $tasks = $selectedProject->tasks;
+            $totalTasks = $tasks->count();
+            $doneTasks = $tasks->where('status', 'done')->count();
+            $pendingTasks = $tasks->whereIn('status', ['pending', 'in_progress', 'review'])->count();
             $overdueTasks = $tasks->filter(fn ($t) => $t->isExceededDeadline())->count();
 
             $stats = compact('totalTasks', 'doneTasks', 'pendingTasks', 'overdueTasks');
         }
 
         return view('livewire.client.client-dashboard', [
-            'projects'        => $projects,
+            'projects' => $projects,
             'selectedProject' => $selectedProject,
-            'calendarGrid'    => $calendarGrid,
-            'upcomingItems'   => $upcomingItems,
-            'stats'           => $stats,
-            'monthLabel'      => Carbon::create($this->year, $this->month, 1)->format('F Y'),
+            'calendarGrid' => $calendarGrid,
+            'upcomingItems' => $upcomingItems,
+            'stats' => $stats,
+            'monthLabel' => Carbon::create($this->year, $this->month, 1)->format('F Y'),
         ]);
     }
 }
