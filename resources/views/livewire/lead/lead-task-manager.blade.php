@@ -83,8 +83,46 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Assign To <span class="text-red-500">*</span>
                     </label>
+                    <div @class([
+                        'rounded-lg border bg-white px-3 py-2',
+                        'border-red-400' => $errors->has('assignedTo'),
+                        'border-gray-300' => ! $errors->has('assignedTo'),
+                        'opacity-60' => ! $teamId,
+                    ])>
+                        @if(!$teamId)
+                            <p class="py-4 text-center text-sm text-gray-400">Select a team first.</p>
+                        @elseif($membersForForm->isEmpty())
+                            <p class="py-4 text-center text-sm text-gray-400">No members in this team yet.</p>
+                        @else
+                            <div class="max-h-40 space-y-1 overflow-y-auto pr-1">
+                                @foreach($membersForForm as $member)
+                                    <label class="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm transition hover:bg-indigo-50">
+                                        <input type="checkbox"
+                                               wire:model="assignedTo"
+                                               value="{{ $member->id }}"
+                                               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                        <span class="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+                                            {{ strtoupper(substr($member->name, 0, 1)) }}
+                                        </span>
+                                        <span class="font-medium text-gray-700">{{ $member->name }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                    @if(!empty($assignedTo))
+                        <div class="mt-2 flex flex-wrap gap-1.5">
+                            @foreach($membersForForm->whereIn('id', array_map('intval', $assignedTo)) as $member)
+                                <span class="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+                                    {{ $member->name }}
+                                </span>
+                            @endforeach
+                        </div>
+                    @endif
                     <select wire:model="assignedTo"
-                            class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 @error('assignedTo') border-red-400 @enderror"
+                            multiple
+                            size="5"
+                            class="hidden"
                             @disabled(!$teamId)>
                         <option value="">— Select member —</option>
                         @foreach($membersForForm as $member)
@@ -92,6 +130,7 @@
                         @endforeach
                     </select>
                     @error('assignedTo') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                    @error('assignedTo.*') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                 </div>
 
                 {{-- Priority --}}
@@ -152,7 +191,7 @@
     @endif
 
     {{-- ── Task list ─────────────────────────────────────────────────────────── --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" @if(!$showForm) wire:poll.visible.10s @endif>
         @if($tasks->isEmpty())
             <div class="py-16 text-center text-gray-400">
                 <svg class="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,9 +246,11 @@
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-2">
                                     <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                                        {{ strtoupper(substr($task->assignee->name, 0, 1)) }}
+                                        {{ strtoupper(substr($task->assignees->first()?->name ?? $task->assignee?->name ?? '?', 0, 1)) }}
                                     </div>
-                                    <span class="text-gray-700">{{ $task->assignee->name }}</span>
+                                    <span class="text-gray-700">
+                                        {{ $task->assignees->isNotEmpty() ? $task->assignees->pluck('name')->join(', ') : $task->assignee?->name }}
+                                    </span>
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">

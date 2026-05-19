@@ -5,7 +5,6 @@ namespace App\Livewire\Member;
 use App\Models\JournalLog;
 use App\Models\Task;
 use Carbon\Carbon;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -60,18 +59,20 @@ class MemberJournal extends Component
 
         $validated = $this->validate([
             'logDate' => ['required', 'date'],
-            'selectedTaskId' => [
-                'nullable',
-                Rule::exists('tasks', 'id')->where('assigned_to', auth()->id()),
-            ],
+            'selectedTaskId' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
+
+        if (! blank($validated['selectedTaskId'] ?? null) && ! $this->memberTaskExists((int) $validated['selectedTaskId'])) {
+            $this->addError('selectedTaskId', 'Choose one of your assigned tasks.');
+            return;
+        }
 
         $totalMinutes = (int) ceil($seconds / 60);
 
         JournalLog::create([
             'user_id' => auth()->id(),
-            'task_id' => $validated['selectedTaskId'] !== '' ? (int) $validated['selectedTaskId'] : null,
+            'task_id' => ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null,
             'log_date' => $validated['logDate'],
             'minutes' => $totalMinutes,
             'notes' => $validated['notes'] ?: null,
@@ -88,14 +89,16 @@ class MemberJournal extends Component
 
         $validated = $this->validate([
             'logDate' => ['required', 'date'],
-            'selectedTaskId' => [
-                'nullable',
-                Rule::exists('tasks', 'id')->where('assigned_to', auth()->id()),
-            ],
+            'selectedTaskId' => ['nullable', 'integer'],
             'hours' => ['required', 'integer', 'min:0', 'max:24'],
             'minutes' => ['required', 'integer', 'min:0', 'max:59'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
+
+        if (! blank($validated['selectedTaskId'] ?? null) && ! $this->memberTaskExists((int) $validated['selectedTaskId'])) {
+            $this->addError('selectedTaskId', 'Choose one of your assigned tasks.');
+            return;
+        }
 
         $totalMinutes = ($validated['hours'] * 60) + $validated['minutes'];
 
@@ -106,7 +109,7 @@ class MemberJournal extends Component
 
         JournalLog::create([
             'user_id' => auth()->id(),
-            'task_id' => $validated['selectedTaskId'] !== '' ? (int) $validated['selectedTaskId'] : null,
+            'task_id' => ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null,
             'log_date' => $validated['logDate'],
             'minutes' => $totalMinutes,
             'notes' => $validated['notes'] ?: null,
@@ -193,6 +196,17 @@ class MemberJournal extends Component
         $this->logDate = $date->toDateString();
     }
 
+    private function memberTaskExists(int $taskId): bool
+    {
+        $userId = auth()->id();
+
+        return Task::whereKey($taskId)
+            ->where(fn ($q) => $q
+                ->where('assigned_to', $userId)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+            ->exists();
+    }
+
     public function render()
     {
         $this->normalizeLogDate();
@@ -200,7 +214,9 @@ class MemberJournal extends Component
         $userId = auth()->id();
 
         $tasks = Task::with('project')
-            ->where('assigned_to', $userId)
+            ->where(fn ($q) => $q
+                ->where('assigned_to', $userId)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
             ->where('status', 'in_progress')
             ->orderBy('title')
             ->get();

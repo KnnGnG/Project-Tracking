@@ -98,7 +98,9 @@ class MemberDashboard extends Component
     private function ownedTask(int $id): ?Task
     {
         return Task::where('id', $id)
-            ->where('assigned_to', auth()->id())
+            ->where(fn ($q) => $q
+                ->where('assigned_to', auth()->id())
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey(auth()->id())))
             ->first();
     }
 
@@ -113,13 +115,17 @@ class MemberDashboard extends Component
         $today  = now()->toDateString();
 
         // ── Gather projects this member has tasks in (for filter dropdown) ──────
-        $projects = Project::whereHas('tasks', fn ($q) => $q->where('assigned_to', $userId))
+        $projects = Project::whereHas('tasks', fn ($q) => $q
+            ->where('assigned_to', $userId)
+            ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
             ->orderBy('name')
             ->get(['id', 'name']);
 
         // ── Base query ───────────────────────────────────────────────────────────
         $base = Task::with(['project', 'team'])
-            ->where('assigned_to', $userId);
+            ->where(fn ($q) => $q
+                ->where('assigned_to', $userId)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)));
 
         if ($this->filterProject > 0) {
             $base->where('project_id', $this->filterProject);

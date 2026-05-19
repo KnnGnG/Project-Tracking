@@ -1,4 +1,4 @@
-<div>
+<div wire:poll.visible.15s>
     <div class="mb-6">
         <h1 class="text-lg font-semibold text-gray-900">Task oversight</h1>
         <p class="text-sm text-gray-500 mt-1">

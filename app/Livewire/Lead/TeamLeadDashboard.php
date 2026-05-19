@@ -231,6 +231,7 @@ class TeamLeadDashboard extends Component
                 'project.events',
                 'members',
                 'tasks.assignee',
+                'tasks.assignees',
             ])->find($this->selectedTeamId);
 
             if ($selectedTeam) {
@@ -251,9 +252,23 @@ class TeamLeadDashboard extends Component
                 ];
 
                 $tasksByPriority = $tasks->groupBy('priority');
-                $memberTasksMap  = $tasks
+                $memberTasksMap = collect();
+                $tasks
                     ->sortBy(fn ($task) => optional($task->due_date)->timestamp ?? PHP_INT_MAX)
-                    ->groupBy('assigned_to');
+                    ->each(function ($task) use ($memberTasksMap) {
+                        $assigneeIds = $task->assignees->pluck('id');
+
+                        if ($assigneeIds->isEmpty() && $task->assigned_to) {
+                            $assigneeIds = collect([$task->assigned_to]);
+                        }
+
+                        foreach ($assigneeIds as $assigneeId) {
+                            $memberTasksMap->put(
+                                $assigneeId,
+                                $memberTasksMap->get($assigneeId, collect())->push($task)
+                            );
+                        }
+                    });
                 $memberStartActivities = $tasks
                     ->filter(fn ($task) => !is_null($task->start_date))
                     ->sortByDesc('start_date')

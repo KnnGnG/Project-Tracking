@@ -120,7 +120,7 @@
     @endif
 
     {{-- ── User table ───────────────────────────────────────────────────────── --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" @if(!$showForm) wire:poll.visible.15s @endif>
         @if($users->isEmpty())
             <div class="py-16 text-center text-gray-400">
                 <p class="text-sm">No users found.</p>

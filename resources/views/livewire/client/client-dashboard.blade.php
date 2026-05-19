@@ -1,4 +1,4 @@
-<div class="space-y-6">
+<div class="space-y-6" wire:poll.visible.15s>
 
     {{-- ── Project tabs ──────────────────────────────────────────────────── --}}
     @if($projects->isNotEmpty())
