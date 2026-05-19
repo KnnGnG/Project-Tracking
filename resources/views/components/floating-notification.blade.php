@@ -28,6 +28,9 @@
          x-transition:leave="transition ease-in duration-300"
          x-transition:leave-start="opacity-100 translate-y-0 sm:translate-x-0"
          x-transition:leave-end="opacity-0 translate-y-2 sm:translate-y-0 sm:translate-x-4"
+         role="status"
+         aria-live="polite"
+         aria-atomic="true"
          class="pointer-events-auto flex items-center justify-between gap-4 rounded-lg border px-4 py-3 text-sm shadow-lg {{ $styles }}">
         <span class="leading-5">{{ $message }}</span>
 
