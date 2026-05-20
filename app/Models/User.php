@@ -139,4 +139,19 @@ class User extends Authenticatable
     {
         return $this->hasMany(JournalLog::class);
     }
+
+    public function inAppNotifications(): HasMany
+    {
+        return $this->hasMany(InAppNotification::class);
+    }
+
+    public function taskComments(): HasMany
+    {
+        return $this->hasMany(TaskComment::class);
+    }
+
+    public function taskMemberProgress(): HasMany
+    {
+        return $this->hasMany(TaskMemberProgress::class);
+    }
 }

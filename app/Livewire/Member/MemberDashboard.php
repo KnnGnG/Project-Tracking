@@ -4,6 +4,9 @@ namespace App\Livewire\Member;
 
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\InAppNotification;
+use App\Models\TaskActivity;
+use App\Models\TaskMemberProgress;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -75,14 +78,26 @@ class MemberDashboard extends Component
             return;
         }
 
-        $updates = ['status' => $newStatus];
+        $oldStatus = $task->status;
+        $updates = [];
 
         // Capture the real start moment: first time a member moves task to in progress.
         if ($newStatus === 'in_progress' && ! $task->start_date) {
             $updates['start_date'] = now()->toDateString();
         }
 
-        $task->update($updates);
+        $this->updateMemberProgress($task, $newStatus);
+        // Overall task status is derived from every assignee's progress below.
+        if ($updates !== []) {
+            $task->update($updates);
+        }
+        $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
+        $task = $task->fresh(['team']);
+        $this->recordStatusActivity($task, $oldStatus, $task->status);
+
+        if ($task->status === 'done' && $oldStatus !== 'done') {
+            $this->notifyTaskCompleted($task);
+        }
 
         $this->flash = match ($newStatus) {
             'in_progress' => 'Task marked as In Progress.',
@@ -110,6 +125,75 @@ class MemberDashboard extends Component
         $this->flash = null;
     }
 
+    private function notifyTaskCompleted(Task $task): void
+    {
+        collect([$task->team?->lead_id, $task->created_by])
+            ->filter()
+            ->unique()
+            ->reject(fn ($userId) => $userId === auth()->id())
+            ->each(function ($userId) use ($task) {
+                InAppNotification::create([
+                    'user_id' => $userId,
+                    'type' => 'task_completed',
+                    'title' => 'Task completed',
+                    'body' => $task->title . ' was marked done.',
+                    'url' => route('dashboard'),
+                    'data' => ['task_id' => $task->id],
+                ]);
+            });
+    }
+
+    private function updateMemberProgress(Task $task, string $status): void
+    {
+        $progress = TaskMemberProgress::updateOrCreate(
+            ['task_id' => $task->id, 'user_id' => auth()->id()],
+            [
+                'status' => $status,
+                'progress' => match ($status) {
+                    'done' => 100,
+                    'in_progress' => 50,
+                    default => 0,
+                },
+            ]
+        );
+
+        $progress->completed_at = $status === 'done' ? now() : null;
+        $progress->save();
+    }
+
+    private function syncOverallTaskStatus(Task $task): void
+    {
+        $progress = $task->memberProgress;
+
+        if ($progress->isEmpty()) {
+            return;
+        }
+
+        $status = match (true) {
+            $progress->every(fn ($item) => $item->status === 'done') => 'done',
+            $progress->every(fn ($item) => $item->status === 'pending') => 'pending',
+            $progress->contains(fn ($item) => $item->status === 'in_progress' || $item->status === 'done') => 'in_progress',
+            default => 'pending',
+        };
+
+        $task->update(['status' => $status]);
+    }
+
+    private function recordStatusActivity(Task $task, string $oldStatus, string $newStatus): void
+    {
+        if ($oldStatus === $newStatus) {
+            return;
+        }
+
+        TaskActivity::create([
+            'task_id' => $task->id,
+            'user_id' => auth()->id(),
+            'type' => 'status_changed',
+            'description' => auth()->user()->name . ' changed status from ' . str_replace('_', ' ', $oldStatus) . ' to ' . str_replace('_', ' ', $newStatus) . '.',
+            'data' => ['old_status' => $oldStatus, 'new_status' => $newStatus],
+        ]);
+    }
+
     public function render()
     {
         $userId = auth()->id();
@@ -126,7 +210,7 @@ class MemberDashboard extends Component
             ->get(['id', 'name']);
 
         // ── Base query ───────────────────────────────────────────────────────────
-        $base = Task::with(['project', 'team'])
+        $base = Task::with(['project', 'team', 'memberProgress.user'])
             ->where(fn ($q) => $q
                 ->where('assigned_to', $userId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)));

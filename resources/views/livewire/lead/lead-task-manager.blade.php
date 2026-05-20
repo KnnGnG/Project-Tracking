@@ -95,6 +95,18 @@
                         @elseif($membersForForm->isEmpty())
                             <p class="py-4 text-center text-sm text-gray-400">No members in this team yet.</p>
                         @else
+                            <div class="mb-2 flex flex-wrap items-center gap-2">
+                                <input type="text"
+                                       wire:model.live.debounce.300ms="memberSearch"
+                                       placeholder="Search members..."
+                                       class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <button type="button" wire:click="selectAllMembers" class="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">
+                                    Select all
+                                </button>
+                                <button type="button" wire:click="clearMembers" class="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">
+                                    Clear
+                                </button>
+                            </div>
                             <div class="max-h-40 space-y-1 overflow-y-auto pr-1">
                                 @foreach($membersForForm as $member)
                                     <label class="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm transition hover:bg-indigo-50">
@@ -286,12 +298,23 @@
                                         class="text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-3 transition">
                                     Edit
                                 </button>
+                                <button wire:click="toggleTaskDetails({{ $task->id }})"
+                                        class="text-gray-600 hover:text-gray-800 text-xs font-medium mr-3 transition">
+                                    {{ $expandedTaskId === $task->id ? 'Hide' : 'Discuss' }}
+                                </button>
                                 <button wire:click="confirmDelete({{ $task->id }})"
                                         class="text-red-500 hover:text-red-700 text-xs font-medium transition">
                                     Delete
                                 </button>
                             </td>
                         </tr>
+                        @if($expandedTaskId === $task->id)
+                            <tr>
+                                <td colspan="6" class="bg-gray-50 px-6 py-4">
+                                    <livewire:task-discussion :task-id="$task->id" :key="'lead-task-discussion-'.$task->id" />
+                                </td>
+                            </tr>
+                        @endif
                     @endforeach
                 </tbody>
             </table>

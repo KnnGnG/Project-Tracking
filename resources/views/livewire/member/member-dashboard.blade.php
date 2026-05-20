@@ -401,6 +401,27 @@
 
                                             </div>
                                         </div>
+
+                                        <div>
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Member Progress</h4>
+                                            <div class="space-y-2">
+                                                @forelse($task->memberProgress as $progress)
+                                                    <div class="rounded-lg border border-gray-100 px-3 py-2">
+                                                        <div class="flex items-center justify-between gap-3">
+                                                            <span class="text-sm font-medium text-gray-700">{{ $progress->user->name }}</span>
+                                                            <span class="text-xs font-semibold text-gray-500">{{ ucfirst(str_replace('_', ' ', $progress->status)) }}</span>
+                                                        </div>
+                                                        <div class="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
+                                                            <div class="h-2 rounded-full bg-indigo-500" style="width: {{ $progress->progress }}%"></div>
+                                                        </div>
+                                                    </div>
+                                                @empty
+                                                    <p class="text-sm text-gray-400">No member progress yet.</p>
+                                                @endforelse
+                                            </div>
+                                        </div>
+
+                                        <livewire:task-discussion :task-id="$task->id" :key="'member-task-discussion-'.$task->id" />
                                     </div>
 
                                     {{-- Task meta sidebar --}}
