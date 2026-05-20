@@ -42,6 +42,8 @@ class LeadTaskManager extends Component
 
     public string $priority = 'medium';
 
+    public string $memberSearch = '';
+
     public bool $confirmingDelete = false;
 
     public ?int $deleteId = null;
@@ -229,6 +231,29 @@ class LeadTaskManager extends Component
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    public function toggleTaskDetails(int $id): void
+    {
+        $this->ownedTask($id);
+        $this->expandedTaskId = $this->expandedTaskId === $id ? null : $id;
+    }
+
+    public function selectAllMembers(): void
+    {
+        if (! $this->teamId) {
+            return;
+        }
+
+        $this->assignedTo = $this->membersForSelectedTeam()
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+    }
+
+    public function clearMembers(): void
+    {
+        $this->assignedTo = [];
+    }
+
     /** Returns a task only if it belongs to one of this lead's teams. */
     private function ownedTask(int $id): Task
     {
@@ -251,6 +276,7 @@ class LeadTaskManager extends Component
         $this->description = '';
         $this->teamId = null;
         $this->assignedTo = [];
+        $this->memberSearch = '';
         $this->startDate = '';
         $this->dueDate = '';
         $this->status = 'pending';

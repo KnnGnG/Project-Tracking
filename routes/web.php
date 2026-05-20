@@ -7,6 +7,7 @@ use App\Livewire\Admin\TaskAssigner;
 use App\Livewire\Admin\TeamManager;
 use App\Livewire\Admin\UserManager;
 use App\Livewire\Client\ClientDashboard;
+use App\Livewire\Lead\LeadJournalReview;
 use App\Livewire\Lead\LeadTaskManager;
 use App\Livewire\Lead\TeamLeadAnalytics;
 use App\Livewire\Lead\TeamLeadDashboard;
@@ -79,6 +80,7 @@ Route::middleware(['auth', 'throttle:300,1'])->group(function () {
             Route::get('/dashboard', TeamLeadDashboard::class)->name('dashboard');
             Route::get('/analytics', TeamLeadAnalytics::class)->name('analytics');
             Route::get('/tasks', LeadTaskManager::class)->name('tasks');
+            Route::get('/journals', LeadJournalReview::class)->name('journals');
         });
 
     /*
