@@ -3,7 +3,10 @@
 namespace App\Livewire\Lead;
 
 use App\Models\Task;
+use App\Models\TaskActivity;
+use App\Models\TaskMemberProgress;
 use App\Models\Team;
+use App\Models\InAppNotification;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -28,9 +31,11 @@ class LeadTaskManager extends Component
     public string $dueDate        = '';
     public string $status         = 'pending';
     public string $priority       = 'medium';
+    public string $memberSearch   = '';
 
     public bool $confirmingDelete = false;
     public ?int $deleteId = null;
+    public ?int $expandedTaskId = null;
 
     public function mount(): void
     {
@@ -85,6 +90,7 @@ class LeadTaskManager extends Component
     public function updatedTeamId(): void
     {
         $this->assignedTo = [];
+        $this->memberSearch = '';
     }
 
     // ── Save / Delete ─────────────────────────────────────────────────────────
@@ -129,17 +135,35 @@ class LeadTaskManager extends Component
         ];
 
         if ($this->editingId) {
+            $existingTask = $this->ownedTask($this->editingId);
+            $oldDueDate = $existingTask->due_date?->toDateString();
+            $previousAssigneeIds = $existingTask
+                ->assignees()
+                ->pluck('users.id')
+                ->push($existingTask->assigned_to)
+                ->filter()
+                ->unique();
+
             DB::transaction(function () use ($payload, $assigneeIds) {
                 $task = $this->ownedTask($this->editingId);
                 $task->update($payload);
                 $task->assignees()->sync($assigneeIds->all());
+                $this->syncMemberProgressRows($task, $assigneeIds);
             });
 
+            $task = $this->ownedTask($this->editingId);
+            if ($oldDueDate !== $payload['due_date']) {
+                $this->recordActivity($task, 'due_date_changed', auth()->user()->name . ' changed due date from ' . ($oldDueDate ?: 'none') . ' to ' . $payload['due_date'] . '.');
+            }
+            $this->notifyAssignedMembers($task, $assigneeIds->diff($previousAssigneeIds));
             session()->flash('success', 'Task updated.');
         } else {
             DB::transaction(function () use ($payload, $assigneeIds) {
                 $task = Task::create(array_merge($payload, ['created_by' => auth()->id()]));
                 $task->assignees()->sync($assigneeIds->all());
+                $this->syncMemberProgressRows($task, $assigneeIds);
+                $this->recordActivity($task, 'created', auth()->user()->name . ' assigned this task.');
+                $this->notifyAssignedMembers($task, $assigneeIds);
             });
 
             session()->flash('success', 'Task created and assigned.');
@@ -179,7 +203,33 @@ class LeadTaskManager extends Component
 
     public function updateStatus(int $id, string $status): void
     {
-        $this->ownedTask($id)->update(['status' => $status]);
+        $task = $this->ownedTask($id);
+        $oldStatus = $task->status;
+        $task->update(['status' => $status]);
+        $this->recordActivity($task, 'status_changed', auth()->user()->name . ' changed status from ' . str_replace('_', ' ', $oldStatus) . ' to ' . str_replace('_', ' ', $status) . '.');
+    }
+
+    public function toggleTaskDetails(int $id): void
+    {
+        $this->ownedTask($id);
+        $this->expandedTaskId = $this->expandedTaskId === $id ? null : $id;
+    }
+
+    public function selectAllMembers(): void
+    {
+        if (! $this->teamId) {
+            return;
+        }
+
+        $this->assignedTo = $this->membersForSelectedTeam()
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+    }
+
+    public function clearMembers(): void
+    {
+        $this->assignedTo = [];
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -205,11 +255,53 @@ class LeadTaskManager extends Component
         $this->description = '';
         $this->teamId      = null;
         $this->assignedTo  = [];
+        $this->memberSearch = '';
         $this->startDate   = '';
         $this->dueDate     = '';
         $this->status      = 'pending';
         $this->priority    = 'medium';
         $this->resetValidation();
+    }
+
+    private function notifyAssignedMembers(Task $task, $assigneeIds): void
+    {
+        collect($assigneeIds)
+            ->filter()
+            ->unique()
+            ->each(function ($userId) use ($task) {
+                InAppNotification::create([
+                    'user_id' => $userId,
+                    'type' => 'task_assigned',
+                    'title' => 'New task assigned',
+                    'body' => $task->title,
+                    'url' => route('member.dashboard'),
+                    'data' => ['task_id' => $task->id],
+                ]);
+            });
+    }
+
+    private function syncMemberProgressRows(Task $task, $assigneeIds): void
+    {
+        TaskMemberProgress::where('task_id', $task->id)
+            ->whereNotIn('user_id', $assigneeIds)
+            ->delete();
+
+        foreach ($assigneeIds as $userId) {
+            TaskMemberProgress::firstOrCreate(
+                ['task_id' => $task->id, 'user_id' => $userId],
+                ['status' => 'pending', 'progress' => 0]
+            );
+        }
+    }
+
+    private function recordActivity(Task $task, string $type, string $description): void
+    {
+        TaskActivity::create([
+            'task_id' => $task->id,
+            'user_id' => auth()->id(),
+            'type' => $type,
+            'description' => $description,
+        ]);
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -228,11 +320,22 @@ class LeadTaskManager extends Component
             ->get();
 
         // Members for the team selected in the form
-        $membersForForm = $this->teamId
-            ? $this->ownedTeam($this->teamId)->members()->orderBy('name')->get()
-            : collect();
+        $membersForForm = $this->membersForSelectedTeam();
 
         return view('livewire.lead.lead-task-manager',
             compact('leadTeams', 'tasks', 'membersForForm'));
+    }
+
+    private function membersForSelectedTeam()
+    {
+        if (! $this->teamId) {
+            return collect();
+        }
+
+        return $this->ownedTeam($this->teamId)
+            ->members()
+            ->when($this->memberSearch, fn ($q) => $q->where('name', 'like', "%{$this->memberSearch}%"))
+            ->orderBy('name')
+            ->get();
     }
 }

@@ -64,6 +64,21 @@ class Task extends Model
         return $this->hasMany(JournalLog::class);
     }
 
+    public function comments(): HasMany
+    {
+        return $this->hasMany(TaskComment::class);
+    }
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(TaskActivity::class);
+    }
+
+    public function memberProgress(): HasMany
+    {
+        return $this->hasMany(TaskMemberProgress::class);
+    }
+
     // --- Scopes ---
 
     public function scopePending(Builder $query): Builder

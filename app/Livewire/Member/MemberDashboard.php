@@ -4,6 +4,9 @@ namespace App\Livewire\Member;
 
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\InAppNotification;
+use App\Models\TaskActivity;
+use App\Models\TaskMemberProgress;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -75,6 +78,7 @@ class MemberDashboard extends Component
             return;
         }
 
+        $oldStatus = $task->status;
         $updates = ['status' => $newStatus];
 
         // Capture the real start moment: first time a member moves task to in progress.
@@ -82,7 +86,14 @@ class MemberDashboard extends Component
             $updates['start_date'] = now()->toDateString();
         }
 
+        $this->updateMemberProgress($task, $newStatus);
         $task->update($updates);
+        $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
+        $this->recordStatusActivity($task, $oldStatus, $newStatus);
+
+        if ($newStatus === 'done' && $oldStatus !== 'done') {
+            $this->notifyTaskCompleted($task->fresh(['team']));
+        }
 
         $this->flash = match ($newStatus) {
             'in_progress' => 'Task marked as In Progress.',
@@ -109,6 +120,72 @@ class MemberDashboard extends Component
         $this->flash = null;
     }
 
+    private function notifyTaskCompleted(Task $task): void
+    {
+        collect([$task->team?->lead_id, $task->created_by])
+            ->filter()
+            ->unique()
+            ->reject(fn ($userId) => $userId === auth()->id())
+            ->each(function ($userId) use ($task) {
+                InAppNotification::create([
+                    'user_id' => $userId,
+                    'type' => 'task_completed',
+                    'title' => 'Task completed',
+                    'body' => $task->title . ' was marked done.',
+                    'url' => route('dashboard'),
+                    'data' => ['task_id' => $task->id],
+                ]);
+            });
+    }
+
+    private function updateMemberProgress(Task $task, string $status): void
+    {
+        TaskMemberProgress::updateOrCreate(
+            ['task_id' => $task->id, 'user_id' => auth()->id()],
+            [
+                'status' => $status,
+                'progress' => match ($status) {
+                    'done' => 100,
+                    'in_progress' => 50,
+                    default => 0,
+                },
+                'completed_at' => $status === 'done' ? now() : null,
+            ]
+        );
+    }
+
+    private function syncOverallTaskStatus(Task $task): void
+    {
+        $progress = $task->memberProgress;
+
+        if ($progress->isEmpty()) {
+            return;
+        }
+
+        $status = match (true) {
+            $progress->every(fn ($item) => $item->status === 'done') => 'done',
+            $progress->contains(fn ($item) => $item->status === 'in_progress') => 'in_progress',
+            default => 'pending',
+        };
+
+        $task->update(['status' => $status]);
+    }
+
+    private function recordStatusActivity(Task $task, string $oldStatus, string $newStatus): void
+    {
+        if ($oldStatus === $newStatus) {
+            return;
+        }
+
+        TaskActivity::create([
+            'task_id' => $task->id,
+            'user_id' => auth()->id(),
+            'type' => 'status_changed',
+            'description' => auth()->user()->name . ' changed status from ' . str_replace('_', ' ', $oldStatus) . ' to ' . str_replace('_', ' ', $newStatus) . '.',
+            'data' => ['old_status' => $oldStatus, 'new_status' => $newStatus],
+        ]);
+    }
+
     public function render()
     {
         $userId = auth()->id();
@@ -125,7 +202,7 @@ class MemberDashboard extends Component
             ->get(['id', 'name']);
 
         // ── Base query ───────────────────────────────────────────────────────────
-        $base = Task::with(['project', 'team'])
+        $base = Task::with(['project', 'team', 'memberProgress.user'])
             ->where(fn ($q) => $q
                 ->where('assigned_to', $userId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)));
