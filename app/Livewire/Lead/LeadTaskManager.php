@@ -17,23 +17,33 @@ use Livewire\Component;
 class LeadTaskManager extends Component
 {
     // ── Filter state ─────────────────────────────────────────────────────────
-    public ?int   $filterTeamId = null;
+    public ?int $filterTeamId = null;
+
     public string $filterStatus = '';
 
     // ── Task form state ───────────────────────────────────────────────────────
-    public bool   $showForm       = false;
-    public ?int   $editingId      = null;
-    public string $title          = '';
-    public string $description    = '';
-    public ?int   $teamId         = null;
-    public array  $assignedTo     = [];
-    public string $startDate      = '';
-    public string $dueDate        = '';
-    public string $status         = 'pending';
-    public string $priority       = 'medium';
-    public string $memberSearch   = '';
+    public bool $showForm = false;
+
+    public ?int $editingId = null;
+
+    public string $title = '';
+
+    public string $description = '';
+
+    public ?int $teamId = null;
+
+    public array $assignedTo = [];
+
+    public string $startDate = '';
+
+    public string $dueDate = '';
+
+    public string $status = 'pending';
+
+    public string $priority = 'medium';
 
     public bool $confirmingDelete = false;
+
     public ?int $deleteId = null;
     public ?int $expandedTaskId = null;
 
@@ -52,7 +62,7 @@ class LeadTaskManager extends Component
     {
         $this->resetForm();
         // Pre-fill team from current filter
-        $this->teamId   = $this->filterTeamId;
+        $this->teamId = $this->filterTeamId;
         $this->showForm = true;
     }
 
@@ -60,10 +70,10 @@ class LeadTaskManager extends Component
     {
         $task = $this->ownedTask($id);
 
-        $this->editingId   = $id;
-        $this->title       = $task->title;
+        $this->editingId = $id;
+        $this->title = $task->title;
         $this->description = $task->description ?? '';
-        $this->teamId      = $task->team_id;
+        $this->teamId = $task->team_id;
         $this->assignedTo = collect([$task->assigned_to])
             ->filter()
             ->merge($task->assignees()->orderBy('users.name')->pluck('users.id'))
@@ -71,11 +81,11 @@ class LeadTaskManager extends Component
             ->map(fn ($id) => (string) $id)
             ->values()
             ->all();
-        $this->startDate   = $task->start_date?->toDateString() ?? '';
-        $this->dueDate     = $task->due_date->toDateString();
-        $this->status      = $task->status;
-        $this->priority    = $task->priority;
-        $this->showForm    = true;
+        $this->startDate = $task->start_date?->toDateString() ?? '';
+        $this->dueDate = $task->due_date->toDateString();
+        $this->status = $task->status;
+        $this->priority = $task->priority;
+        $this->showForm = true;
     }
 
     public function cancelForm(): void
@@ -98,15 +108,15 @@ class LeadTaskManager extends Component
     public function save(): void
     {
         $data = $this->validate([
-            'title'       => 'required|string|max:255',
+            'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'teamId'      => 'required|exists:teams,id',
-            'assignedTo'  => 'required|array|min:1',
+            'teamId' => 'required|exists:teams,id',
+            'assignedTo' => 'required|array|min:1',
             'assignedTo.*' => 'integer|exists:users,id',
-            'startDate'   => 'nullable|date',
-            'dueDate'     => 'required|date',
-            'status'      => 'required|in:pending,in_progress,done',
-            'priority'    => 'required|in:low,medium,high',
+            'startDate' => 'nullable|date',
+            'dueDate' => 'required|date',
+            'status' => 'required|in:pending,in_progress,review,done',
+            'priority' => 'required|in:low,medium,high',
         ]);
 
         // Ensure the team belongs to this lead
@@ -119,19 +129,20 @@ class LeadTaskManager extends Component
 
         if ($validMemberIds->count() !== $assigneeIds->count()) {
             $this->addError('assignedTo', 'Choose members from the selected team.');
+
             return;
         }
 
         $payload = [
-            'title'       => $data['title'],
+            'title' => $data['title'],
             'description' => $data['description'],
-            'project_id'  => $team->project_id,
-            'team_id'     => $team->id,
+            'project_id' => $team->project_id,
+            'team_id' => $team->id,
             'assigned_to' => $assigneeIds->first(),
-            'start_date'  => $this->editingId ? ($data['startDate'] ?: null) : null,
-            'due_date'    => $data['dueDate'],
-            'status'      => $data['status'],
-            'priority'    => $data['priority'],
+            'start_date' => $this->editingId ? ($data['startDate'] ?: null) : null,
+            'due_date' => $data['dueDate'],
+            'status' => $data['status'],
+            'priority' => $data['priority'],
         ];
 
         if ($this->editingId) {
@@ -209,42 +220,11 @@ class LeadTaskManager extends Component
 
     public function updateStatus(int $id, string $status): void
     {
-        if (! in_array($status, ['pending', 'in_progress', 'done'], true)) {
+        if (! in_array($status, ['pending', 'in_progress', 'review', 'done'], true)) {
             return;
         }
 
-        $task = $this->ownedTask($id);
-        $oldStatus = $task->status;
-
-        DB::transaction(function () use ($task, $oldStatus, $status) {
-            $task->update(['status' => $status]);
-            $assigneeIds = $task->assignees()->pluck('users.id')->push($task->assigned_to)->filter()->unique()->values();
-            $this->syncMemberProgressRows($task, $assigneeIds, $status);
-            $this->recordActivity($task, 'status_changed', auth()->user()->name . ' changed status from ' . str_replace('_', ' ', $oldStatus) . ' to ' . str_replace('_', ' ', $status) . '.');
-        });
-    }
-
-    public function toggleTaskDetails(int $id): void
-    {
-        $this->ownedTask($id);
-        $this->expandedTaskId = $this->expandedTaskId === $id ? null : $id;
-    }
-
-    public function selectAllMembers(): void
-    {
-        if (! $this->teamId) {
-            return;
-        }
-
-        $this->assignedTo = $this->membersForSelectedTeam()
-            ->pluck('id')
-            ->map(fn ($id) => (string) $id)
-            ->all();
-    }
-
-    public function clearMembers(): void
-    {
-        $this->assignedTo = [];
+        $this->ownedTask($id)->update(['status' => $status]);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -253,7 +233,8 @@ class LeadTaskManager extends Component
     private function ownedTask(int $id): Task
     {
         $teamIds = auth()->user()->ledTeams()->pluck('id');
-        $task    = Task::whereIn('team_id', $teamIds)->findOrFail($id);
+        $task = Task::whereIn('team_id', $teamIds)->findOrFail($id);
+
         return $task;
     }
 
@@ -265,16 +246,15 @@ class LeadTaskManager extends Component
 
     private function resetForm(): void
     {
-        $this->editingId   = null;
-        $this->title       = '';
+        $this->editingId = null;
+        $this->title = '';
         $this->description = '';
-        $this->teamId      = null;
-        $this->assignedTo  = [];
-        $this->memberSearch = '';
-        $this->startDate   = '';
-        $this->dueDate     = '';
-        $this->status      = 'pending';
-        $this->priority    = 'medium';
+        $this->teamId = null;
+        $this->assignedTo = [];
+        $this->startDate = '';
+        $this->dueDate = '';
+        $this->status = 'pending';
+        $this->priority = 'medium';
         $this->resetValidation();
     }
 
@@ -346,7 +326,7 @@ class LeadTaskManager extends Component
             ->whereIn('team_id', $leadTeams->pluck('id'))
             ->when($this->filterTeamId, fn ($q) => $q->where('team_id', $this->filterTeamId))
             ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))
-            ->orderByRaw("FIELD(status, 'in_progress', 'pending', 'done')")
+            ->orderByRaw("CASE WHEN status = 'in_progress' THEN 0 WHEN status = 'review' THEN 1 WHEN status = 'pending' THEN 2 WHEN status = 'done' THEN 3 ELSE 4 END")
             ->orderBy('due_date')
             ->get();
 

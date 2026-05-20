@@ -15,14 +15,20 @@ class TeamLeadDashboard extends Component
     public ?int $selectedTeamId = null;
 
     // ── Event form state ──────────────────────────────────────────────────────
-    public bool   $showEventForm    = false;
-    public ?int   $editingEventId   = null;
-    public string $eventTitle       = '';
+    public bool $showEventForm = false;
+
+    public ?int $editingEventId = null;
+
+    public string $eventTitle = '';
+
     public string $eventDescription = '';
-    public string $eventDate        = '';
-    public string $eventType        = 'update';
+
+    public string $eventDate = '';
+
+    public string $eventType = 'update';
 
     public bool $confirmingDeleteEvent = false;
+
     public ?int $deleteEventId = null;
 
     public function mount(): void
@@ -66,14 +72,14 @@ class TeamLeadDashboard extends Component
             return;
         }
 
-        $this->modalMemberId         = $userId;
+        $this->modalMemberId = $userId;
         $this->showMemberTasksModal = true;
     }
 
     public function closeMemberTasksModal(): void
     {
         $this->showMemberTasksModal = false;
-        $this->modalMemberId        = null;
+        $this->modalMemberId = null;
     }
 
     // ── Event CRUD ────────────────────────────────────────────────────────────
@@ -81,7 +87,7 @@ class TeamLeadDashboard extends Component
     public function openCreateEvent(): void
     {
         $this->resetEventForm();
-        $this->showEventForm  = true;
+        $this->showEventForm = true;
         $this->editingEventId = null;
     }
 
@@ -90,12 +96,12 @@ class TeamLeadDashboard extends Component
         $event = ProjectEvent::findOrFail($id);
         $this->authorizeEvent($event);
 
-        $this->editingEventId   = $id;
-        $this->eventTitle       = $event->title;
+        $this->editingEventId = $id;
+        $this->eventTitle = $event->title;
         $this->eventDescription = $event->description ?? '';
-        $this->eventDate        = $event->event_date->toDateString();
-        $this->eventType        = $event->type;
-        $this->showEventForm    = true;
+        $this->eventDate = $event->event_date->toDateString();
+        $this->eventType = $event->type;
+        $this->showEventForm = true;
     }
 
     public function saveEvent(): void
@@ -104,22 +110,23 @@ class TeamLeadDashboard extends Component
 
         $project = $this->currentProject();
 
-        $payload = [
-            'title'       => $data['eventTitle'],
+        $basePayload = [
+            'title' => $data['eventTitle'],
             'description' => $data['eventDescription'],
-            'event_date'  => $data['eventDate'],
-            'type'        => $data['eventType'],
-            'project_id'  => $project->id,
-            'created_by'  => auth()->id(),
+            'event_date' => $data['eventDate'],
+            'type' => $data['eventType'],
         ];
 
         if ($this->editingEventId) {
             $event = ProjectEvent::findOrFail($this->editingEventId);
             $this->authorizeEvent($event);
-            $event->update($payload);
+            $event->update($basePayload);
             session()->flash('event_success', 'Event updated.');
         } else {
-            ProjectEvent::create($payload);
+            ProjectEvent::create($basePayload + [
+                'project_id' => $project->id,
+                'created_by' => auth()->id(),
+            ]);
             session()->flash('event_success', 'Event added to timeline.');
         }
 
@@ -174,20 +181,20 @@ class TeamLeadDashboard extends Component
     private function validateEvent(): array
     {
         return $this->validate([
-            'eventTitle'       => 'required|string|max:255',
+            'eventTitle' => 'required|string|max:255',
             'eventDescription' => 'nullable|string',
-            'eventDate'        => 'required|date',
-            'eventType'        => 'required|in:milestone,update,deadline',
+            'eventDate' => 'required|date',
+            'eventType' => 'required|in:milestone,update,deadline',
         ]);
     }
 
     private function resetEventForm(): void
     {
-        $this->eventTitle       = '';
+        $this->eventTitle = '';
         $this->eventDescription = '';
-        $this->eventDate        = '';
-        $this->eventType        = 'update';
-        $this->editingEventId   = null;
+        $this->eventDate = '';
+        $this->eventType = 'update';
+        $this->editingEventId = null;
         $this->resetValidation();
     }
 
@@ -216,15 +223,15 @@ class TeamLeadDashboard extends Component
             ->with('project')
             ->get();
 
-        $selectedTeam    = null;
-        $project         = null;
-        $stats           = null;
+        $selectedTeam = null;
+        $project = null;
+        $stats = null;
         $tasksByPriority = collect();
-        $memberTasksMap  = collect();
+        $memberTasksMap = collect();
         $memberStartActivities = collect();
-        $events          = collect();
-        $daysRemaining   = null;
-        $progressPct     = 0;
+        $events = collect();
+        $daysRemaining = null;
+        $progressPct = 0;
 
         if ($this->selectedTeamId) {
             $selectedTeam = auth()->user()->ledTeams()->with([
@@ -236,19 +243,20 @@ class TeamLeadDashboard extends Component
 
             if ($selectedTeam) {
                 $project = $selectedTeam->project;
-                $tasks   = $selectedTeam->tasks;
+                $tasks = $selectedTeam->tasks;
 
-                $total       = $tasks->count();
-                $done        = $tasks->where('status', 'done')->count();
+                $total = $tasks->count();
+                $done = $tasks->where('status', 'done')->count();
                 $progressPct = $total > 0 ? (int) round(($done / $total) * 100) : 0;
 
                 $stats = [
-                    'total'      => $total,
-                    'done'       => $done,
+                    'total' => $total,
+                    'done' => $done,
                     'inProgress' => $tasks->where('status', 'in_progress')->count(),
-                    'pending'    => $tasks->where('status', 'pending')->count(),
-                    'overdue'    => $tasks->filter(fn ($t) => $t->isExceededDeadline())->count(),
-                    'members'    => $selectedTeam->members->count(),
+                    'review' => $tasks->where('status', 'review')->count(),
+                    'pending' => $tasks->where('status', 'pending')->count(),
+                    'overdue' => $tasks->filter(fn ($t) => $t->isExceededDeadline())->count(),
+                    'members' => $selectedTeam->members->count(),
                 ];
 
                 $tasksByPriority = $tasks->groupBy('priority');
@@ -270,7 +278,7 @@ class TeamLeadDashboard extends Component
                         }
                     });
                 $memberStartActivities = $tasks
-                    ->filter(fn ($task) => !is_null($task->start_date))
+                    ->filter(fn ($task) => ! is_null($task->start_date))
                     ->sortByDesc('start_date')
                     ->values();
 
@@ -278,10 +286,11 @@ class TeamLeadDashboard extends Component
                     ->orderBy('event_date')
                     ->get()
                     ->map(function ($event) {
-                        $event->is_past   = $event->event_date->isPast();
-                        $event->is_today  = $event->event_date->isToday();
+                        $event->is_past = $event->event_date->isPast();
+                        $event->is_today = $event->event_date->isToday();
                         $event->days_diff = (int) now()->startOfDay()
                             ->diffInDays($event->event_date, false);
+
                         return $event;
                     });
 
@@ -290,11 +299,11 @@ class TeamLeadDashboard extends Component
             }
         }
 
-        $modalMember      = null;
+        $modalMember = null;
         $modalMemberTasks = collect();
         if ($this->showMemberTasksModal && $this->modalMemberId && $selectedTeam
             && $selectedTeam->members->contains('id', $this->modalMemberId)) {
-            $modalMember      = $selectedTeam->members->firstWhere('id', $this->modalMemberId);
+            $modalMember = $selectedTeam->members->firstWhere('id', $this->modalMemberId);
             $modalMemberTasks = $memberTasksMap->get($this->modalMemberId, collect());
         }
 

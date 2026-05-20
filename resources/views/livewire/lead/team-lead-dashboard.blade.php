@@ -84,7 +84,7 @@
 
             {{-- Stat chips --}}
             @if($stats)
-                <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                <div class="grid grid-cols-3 sm:grid-cols-7 gap-3">
                     <div class="bg-gray-50 rounded-xl px-3 py-3 text-center">
                         <p class="text-xl font-bold text-gray-800">{{ $stats['total'] }}</p>
                         <p class="text-xs text-gray-400 mt-0.5">Total</p>
@@ -96,6 +96,10 @@
                     <div class="bg-blue-50 rounded-xl px-3 py-3 text-center">
                         <p class="text-xl font-bold text-blue-700">{{ $stats['inProgress'] }}</p>
                         <p class="text-xs text-blue-500 mt-0.5">In Progress</p>
+                    </div>
+                    <div class="bg-amber-50 rounded-xl px-3 py-3 text-center">
+                        <p class="text-xl font-bold text-amber-800">{{ $stats['review'] }}</p>
+                        <p class="text-xs text-amber-600 mt-0.5">Review</p>
                     </div>
                     <div class="bg-green-50 rounded-xl px-3 py-3 text-center">
                         <p class="text-xl font-bold text-green-700">{{ $stats['done'] }}</p>
@@ -139,15 +143,21 @@
                                  style="width: {{ round(($stats['inProgress'] / $stats['total']) * 100) }}%"
                                  title="In Progress: {{ $stats['inProgress'] }}"></div>
                         @endif
+                        @if(($stats['review'] ?? 0) > 0)
+                            <div class="bg-amber-400 transition-all duration-700"
+                                 style="width: {{ round((($stats['review'] ?? 0) / $stats['total']) * 100) }}%"
+                                 title="Review: {{ $stats['review'] ?? 0 }}"></div>
+                        @endif
                         @if($stats['pending'] > 0)
                             <div class="bg-gray-200 transition-all duration-700"
                                  style="width: {{ round(($stats['pending'] / $stats['total']) * 100) }}%"
                                  title="Pending: {{ $stats['pending'] }}"></div>
                         @endif
                     </div>
-                    <div class="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                    <div class="flex flex-wrap items-center gap-4 mt-3 text-xs text-gray-500">
                         <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>Done</span>
                         <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span>In Progress</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>Review</span>
                         <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-gray-200 border border-gray-300"></span>Pending</span>
                     </div>
                 @else
@@ -486,6 +496,7 @@
                                                 $statusLabel = match($task->status) {
                                                     'pending'     => 'Pending',
                                                     'in_progress' => 'In Progress',
+                                                    'review'      => 'Review',
                                                     'done'        => 'Done',
                                                     default       => ucfirst($task->status),
                                                 };
@@ -493,6 +504,7 @@
                                                 $statusClass = match($task->status) {
                                                     'pending'     => 'bg-gray-100 text-gray-600',
                                                     'in_progress' => 'bg-blue-100 text-blue-700',
+                                                    'review'      => 'bg-amber-100 text-amber-800',
                                                     'done'        => 'bg-green-100 text-green-700',
                                                     default       => 'bg-gray-100 text-gray-500',
                                                 };
@@ -591,12 +603,14 @@
                                     $statusLabel = match($task->status) {
                                         'pending'     => 'Pending',
                                         'in_progress' => 'In progress',
+                                        'review'      => 'Review',
                                         'done'        => 'Done',
                                         default       => ucfirst($task->status),
                                     };
                                     $statusClass = match($task->status) {
                                         'pending'     => 'bg-gray-100 text-gray-600',
                                         'in_progress' => 'bg-blue-100 text-blue-700',
+                                        'review'      => 'bg-amber-100 text-amber-800',
                                         'done'        => 'bg-green-100 text-green-700',
                                         default       => 'bg-gray-100 text-gray-500',
                                     };

@@ -27,7 +27,7 @@ class Task extends Model
     {
         return [
             'start_date' => 'date',
-            'due_date'   => 'date',
+            'due_date' => 'date',
         ];
     }
 
@@ -91,6 +91,11 @@ class Task extends Model
         return $query->where('status', 'in_progress');
     }
 
+    public function scopeReview(Builder $query): Builder
+    {
+        return $query->where('status', 'review');
+    }
+
     public function scopeDone(Builder $query): Builder
     {
         return $query->where('status', 'done');
@@ -98,7 +103,7 @@ class Task extends Model
 
     public function scopeExceededDeadline(Builder $query): Builder
     {
-        return $query->whereIn('status', ['pending', 'in_progress'])
+        return $query->whereIn('status', ['pending', 'in_progress', 'review'])
             ->where('due_date', '<', now()->toDateString());
     }
 
@@ -106,7 +111,7 @@ class Task extends Model
 
     public function isExceededDeadline(): bool
     {
-        return in_array($this->status, ['pending', 'in_progress'])
+        return in_array($this->status, ['pending', 'in_progress', 'review'], true)
             && $this->due_date->isPast();
     }
 }
