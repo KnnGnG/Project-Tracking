@@ -286,6 +286,10 @@
             </div>
         </div>
 
+        {{-- Legacy event timeline UI is intentionally parked while the graph-based Project Timeline is active.
+             It still references $events, $memberStartActivities, and event CRUD methods such as
+             openCreateEvent/openEditEvent; restore this block only if the lead dashboard needs the
+             editable event-list timeline instead of the current graph. --}}
         @if(false)
         {{-- Timeline (takes 2/3) --}}
         <div class="xl:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
