@@ -26,6 +26,8 @@ class ProjectManager extends Component
     public bool $confirmingDelete = false;
     public ?int $deleteId = null;
 
+    public ?int $progressProjectId = null;
+
     protected function rules(): array
     {
         return [
@@ -73,10 +75,11 @@ class ProjectManager extends Component
         ];
 
         if ($this->editingId) {
-            Project::findOrFail($this->editingId)->update($payload);
+            $project = Project::findOrFail($this->editingId);
+            $project->update($payload);
             session()->flash('success', 'Project updated successfully.');
         } else {
-            Project::create(array_merge($payload, ['created_by' => auth()->id()]));
+            $project = Project::create(array_merge($payload, ['created_by' => auth()->id()]));
             session()->flash('success', 'Project created successfully.');
         }
 
@@ -117,6 +120,11 @@ class ProjectManager extends Component
         $this->showForm = false;
     }
 
+    public function toggleProgressDetails(int $projectId): void
+    {
+        $this->progressProjectId = $this->progressProjectId === $projectId ? null : $projectId;
+    }
+
     private function resetForm(): void
     {
         $this->name        = '';
@@ -131,7 +139,13 @@ class ProjectManager extends Component
 
     public function render()
     {
-        $projects = Project::with(['client', 'teams', 'tasks'])
+        $projects = Project::with([
+            'client',
+            'teams',
+            'tasks.assignee',
+            'tasks.assignees',
+            'tasks.team',
+        ])
             ->when($this->search, fn ($q) => $q->where('name', 'like', "%{$this->search}%"))
             ->latest()
             ->get();

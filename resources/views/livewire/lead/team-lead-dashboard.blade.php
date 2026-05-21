@@ -229,7 +229,8 @@
                         No project, task, or member dates in this month.
                     </div>
                 @else
-                    <div class="h-full w-full">
+                    <div class="h-full w-full overflow-x-auto pb-2">
+                        <div class="min-w-[960px]">
                         <div class="border-b border-gray-100 pb-4">
                             <div class="grid h-10"
                                  style="grid-template-columns: repeat({{ $timelineGraph['totalDays'] }}, minmax(0, 1fr));">
@@ -249,6 +250,7 @@
                                         'project' => 'bg-indigo-600 border-indigo-700',
                                         'task' => 'bg-amber-500 border-amber-600',
                                         'member' => 'bg-sky-500 border-sky-600',
+                                        'actual' => 'bg-emerald-500 border-emerald-600',
                                         default => 'bg-gray-400 border-gray-500',
                                     };
                                 @endphp
@@ -269,6 +271,7 @@
                                 </div>
                             @endforeach
                         </div>
+                        </div>
                     </div>
                 @endif
             </div>
@@ -282,6 +285,9 @@
                 </span>
                 <span class="flex items-center gap-1.5">
                     <span class="w-4 h-3 rounded bg-sky-500"></span> Member
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="w-4 h-3 rounded bg-emerald-500"></span> Actual start
                 </span>
             </div>
         </div>
@@ -567,6 +573,7 @@
                 @endif
             </div>
 
+            @if(false)
             {{-- Assigned tasks by member --}}
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div class="px-5 py-4 border-b border-gray-100">
@@ -634,6 +641,8 @@
                     </div>
                 @endif
             </div>
+
+            @endif
 
             {{-- Recent overdue tasks warning --}}
             @php

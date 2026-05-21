@@ -485,6 +485,54 @@ class TeamLeadDashboard extends Component
                         $rows->push($memberRow);
                     }
                 }
+
+                $progressRows = $task->memberProgress->filter(fn ($progress) => $progress->user);
+
+                if ($progressRows->isEmpty() && $task->assignee) {
+                    $progressRows = collect([(object) [
+                        'user' => $task->assignee,
+                        'started_at' => $task->start_date,
+                        'completed_at' => null,
+                        'status' => $task->status,
+                        'updated_at' => $task->updated_at,
+                    ]]);
+                }
+
+                $progressRows->each(function ($progress) use ($rows, $makeRow, $task) {
+                    $memberStart = $progress->started_at
+                        ?? ($progress->status !== 'pending' ? $progress->updated_at : null)
+                        ?? $task->start_date;
+
+                    if (! $memberStart) {
+                        return;
+                    }
+
+                    $memberEnd = $task->due_date ?? $memberStart;
+                    $dueLabel = $task->due_date ? $task->due_date->format('M d') : 'No due date';
+                    $startedLabel = $memberStart->format('M d');
+                    $timing = match (true) {
+                        $task->due_date && $progress->completed_at && $progress->completed_at->gt($task->due_date->copy()->endOfDay()) => 'Completed late',
+                        $task->due_date && $progress->completed_at && $progress->completed_at->lte($task->due_date->copy()->endOfDay()) => 'Completed on time',
+                        $progress->status === 'done' => 'Done',
+                        $task->due_date && ! $progress->completed_at && now()->startOfDay()->gt($task->due_date) => 'Overdue',
+                        $task->due_date && $memberStart->lt($task->due_date) => 'Started early',
+                        $task->due_date && $memberStart->isSameDay($task->due_date) => 'Started on due date',
+                        $task->due_date && $memberStart->gt($task->due_date) => 'Started late',
+                        default => 'Started',
+                    };
+
+                    $actualStartRow = $makeRow(
+                        'actual',
+                        'Actual',
+                        $progress->user->name.' - Started '.$startedLabel.' / Due '.$dueLabel.' / '.$timing,
+                        $memberStart,
+                        $memberEnd,
+                    );
+
+                    if ($actualStartRow) {
+                        $rows->push($actualStartRow);
+                    }
+                });
             });
 
         $tickDays = collect(range(1, $monthEnd->day))
@@ -539,6 +587,7 @@ class TeamLeadDashboard extends Component
                 'members',
                 'tasks.assignee',
                 'tasks.assignees',
+                'tasks.memberProgress.user',
             ])->find($this->selectedTeamId);
 
             if ($selectedTeam) {

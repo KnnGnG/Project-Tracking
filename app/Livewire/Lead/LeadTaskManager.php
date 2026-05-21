@@ -316,6 +316,9 @@ class LeadTaskManager extends Component
             if ($status) {
                 $progress->status = $status;
                 $progress->progress = $this->progressValueForStatus($status);
+                if (in_array($status, ['in_progress', 'review', 'done'], true) && ! $progress->started_at) {
+                    $progress->started_at = now();
+                }
                 $progress->completed_at = $status === 'done' ? now() : null;
                 $progress->save();
             }
