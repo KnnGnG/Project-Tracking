@@ -17,13 +17,11 @@ class TeamManager extends Component
     public string $name      = '';
     public ?int   $projectId = null;
     public ?int   $leadId    = null;
+    public array $projectTeamIds = [];
+    public string $teamSearch = '';
 
     public bool $showForm  = false;
     public ?int $editingId = null;
-
-    // Member management panel
-    public ?int $managingTeamId = null;
-    public ?int $memberToAdd    = null;
 
     public bool $confirmingDelete = false;
     public ?int $deleteId = null;
@@ -34,6 +32,8 @@ class TeamManager extends Component
             'name'      => 'required|string|max:255',
             'projectId' => 'required|exists:projects,id',
             'leadId'    => 'required|exists:users,id',
+            'projectTeamIds' => 'nullable|array',
+            'projectTeamIds.*' => 'integer|exists:teams,id',
         ];
     }
 
@@ -52,7 +52,13 @@ class TeamManager extends Component
         $this->name      = $team->name;
         $this->projectId = $team->project_id;
         $this->leadId    = $team->lead_id;
+        $this->loadProjectTeamSelection();
         $this->showForm  = true;
+    }
+
+    public function updatedProjectId(): void
+    {
+        $this->loadProjectTeamSelection();
     }
 
     public function save(): void
@@ -66,12 +72,21 @@ class TeamManager extends Component
         ];
 
         if ($this->editingId) {
-            Team::findOrFail($this->editingId)->update($payload);
+            $team = Team::findOrFail($this->editingId);
+            $team->update($payload);
             session()->flash('success', 'Team updated successfully.');
         } else {
-            Team::create($payload);
+            $team = Team::create($payload);
             session()->flash('success', 'Team created successfully.');
         }
+
+        $projectTeamIds = collect($data['projectTeamIds'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->push($team->id)
+            ->unique()
+            ->values();
+
+        Team::whereIn('id', $projectTeamIds->all())->update(['project_id' => $team->project_id]);
 
         $this->resetForm();
         $this->showForm = false;
@@ -80,9 +95,6 @@ class TeamManager extends Component
     public function delete(int $id): void
     {
         Team::findOrFail($id)->delete();
-        if ($this->managingTeamId === $id) {
-            $this->managingTeamId = null;
-        }
         session()->flash('success', 'Team deleted.');
     }
 
@@ -113,37 +125,56 @@ class TeamManager extends Component
         $this->showForm = false;
     }
 
-    public function openMembers(int $teamId): void
+    public function selectAllProjectTeams(): void
     {
-        $this->managingTeamId = ($this->managingTeamId === $teamId) ? null : $teamId;
-        $this->memberToAdd    = null;
-    }
-
-    public function addMember(): void
-    {
-        $this->validate(['memberToAdd' => 'required|exists:users,id']);
-
-        $team = Team::findOrFail($this->managingTeamId);
-
-        if (! $team->members()->where('user_id', $this->memberToAdd)->exists()) {
-            $team->members()->attach($this->memberToAdd);
+        if (! $this->projectId) {
+            return;
         }
 
-        $this->memberToAdd = null;
+        $this->projectTeamIds = $this->projectTeamOptions()
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
-    public function removeMember(int $userId): void
+    public function clearProjectTeams(): void
     {
-        Team::findOrFail($this->managingTeamId)->members()->detach($userId);
+        $this->projectTeamIds = [];
     }
 
     private function resetForm(): void
     {
-        $this->name      = '';
-        $this->projectId = null;
-        $this->leadId    = null;
-        $this->editingId = null;
+        $this->name           = '';
+        $this->projectId      = null;
+        $this->leadId         = null;
+        $this->projectTeamIds = [];
+        $this->teamSearch     = '';
+        $this->editingId      = null;
         $this->resetValidation();
+    }
+
+    private function loadProjectTeamSelection(): void
+    {
+        if (! $this->projectId) {
+            $this->projectTeamIds = [];
+            return;
+        }
+
+        $this->projectTeamIds = Team::where('project_id', $this->projectId)
+            ->pluck('id')
+            ->when($this->editingId, fn ($ids) => $ids->push($this->editingId))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function projectTeamOptions()
+    {
+        return Team::with(['project', 'lead'])
+            ->when($this->teamSearch, fn ($q) => $q->where('name', 'like', "%{$this->teamSearch}%"))
+            ->orderBy('name')
+            ->get();
     }
 
     public function render()
@@ -151,11 +182,13 @@ class TeamManager extends Component
         $teams    = Team::with(['project', 'lead', 'members'])->latest()->get();
         $projects = Project::orderBy('name')->get();
         $leads    = User::where('role', 'team_lead')->orderBy('name')->get();
-
-        $managingTeam   = $this->managingTeamId ? Team::with('members')->find($this->managingTeamId) : null;
-        $availableUsers = User::where('role', 'member')->orderBy('name')->get();
+        $projectTeamOptions = $this->projectTeamOptions();
+        $selectedProjectTeams = Team::with(['project', 'lead'])
+            ->whereIn('id', array_map('intval', $this->projectTeamIds))
+            ->orderBy('name')
+            ->get();
 
         return view('livewire.admin.team-manager',
-            compact('teams', 'projects', 'leads', 'managingTeam', 'availableUsers'));
+            compact('teams', 'projects', 'leads', 'projectTeamOptions', 'selectedProjectTeams'));
     }
 }

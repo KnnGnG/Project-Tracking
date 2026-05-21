@@ -84,6 +84,7 @@
                         @endforeach
                     </select>
                 </div>
+
             </div>
 
             {{-- Actions --}}
@@ -120,7 +121,7 @@
                         <th class="px-6 py-3 text-left font-semibold text-gray-600">Status</th>
                         <th class="px-6 py-3 text-left font-semibold text-gray-600">Progress</th>
                         <th class="px-6 py-3 text-left font-semibold text-gray-600">Teams</th>
-                        <th class="px-4 py-3"></th>
+                        <th class="w-56 px-4 py-3 text-left font-semibold text-gray-600">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -154,27 +155,118 @@
                             </td>
                             <td class="px-6 py-4">
                                 @php $pct = $project->completionPercentage() @endphp
-                                <div class="flex items-center gap-2">
+                                <button type="button"
+                                        wire:click="toggleProgressDetails({{ $project->id }})"
+                                        class="flex items-center gap-2 rounded-lg px-2 py-1 -mx-2 text-left transition hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        aria-expanded="{{ $progressProjectId === $project->id ? 'true' : 'false' }}">
                                     <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
                                         <div class="h-2 bg-indigo-500 rounded-full" style="width: {{ $pct }}%"></div>
                                     </div>
                                     <span class="text-xs text-gray-500">{{ $pct }}%</span>
-                                </div>
+                                </button>
                             </td>
                             <td class="px-6 py-4 text-gray-600">
                                 {{ $project->teams->count() }}
                             </td>
-                            <td class="px-4 py-4 text-right whitespace-nowrap">
-                                <button wire:click="openEdit({{ $project->id }})"
-                                        class="text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-3 transition">
-                                    Edit
-                                </button>
-                                <button wire:click="confirmDelete({{ $project->id }})"
-                                        class="text-red-500 hover:text-red-700 text-xs font-medium transition">
-                                    Delete
-                                </button>
+                            <td class="w-56 px-4 py-4 whitespace-nowrap">
+                                <div class="flex items-center justify-start gap-4">
+                                    <button wire:click="openEdit({{ $project->id }})"
+                                            class="inline-flex w-9 justify-center text-indigo-600 hover:text-indigo-800 text-xs font-medium transition">
+                                        Edit
+                                    </button>
+                                    <button wire:click="confirmDelete({{ $project->id }})"
+                                            class="inline-flex w-11 justify-center text-red-500 hover:text-red-700 text-xs font-medium transition">
+                                        Delete
+                                    </button>
+                                </div>
                             </td>
                         </tr>
+                        @if($progressProjectId === $project->id)
+                            @php
+                                $projectTasks = $project->tasks;
+                                $memberTaskMap = collect();
+
+                                $projectTasks->each(function ($task) use ($memberTaskMap) {
+                                    $assignees = $task->assignees;
+
+                                    if ($assignees->isEmpty() && $task->assignee) {
+                                        $assignees = collect([$task->assignee]);
+                                    }
+
+                                    $assignees->each(function ($member) use ($memberTaskMap, $task) {
+                                        $memberTaskMap->put(
+                                            $member->id,
+                                            [
+                                                'member' => $member,
+                                                'tasks' => $memberTaskMap->get($member->id, ['tasks' => collect()])['tasks']->push($task),
+                                            ]
+                                        );
+                                    });
+                                });
+                            @endphp
+                            <tr>
+                                <td colspan="7" class="px-6 py-5 bg-indigo-50/40">
+                                    <div class="rounded-lg border border-indigo-100 bg-white p-4">
+                                        <h3 class="text-sm font-semibold text-gray-800 mb-3">Member tasks</h3>
+                                        @if($memberTaskMap->isEmpty())
+                                            <p class="text-xs text-gray-400">No assigned tasks yet.</p>
+                                        @else
+                                            <div class="space-y-4">
+                                                @foreach($memberTaskMap as $row)
+                                                    <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                                                        <p class="text-sm font-semibold text-gray-800 mb-2">{{ $row['member']->name }}</p>
+                                                        <div class="overflow-x-auto">
+                                                            <table class="w-full text-xs">
+                                                                <thead>
+                                                                    <tr class="text-left text-gray-400">
+                                                                        <th class="py-2 font-semibold">Task</th>
+                                                                        <th class="py-2 font-semibold">Team</th>
+                                                                        <th class="py-2 font-semibold">Status</th>
+                                                                        <th class="py-2 font-semibold">Start</th>
+                                                                        <th class="py-2 font-semibold">Due</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody class="divide-y divide-gray-200">
+                                                                    @foreach($row['tasks'] as $task)
+                                                                        @php
+                                                                            $statusLabel = match($task->status) {
+                                                                                'pending' => 'Pending',
+                                                                                'in_progress' => 'In Progress',
+                                                                                'review' => 'Review',
+                                                                                'done' => 'Done',
+                                                                                default => ucfirst(str_replace('_', ' ', $task->status)),
+                                                                            };
+                                                                            $statusClass = match($task->status) {
+                                                                                'pending' => 'bg-gray-100 text-gray-600',
+                                                                                'in_progress' => 'bg-blue-100 text-blue-700',
+                                                                                'review' => 'bg-amber-100 text-amber-800',
+                                                                                'done' => 'bg-green-100 text-green-700',
+                                                                                default => 'bg-gray-100 text-gray-600',
+                                                                            };
+                                                                        @endphp
+                                                                        <tr>
+                                                                            <td class="py-2 pr-3 font-medium text-gray-700">{{ $task->title }}</td>
+                                                                            <td class="py-2 pr-3 text-gray-500 whitespace-nowrap">{{ $task->team?->name ?? 'Unassigned' }}</td>
+                                                                            <td class="py-2 pr-3 whitespace-nowrap">
+                                                                                <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium {{ $statusClass }}">
+                                                                                    {{ $statusLabel }}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td class="py-2 pr-3 text-gray-500 whitespace-nowrap">{{ $task->start_date?->format('M d, Y') ?? 'Not set' }}</td>
+                                                                            <td class="py-2 text-gray-500 whitespace-nowrap">{{ $task->due_date?->format('M d, Y') ?? 'Not set' }}</td>
+                                                                        </tr>
+                                                                    @endforeach
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @endif
                     @endforeach
                 </tbody>
             </table>

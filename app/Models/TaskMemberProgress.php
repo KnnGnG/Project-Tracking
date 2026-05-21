@@ -12,14 +12,15 @@ class TaskMemberProgress extends Model
     protected $fillable = [
         'task_id',
         'user_id',
-        'status',
-        'progress',
-    ];
+            'status',
+            'progress',
+        ];
 
     protected function casts(): array
     {
         return [
             'progress' => 'integer',
+            'started_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
     }
