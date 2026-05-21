@@ -139,7 +139,13 @@ class ProjectManager extends Component
 
     public function render()
     {
-        $projects = Project::with(['client', 'teams', 'tasks'])
+        $projects = Project::with([
+            'client',
+            'teams',
+            'tasks.assignee',
+            'tasks.assignees',
+            'tasks.team',
+        ])
             ->when($this->search, fn ($q) => $q->where('name', 'like', "%{$this->search}%"))
             ->latest()
             ->get();

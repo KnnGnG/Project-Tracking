@@ -494,6 +494,7 @@ class TeamLeadDashboard extends Component
                         'started_at' => $task->start_date,
                         'completed_at' => null,
                         'status' => $task->status,
+                        'updated_at' => $task->updated_at,
                     ]]);
                 }
 

@@ -171,6 +171,7 @@ class TeamManager extends Component
 
     private function projectTeamOptions()
     {
+        // Intentionally global: selected teams are reassigned into the chosen project on save.
         return Team::with(['project', 'lead'])
             ->when($this->teamSearch, fn ($q) => $q->where('name', 'like', "%{$this->teamSearch}%"))
             ->orderBy('name')

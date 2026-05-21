@@ -62,7 +62,7 @@
 
                 {{-- Teams in selected project --}}
                 <div class="md:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Teams in this project</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Select teams for this project</label>
                     <div @class([
                         'rounded-lg border bg-white px-3 py-2',
                         'border-red-400' => $errors->has('projectTeamIds'),
@@ -181,45 +181,6 @@
                         </button>
                     </div>
                 </div>
-
-                @if(false)
-                {{-- Legacy member management panel. Members are now selected directly in the team create/edit form. --}}
-                @if($managingTeamId === $team->id)
-                    <div class="border-t border-gray-100 bg-gray-50 px-6 py-4">
-                        <div class="flex items-center gap-3 mb-3">
-                            <select wire:model="memberToAdd"
-                                    class="flex-1 max-w-xs px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                <option value="">— Add a member —</option>
-                                @foreach($availableUsers as $user)
-                                    <option value="{{ $user->id }}">{{ $user->name }}</option>
-                                @endforeach
-                            </select>
-                            <button wire:click="addMember"
-                                    class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
-                                Add
-                            </button>
-                        </div>
-
-                        @if($managingTeam && $managingTeam->members->count())
-                            <div class="flex flex-wrap gap-2">
-                                @foreach($managingTeam->members as $member)
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-700">
-                                        {{ $member->name }}
-                                        <button wire:click="removeMember({{ $member->id }})"
-                                                class="text-gray-400 hover:text-red-500 transition">
-                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                            </svg>
-                                        </button>
-                                    </span>
-                                @endforeach
-                            </div>
-                        @else
-                            <p class="text-xs text-gray-400">No members yet.</p>
-                        @endif
-                    </div>
-                @endif
-                @endif
             </div>
         @empty
             <div class="bg-white rounded-xl border border-gray-200 py-16 text-center text-gray-400">
