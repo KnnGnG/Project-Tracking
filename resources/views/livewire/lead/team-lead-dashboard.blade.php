@@ -229,7 +229,7 @@
                         No project, task, or member dates in this month.
                     </div>
                 @else
-                    <div class="h-full w-full overflow-x-auto pb-2">
+                    <div class="max-h-[430px] w-full overflow-auto pb-2 pr-2">
                         <div class="min-w-[960px]">
                         <div class="border-b border-gray-100 pb-4">
                             <div class="grid h-10"

@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -27,6 +28,8 @@ class ProjectManager extends Component
     public ?int $deleteId = null;
 
     public ?int $progressProjectId = null;
+    public ?int $detailsProjectId = null;
+    public $detailsProjectTasks = null;
 
     protected function rules(): array
     {
@@ -125,6 +128,12 @@ class ProjectManager extends Component
         $this->progressProjectId = $this->progressProjectId === $projectId ? null : $projectId;
     }
 
+    public function showDetails(int $projectId): void
+    {
+        // Toggle the inline details dropdown for the given project
+        $this->detailsProjectId = $this->detailsProjectId === $projectId ? null : $projectId;
+    }
+
     private function resetForm(): void
     {
         $this->name        = '';
@@ -141,17 +150,34 @@ class ProjectManager extends Component
     {
         $projects = Project::with([
             'client',
-            'teams',
-            'tasks.assignee',
-            'tasks.assignees',
-            'tasks.team',
+            'teams.lead',
+            'teams.members',
         ])
             ->when($this->search, fn ($q) => $q->where('name', 'like', "%{$this->search}%"))
             ->latest()
             ->get();
 
         $clients = User::where('role', 'client')->orderBy('name')->get();
+        if ($this->detailsProjectId) {
+            $detailsProject = Project::with([
+                'client',
+                'teams.lead',
+                'teams.members',
+            ])->find($this->detailsProjectId);
 
-        return view('livewire.admin.project-manager', compact('projects', 'clients'));
+            $this->detailsProjectTasks = Task::where('project_id', $this->detailsProjectId)
+                ->with(['team', 'assignee', 'assignees'])
+                ->orderBy('due_date')
+                ->limit(10)
+                ->get();
+        } else {
+            $detailsProject = null;
+            $this->detailsProjectTasks = null;
+        }
+
+        // expose the property as a local variable for compact() and the view
+        $detailsProjectTasks = $this->detailsProjectTasks;
+
+        return view('livewire.admin.project-manager', compact('projects', 'clients', 'detailsProject', 'detailsProjectTasks'));
     }
 }

@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Models\Project;
 use App\Models\Team;
+use App\Models\Task;
 use App\Models\User;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -25,6 +26,7 @@ class TeamManager extends Component
 
     public bool $confirmingDelete = false;
     public ?int $deleteId = null;
+    public ?int $detailsTeamId = null;
 
     protected function rules(): array
     {
@@ -125,6 +127,12 @@ class TeamManager extends Component
         $this->showForm = false;
     }
 
+    public function showDetails(int $teamId): void
+    {
+        // Toggle inline details for the given team
+        $this->detailsTeamId = $this->detailsTeamId === $teamId ? null : $teamId;
+    }
+
     public function selectAllProjectTeams(): void
     {
         if (! $this->projectId) {
@@ -180,7 +188,7 @@ class TeamManager extends Component
 
     public function render()
     {
-        $teams    = Team::with(['project', 'lead', 'members'])->latest()->get();
+        $teams    = Team::with(['project', 'lead', 'members'])->withCount('tasks')->latest()->get();
         $projects = Project::orderBy('name')->get();
         $leads    = User::where('role', 'team_lead')->orderBy('name')->get();
         $projectTeamOptions = $this->projectTeamOptions();
@@ -188,8 +196,21 @@ class TeamManager extends Component
             ->whereIn('id', array_map('intval', $this->projectTeamIds))
             ->orderBy('name')
             ->get();
+        $detailsTeam = $this->detailsTeamId
+            ? Team::with(['project', 'lead', 'members'])
+                ->withCount('tasks')
+                ->find($this->detailsTeamId)
+            : null;
+
+        if ($detailsTeam) {
+            $detailsTeam->limitedTasks = Task::where('team_id', $this->detailsTeamId)
+                ->with(['assignee', 'assignees'])
+                ->orderBy('due_date')
+                ->limit(8)
+                ->get();
+        }
 
         return view('livewire.admin.team-manager',
-            compact('teams', 'projects', 'leads', 'projectTeamOptions', 'selectedProjectTeams'));
+            compact('teams', 'projects', 'leads', 'projectTeamOptions', 'selectedProjectTeams', 'detailsTeam'));
     }
 }
