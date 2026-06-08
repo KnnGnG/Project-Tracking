@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class Task extends Model
 {
@@ -113,5 +114,19 @@ class Task extends Model
     {
         return in_array($this->status, ['pending', 'in_progress', 'review'], true)
             && $this->due_date->isPast();
+    }
+
+    /**
+     * Return all assignees for a task, falling back to the single `assignee`.
+     */
+    public function getAllAssignees(): Collection
+    {
+        $assignees = $this->assignees ?? collect();
+
+        if ($assignees->isEmpty() && $this->assignee) {
+            return collect([$this->assignee]);
+        }
+
+        return $assignees;
     }
 }

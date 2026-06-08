@@ -294,20 +294,22 @@
                                 </select>
                             </td>
                             <td class="px-4 py-4 text-right whitespace-nowrap">
-                                <button wire:click="toggleTaskDetails({{ $task->id }})"
-                                        class="text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-3 transition">
-                                    Details
-                                </button>
-                                <button wire:click="openEdit({{ $task->id }})"
-                                        class="text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-3 transition">
-                                    Edit
-                                </button>
-                                @if($expandedTaskId === $task->id)
+                                @if($expandedTaskId !== $task->id)
+                                    <button wire:click="toggleTaskDetails({{ $task->id }})"
+                                            class="text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-3 transition">
+                                        Details
+                                    </button>
+                                @else
                                     <button wire:click="toggleTaskDetails({{ $task->id }})"
                                             class="text-gray-600 hover:text-gray-800 text-xs font-medium mr-3 transition">
                                         Hide
                                     </button>
                                 @endif
+                                <button wire:click="openEdit({{ $task->id }})"
+                                        class="text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-3 transition">
+                                    Edit
+                                </button>
+                                
                                 <button wire:click="confirmDelete({{ $task->id }})"
                                         class="text-red-500 hover:text-red-700 text-xs font-medium transition">
                                     Delete

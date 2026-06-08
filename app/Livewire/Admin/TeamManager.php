@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Models\Project;
 use App\Models\Team;
+use App\Models\Task;
 use App\Models\User;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -25,7 +26,6 @@ class TeamManager extends Component
 
     public bool $confirmingDelete = false;
     public ?int $deleteId = null;
-    public bool $showingDetails = false;
     public ?int $detailsTeamId = null;
 
     protected function rules(): array
@@ -129,14 +129,8 @@ class TeamManager extends Component
 
     public function showDetails(int $teamId): void
     {
-        $this->detailsTeamId = $teamId;
-        $this->showingDetails = true;
-    }
-
-    public function closeDetails(): void
-    {
-        $this->showingDetails = false;
-        $this->detailsTeamId = null;
+        // Toggle inline details for the given team
+        $this->detailsTeamId = $this->detailsTeamId === $teamId ? null : $teamId;
     }
 
     public function selectAllProjectTeams(): void
@@ -203,10 +197,18 @@ class TeamManager extends Component
             ->orderBy('name')
             ->get();
         $detailsTeam = $this->detailsTeamId
-            ? Team::with(['project', 'lead', 'members', 'tasks.assignee', 'tasks.assignees'])
+            ? Team::with(['project', 'lead', 'members'])
                 ->withCount('tasks')
                 ->find($this->detailsTeamId)
             : null;
+
+        if ($detailsTeam) {
+            $detailsTeam->limitedTasks = Task::where('team_id', $this->detailsTeamId)
+                ->with(['assignee', 'assignees'])
+                ->orderBy('due_date')
+                ->limit(8)
+                ->get();
+        }
 
         return view('livewire.admin.team-manager',
             compact('teams', 'projects', 'leads', 'projectTeamOptions', 'selectedProjectTeams', 'detailsTeam'));
