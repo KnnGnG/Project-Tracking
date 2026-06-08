@@ -27,6 +27,8 @@ class ProjectManager extends Component
     public ?int $deleteId = null;
 
     public ?int $progressProjectId = null;
+    public bool $showingDetails = false;
+    public ?int $detailsProjectId = null;
 
     protected function rules(): array
     {
@@ -125,6 +127,18 @@ class ProjectManager extends Component
         $this->progressProjectId = $this->progressProjectId === $projectId ? null : $projectId;
     }
 
+    public function showDetails(int $projectId): void
+    {
+        $this->detailsProjectId = $projectId;
+        $this->showingDetails = true;
+    }
+
+    public function closeDetails(): void
+    {
+        $this->showingDetails = false;
+        $this->detailsProjectId = null;
+    }
+
     private function resetForm(): void
     {
         $this->name        = '';
@@ -151,7 +165,17 @@ class ProjectManager extends Component
             ->get();
 
         $clients = User::where('role', 'client')->orderBy('name')->get();
+        $detailsProject = $this->detailsProjectId
+            ? Project::with([
+                'client',
+                'teams.lead',
+                'teams.members',
+                'tasks.team',
+                'tasks.assignee',
+                'tasks.assignees',
+            ])->find($this->detailsProjectId)
+            : null;
 
-        return view('livewire.admin.project-manager', compact('projects', 'clients'));
+        return view('livewire.admin.project-manager', compact('projects', 'clients', 'detailsProject'));
     }
 }

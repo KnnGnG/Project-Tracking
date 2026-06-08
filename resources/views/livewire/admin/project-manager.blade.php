@@ -170,6 +170,10 @@
                             </td>
                             <td class="w-56 px-4 py-4 whitespace-nowrap">
                                 <div class="flex items-center justify-start gap-4">
+                                    <button wire:click="showDetails({{ $project->id }})"
+                                            class="inline-flex w-12 justify-center text-indigo-600 hover:text-indigo-800 text-xs font-medium transition">
+                                        Details
+                                    </button>
                                     <button wire:click="openEdit({{ $project->id }})"
                                             class="inline-flex w-9 justify-center text-indigo-600 hover:text-indigo-800 text-xs font-medium transition">
                                         Edit
@@ -272,6 +276,181 @@
             </table>
         @endif
     </div>
+
+    <x-dialog-modal wire:model="showingDetails" maxWidth="2xl">
+        <x-slot name="title">
+            Project details
+        </x-slot>
+
+        <x-slot name="content">
+            @if($detailsProject)
+                @php
+                    $tasks = $detailsProject->tasks;
+                    $teams = $detailsProject->teams;
+                    $totalTasks = $tasks->count();
+                    $doneTasks = $tasks->where('status', 'done')->count();
+                    $inProgressTasks = $tasks->where('status', 'in_progress')->count();
+                    $reviewTasks = $tasks->where('status', 'review')->count();
+                    $pendingTasks = $tasks->where('status', 'pending')->count();
+                    $overdueTasks = $tasks->filter(fn ($task) => $task->due_date && $task->isExceededDeadline())->count();
+                    $completion = $totalTasks > 0 ? (int) round(($doneTasks / $totalTasks) * 100) : 0;
+                    $statusClass = fn ($status) => match($status) {
+                        'active' => 'bg-green-100 text-green-700',
+                        'on_hold' => 'bg-yellow-100 text-yellow-700',
+                        'completed' => 'bg-blue-100 text-blue-700',
+                        'done' => 'bg-green-100 text-green-700',
+                        'in_progress' => 'bg-blue-100 text-blue-700',
+                        'review' => 'bg-amber-100 text-amber-800',
+                        'pending' => 'bg-gray-100 text-gray-600',
+                        default => 'bg-gray-100 text-gray-600',
+                    };
+                @endphp
+
+                <div class="space-y-5">
+                    <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h3 class="text-lg font-semibold text-gray-900">{{ $detailsProject->name }}</h3>
+                                    <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass($detailsProject->status) }}">
+                                        {{ ucfirst(str_replace('_', ' ', $detailsProject->status)) }}
+                                    </span>
+                                </div>
+                                <p class="mt-1 text-sm text-gray-500">
+                                    {{ $detailsProject->description ?: 'No description provided.' }}
+                                </p>
+                            </div>
+                            <div class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-700 shadow-sm">
+                                {{ $completion }}% complete
+                            </div>
+                        </div>
+                        <div class="mt-4 h-2 overflow-hidden rounded-full bg-white">
+                            <div class="h-2 rounded-full bg-indigo-600" style="width: {{ $completion }}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div class="rounded-lg bg-gray-50 p-3">
+                            <p class="text-xs font-medium text-gray-400">Client</p>
+                            <p class="mt-1 truncate text-sm font-semibold text-gray-800">{{ $detailsProject->client?->name ?? 'No client' }}</p>
+                        </div>
+                        <div class="rounded-lg bg-gray-50 p-3">
+                            <p class="text-xs font-medium text-gray-400">Timeline</p>
+                            <p class="mt-1 text-sm font-semibold text-gray-800">
+                                {{ $detailsProject->start_date->format('M d, Y') }} - {{ $detailsProject->end_date->format('M d, Y') }}
+                            </p>
+                        </div>
+                        <div class="rounded-lg bg-red-50 p-3">
+                            <p class="text-xs font-medium text-red-400">Overdue tasks</p>
+                            <p class="mt-1 text-sm font-semibold text-red-700">{{ $overdueTasks }}</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 md:grid-cols-6">
+                        <div class="rounded-lg bg-gray-50 p-3 text-center">
+                            <p class="text-lg font-bold text-gray-800">{{ $totalTasks }}</p>
+                            <p class="text-xs font-medium text-gray-500">Tasks</p>
+                        </div>
+                        <div class="rounded-lg bg-indigo-50 p-3 text-center">
+                            <p class="text-lg font-bold text-indigo-700">{{ $teams->count() }}</p>
+                            <p class="text-xs font-medium text-indigo-700">Teams</p>
+                        </div>
+                        <div class="rounded-lg bg-green-50 p-3 text-center">
+                            <p class="text-lg font-bold text-green-700">{{ $doneTasks }}</p>
+                            <p class="text-xs font-medium text-green-700">Done</p>
+                        </div>
+                        <div class="rounded-lg bg-blue-50 p-3 text-center">
+                            <p class="text-lg font-bold text-blue-700">{{ $inProgressTasks }}</p>
+                            <p class="text-xs font-medium text-blue-700">In progress</p>
+                        </div>
+                        <div class="rounded-lg bg-amber-50 p-3 text-center">
+                            <p class="text-lg font-bold text-amber-800">{{ $reviewTasks }}</p>
+                            <p class="text-xs font-medium text-amber-800">Review</p>
+                        </div>
+                        <div class="rounded-lg bg-gray-50 p-3 text-center">
+                            <p class="text-lg font-bold text-gray-700">{{ $pendingTasks }}</p>
+                            <p class="text-xs font-medium text-gray-500">Pending</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="mb-2 text-sm font-semibold text-gray-800">Teams</p>
+                        @if($teams->isEmpty())
+                            <p class="rounded-lg bg-gray-50 p-3 text-sm text-gray-400">No teams assigned yet.</p>
+                        @else
+                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                @foreach($teams as $team)
+                                    <div class="rounded-lg border border-gray-100 bg-white p-3">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p class="truncate text-sm font-semibold text-gray-800">{{ $team->name }}</p>
+                                                <p class="mt-1 truncate text-xs text-gray-400">Lead: {{ $team->lead?->name ?? 'Unassigned' }}</p>
+                                            </div>
+                                            <span class="shrink-0 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+                                                {{ $team->members->count() }} members
+                                            </span>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+
+                    <div>
+                        <p class="mb-2 text-sm font-semibold text-gray-800">Tasks</p>
+                        @if($tasks->isEmpty())
+                            <p class="rounded-lg bg-gray-50 p-3 text-sm text-gray-400">No tasks created for this project yet.</p>
+                        @else
+                            <div class="max-h-64 space-y-2 overflow-y-auto pr-1">
+                                @foreach($tasks->sortByDesc('due_date')->take(10) as $task)
+                                    @php
+                                        $assignees = $task->assignees;
+
+                                        if ($assignees->isEmpty() && $task->assignee) {
+                                            $assignees = collect([$task->assignee]);
+                                        }
+                                    @endphp
+                                    <div class="rounded-lg border border-gray-100 bg-white p-3">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p class="truncate text-sm font-semibold text-gray-800">{{ $task->title }}</p>
+                                                <p class="mt-1 text-xs text-gray-400">
+                                                    {{ $task->team?->name ?? 'No team' }}
+                                                    <span class="mx-1">/</span>
+                                                    Start {{ $task->start_date?->format('M d, Y') ?? 'Not set' }}
+                                                    <span class="mx-1">/</span>
+                                                    Due {{ $task->due_date?->format('M d, Y') ?? 'Not set' }}
+                                                </p>
+                                            </div>
+                                            <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold {{ $statusClass($task->status) }}">
+                                                {{ ucfirst(str_replace('_', ' ', $task->status)) }}
+                                            </span>
+                                        </div>
+
+                                        @if($assignees->isNotEmpty())
+                                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                                @foreach($assignees as $assignee)
+                                                    <span class="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                                                        {{ $assignee->name }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            @endif
+        </x-slot>
+
+        <x-slot name="footer">
+            <x-secondary-button wire:click="closeDetails" wire:loading.attr="disabled">
+                Close
+            </x-secondary-button>
+        </x-slot>
+    </x-dialog-modal>
 
     <x-confirmation-modal wire:model="confirmingDelete" maxWidth="md">
         <x-slot name="title">

@@ -25,6 +25,8 @@ class TeamManager extends Component
 
     public bool $confirmingDelete = false;
     public ?int $deleteId = null;
+    public bool $showingDetails = false;
+    public ?int $detailsTeamId = null;
 
     protected function rules(): array
     {
@@ -125,6 +127,18 @@ class TeamManager extends Component
         $this->showForm = false;
     }
 
+    public function showDetails(int $teamId): void
+    {
+        $this->detailsTeamId = $teamId;
+        $this->showingDetails = true;
+    }
+
+    public function closeDetails(): void
+    {
+        $this->showingDetails = false;
+        $this->detailsTeamId = null;
+    }
+
     public function selectAllProjectTeams(): void
     {
         if (! $this->projectId) {
@@ -180,7 +194,7 @@ class TeamManager extends Component
 
     public function render()
     {
-        $teams    = Team::with(['project', 'lead', 'members'])->latest()->get();
+        $teams    = Team::with(['project', 'lead', 'members'])->withCount('tasks')->latest()->get();
         $projects = Project::orderBy('name')->get();
         $leads    = User::where('role', 'team_lead')->orderBy('name')->get();
         $projectTeamOptions = $this->projectTeamOptions();
@@ -188,8 +202,13 @@ class TeamManager extends Component
             ->whereIn('id', array_map('intval', $this->projectTeamIds))
             ->orderBy('name')
             ->get();
+        $detailsTeam = $this->detailsTeamId
+            ? Team::with(['project', 'lead', 'members', 'tasks.assignee', 'tasks.assignees'])
+                ->withCount('tasks')
+                ->find($this->detailsTeamId)
+            : null;
 
         return view('livewire.admin.team-manager',
-            compact('teams', 'projects', 'leads', 'projectTeamOptions', 'selectedProjectTeams'));
+            compact('teams', 'projects', 'leads', 'projectTeamOptions', 'selectedProjectTeams', 'detailsTeam'));
     }
 }
