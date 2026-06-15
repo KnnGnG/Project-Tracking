@@ -30,6 +30,23 @@ class Team extends Model
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'team_members', 'team_id', 'user_id')
+            ->withPivot('role')
+            ->withTimestamps();
+    }
+
+    public function leads(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'team_members', 'team_id', 'user_id')
+            ->withPivot('role')
+            ->wherePivot('role', 'lead')
+            ->withTimestamps();
+    }
+
+    public function regularMembers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'team_members', 'team_id', 'user_id')
+            ->withPivot('role')
+            ->wherePivot('role', 'member')
             ->withTimestamps();
     }
 

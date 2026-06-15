@@ -317,9 +317,115 @@
                             </td>
                         </tr>
                         @if($expandedTaskId === $task->id)
+                            @php
+                                $memberProgress = $task->memberProgress ?? collect();
+                                $progressCounts = [
+                                    'pending' => $memberProgress->where('status', 'pending')->count(),
+                                    'in_progress' => $memberProgress->where('status', 'in_progress')->count(),
+                                    'review' => $memberProgress->where('status', 'review')->count(),
+                                    'done' => $memberProgress->where('status', 'done')->count(),
+                                ];
+                                $progressLabel = fn (string $status) => match ($status) {
+                                    'pending' => 'Pending',
+                                    'in_progress' => 'In Progress',
+                                    'review' => 'Review',
+                                    'done' => 'Done',
+                                    default => ucfirst($status),
+                                };
+                                $progressClass = fn (string $status) => match ($status) {
+                                    'pending' => 'bg-gray-100 text-gray-600',
+                                    'in_progress' => 'bg-blue-100 text-blue-700',
+                                    'review' => 'bg-amber-100 text-amber-800',
+                                    'done' => 'bg-green-100 text-green-700',
+                                    default => 'bg-gray-100 text-gray-600',
+                                };
+                            @endphp
                             <tr>
                                 <td colspan="6" class="bg-gray-50 px-6 py-4">
-                                    <livewire:task-discussion :task-id="$task->id" :key="'lead-task-discussion-'.$task->id" />
+                                    <div class="rounded-xl border border-gray-200 bg-white p-4 space-y-4">
+                                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                            <div class="min-w-0 space-y-2">
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <p class="text-base font-semibold text-gray-900">Task details</p>
+                                                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $statusColor }}">
+                                                        {{ $statusOptions[$task->status] ?? ucfirst($task->status) }}
+                                                    </span>
+                                                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $priorityBadge }}">
+                                                        {{ ucfirst($task->priority) }} priority
+                                                    </span>
+                                                    @if($isOverdue)
+                                                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                                                            Overdue
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                                <p class="text-sm text-gray-600 whitespace-pre-line">
+                                                    {{ $task->description ?: 'No description provided.' }}
+                                                </p>
+                                                <div class="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+                                                    <span><span class="font-semibold text-gray-700">Project:</span> {{ $task->project?->name ?? 'No project' }}</span>
+                                                    <span><span class="font-semibold text-gray-700">Team:</span> {{ $task->team?->name ?? 'No team' }}</span>
+                                                    <span><span class="font-semibold text-gray-700">Start:</span> {{ $task->start_date?->format('M d, Y') ?? 'Not set' }}</span>
+                                                    <span><span class="font-semibold text-gray-700">Due:</span> {{ $task->due_date?->format('M d, Y') ?? 'Not set' }}</span>
+                                                </div>
+                                            </div>
+
+                                            <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:w-[28rem]">
+                                                <div class="rounded-lg bg-gray-50 p-3 text-center">
+                                                    <p class="text-lg font-bold text-gray-800">{{ $memberProgress->count() }}</p>
+                                                    <p class="text-xs font-medium text-gray-500">Members</p>
+                                                </div>
+                                                <div class="rounded-lg bg-gray-50 p-3 text-center">
+                                                    <p class="text-lg font-bold text-blue-700">{{ $progressCounts['in_progress'] }}</p>
+                                                    <p class="text-xs font-medium text-blue-700">In Progress</p>
+                                                </div>
+                                                <div class="rounded-lg bg-amber-50 p-3 text-center">
+                                                    <p class="text-lg font-bold text-amber-800">{{ $progressCounts['review'] }}</p>
+                                                    <p class="text-xs font-medium text-amber-800">Review</p>
+                                                </div>
+                                                <div class="rounded-lg bg-green-50 p-3 text-center">
+                                                    <p class="text-lg font-bold text-green-700">{{ $progressCounts['done'] }}</p>
+                                                    <p class="text-xs font-medium text-green-700">Done</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Member review status</p>
+                                            @if($memberProgress->isEmpty())
+                                                <p class="rounded-lg bg-gray-50 p-3 text-sm text-gray-400">No member progress recorded yet.</p>
+                                            @else
+                                                <div class="overflow-hidden rounded-lg border border-gray-200">
+                                                    <table class="w-full text-sm">
+                                                        <thead class="bg-gray-50 text-gray-500">
+                                                            <tr>
+                                                                <th class="px-3 py-2 text-left font-semibold">Member</th>
+                                                                <th class="px-3 py-2 text-left font-semibold">Status</th>
+                                                                <th class="px-3 py-2 text-left font-semibold">Started</th>
+                                                                <th class="px-3 py-2 text-left font-semibold">Completed</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody class="divide-y divide-gray-100 bg-white">
+                                                            @foreach($memberProgress as $progress)
+                                                                <tr>
+                                                                    <td class="px-3 py-2 text-gray-700">{{ $progress->user?->name ?? 'Unknown member' }}</td>
+                                                                    <td class="px-3 py-2">
+                                                                        <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {{ $progressClass($progress->status) }}">
+                                                                            {{ $progressLabel($progress->status) }}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td class="px-3 py-2 text-gray-500">{{ $progress->started_at?->format('M d, Y h:i A') ?? '—' }}</td>
+                                                                    <td class="px-3 py-2 text-gray-500">{{ $progress->completed_at?->format('M d, Y h:i A') ?? '—' }}</td>
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            @endif
+                                        </div>
+
+                                        <livewire:task-discussion :task-id="$task->id" :key="'lead-task-discussion-'.$task->id" />
+                                    </div>
                                 </td>
                             </tr>
                         @endif

@@ -56,12 +56,12 @@ class User extends Authenticatable
 
     public function isTeamLead(): bool
     {
-        return $this->role === 'team_lead';
+        return $this->role === 'team_lead' || $this->ledTeams()->exists();
     }
 
     public function isMember(): bool
     {
-        return $this->role === 'member';
+        return $this->role === 'member' || $this->memberTeams()->exists();
     }
 
     /**
@@ -85,13 +85,23 @@ class User extends Authenticatable
      */
     public function dashboardRoute(): string
     {
-        return match ($this->role) {
-            'admin'     => 'admin.dashboard',
-            'client'    => 'client.dashboard',
-            'team_lead' => 'lead.dashboard',
-            'member'    => 'member.dashboard',
-            default     => 'login',
-        };
+        if ($this->isAdmin()) {
+            return 'admin.dashboard';
+        }
+
+        if ($this->isClient()) {
+            return 'client.dashboard';
+        }
+
+        if ($this->isTeamLead()) {
+            return 'lead.dashboard';
+        }
+
+        if ($this->isMember()) {
+            return 'member.dashboard';
+        }
+
+        return 'login';
     }
 
     // =========================================================================
@@ -108,14 +118,26 @@ class User extends Authenticatable
         return $this->hasMany(Project::class, 'created_by');
     }
 
-    public function ledTeams(): HasMany
+    public function ledTeams(): BelongsToMany
     {
-        return $this->hasMany(Team::class, 'lead_id');
+        return $this->belongsToMany(Team::class, 'team_members', 'user_id', 'team_id')
+            ->withPivot('role')
+            ->wherePivot('role', 'lead')
+            ->withTimestamps();
     }
 
     public function teams(): BelongsToMany
     {
         return $this->belongsToMany(Team::class, 'team_members', 'user_id', 'team_id')
+            ->withPivot('role')
+            ->withTimestamps();
+    }
+
+    public function memberTeams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, 'team_members', 'user_id', 'team_id')
+            ->withPivot('role')
+            ->wherePivot('role', 'member')
             ->withTimestamps();
     }
 

@@ -12,7 +12,23 @@
                     <p class="text-sm text-gray-500">Record what you worked on and how long it took.</p>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-3">
+                    @if($teams->isNotEmpty())
+                        <div class="flex items-center gap-2">
+                            <label for="filterTeam" class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Team</label>
+                            <select id="filterTeam"
+                                    wire:model.live="filterTeam"
+                                    class="border border-gray-300 rounded-lg text-sm px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="0">All my teams</option>
+                                @foreach($teams as $team)
+                                    <option value="{{ $team->id }}">
+                                        {{ $team->name }}@if($team->project) / {{ $team->project->name }}@endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+
                     <label for="logDate" class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Day</label>
                     <input id="logDate"
                            type="date"
@@ -28,10 +44,10 @@
                         <select id="selectedTaskId"
                                 wire:model="selectedTaskId"
                                 class="mt-1 w-full border border-gray-300 rounded-lg text-sm px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500">
-                            <option value="">General work / no task</option>
+                            <option value="">{{ $filterTeam > 0 ? 'General work for selected team' : 'General work / no task' }}</option>
                             @foreach($tasks as $task)
                                 <option value="{{ $task->id }}">
-                                    {{ $task->title }}@if($task->project) - {{ $task->project->name }}@endif
+                                    {{ $task->title }}@if($task->team) - {{ $task->team->name }}@endif @if($task->project) / {{ $task->project->name }}@endif
                                 </option>
                             @endforeach
                         </select>
@@ -172,8 +188,11 @@
                                 </p>
                                 <p class="text-xs text-gray-500">
                                     {{ $log->task?->title ?? 'General work' }}
-                                    @if($log->task?->project)
-                                        <span class="text-gray-300">/</span> {{ $log->task->project->name }}
+                                    @if($log->task?->team || $log->team)
+                                        <span class="text-gray-300">/</span> {{ $log->task?->team?->name ?? $log->team?->name }}
+                                    @endif
+                                    @if($log->task?->project || $log->team?->project)
+                                        <span class="text-gray-300">/</span> {{ $log->task?->project?->name ?? $log->team?->project?->name }}
                                     @endif
                                 </p>
                             </div>
@@ -212,6 +231,9 @@
                     <div>
                         <p class="text-sm font-semibold text-gray-900">
                             {{ $log->log_date->format('M d, Y') }} - {{ $log->task?->title ?? 'General work' }}
+                            @if($log->task?->team || $log->team)
+                                <span class="text-gray-300">/</span> {{ $log->task?->team?->name ?? $log->team?->name }}
+                            @endif
                         </p>
                         @if($log->notes)
                             <p class="mt-1 text-sm text-gray-600 line-clamp-2">{{ $log->notes }}</p>

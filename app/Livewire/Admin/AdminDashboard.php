@@ -55,7 +55,32 @@ class AdminDashboard extends Component
             ->take(5)
             ->get();
 
+        $attention = [
+            'overdueTasks' => Task::with(['project', 'team'])
+                ->whereIn('status', ['pending', 'in_progress', 'review'])
+                ->where('due_date', '<', now()->toDateString())
+                ->orderBy('due_date')
+                ->take(5)
+                ->get(),
+            'endingSoonProjects' => Project::withCount(['teams', 'tasks'])
+                ->where('status', 'active')
+                ->whereBetween('end_date', [now()->toDateString(), now()->addDays(7)->toDateString()])
+                ->orderBy('end_date')
+                ->take(5)
+                ->get(),
+            'projectsWithoutTeams' => Project::with('client')
+                ->whereDoesntHave('teams')
+                ->orderBy('name')
+                ->take(5)
+                ->get(),
+            'teamsWithoutMembers' => Team::with(['project', 'lead'])
+                ->whereDoesntHave('regularMembers')
+                ->orderBy('name')
+                ->take(5)
+                ->get(),
+        ];
+
         return view('livewire.admin.admin-dashboard',
-            compact('stats', 'taskStats', 'newUsers', 'activeProjects'));
+            compact('stats', 'taskStats', 'newUsers', 'activeProjects', 'attention'));
     }
 }

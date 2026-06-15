@@ -6,6 +6,79 @@
     @endif
 
     {{-- ── Summary stat cards ─────────────────────────────────────────────────── --}}
+    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+            <div>
+                <h2 class="text-sm font-semibold text-gray-900">Today Focus</h2>
+                <p class="mt-0.5 text-xs text-gray-400">Overdue, due today, and active work that needs your attention.</p>
+            </div>
+            <span class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                {{ $focusTasks->count() }} task{{ $focusTasks->count() !== 1 ? 's' : '' }}
+            </span>
+        </div>
+
+        @if($focusTasks->isEmpty())
+            <div class="px-5 py-8 text-center text-sm text-gray-400">
+                Nothing urgent right now. Nice, steady day.
+            </div>
+        @else
+            <div class="grid grid-cols-1 divide-y divide-gray-100 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+                @foreach($focusTasks->take(3) as $task)
+                    @php
+                        $isOverdue = $task->due_date && $task->due_date->toDateString() < now()->toDateString();
+                        $isDueToday = $task->due_date && $task->due_date->isToday();
+                        $tone = $isOverdue ? 'red' : ($isDueToday ? 'amber' : ($task->personal_status === 'review' ? 'amber' : 'blue'));
+                        $toneClass = match($tone) {
+                            'red' => 'bg-red-50 text-red-700 border-red-100',
+                            'amber' => 'bg-amber-50 text-amber-800 border-amber-100',
+                            default => 'bg-blue-50 text-blue-700 border-blue-100',
+                        };
+                    @endphp
+                    <div role="button"
+                         tabindex="0"
+                         wire:click="openFocusTask({{ $task->id }})"
+                         wire:keydown.enter="openFocusTask({{ $task->id }})"
+                         wire:keydown.space="openFocusTask({{ $task->id }})"
+                         class="block w-full cursor-pointer p-4 text-left transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500">
+                        <div class="mb-3 flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-semibold text-gray-900">{{ $task->title }}</p>
+                                <p class="mt-0.5 truncate text-xs text-gray-400">{{ $task->project?->name ?? 'No Project' }} / {{ $task->team?->name ?? 'No Team' }}</p>
+                            </div>
+                            <span class="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold {{ $toneClass }}">
+                                @if($isOverdue)
+                                    Overdue
+                                @elseif($isDueToday)
+                                    Due Today
+                                @else
+                                    {{ ucfirst(str_replace('_', ' ', $task->personal_status)) }}
+                                @endif
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="text-xs text-gray-500">
+                                Due {{ $task->due_date?->format('M d, Y') ?? 'not set' }}
+                            </p>
+                            @if($task->personal_status === 'pending')
+                                <button type="button" wire:click.stop="setStatus({{ $task->id }}, 'in_progress')" class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
+                                    Start
+                                </button>
+                            @elseif($task->personal_status === 'in_progress')
+                                <button type="button" wire:click.stop="setStatus({{ $task->id }}, 'review')" class="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600">
+                                    Review
+                                </button>
+                            @elseif($task->personal_status === 'review')
+                                <button type="button" wire:click.stop="setStatus({{ $task->id }}, 'done')" class="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
+                                    Done
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
+
     <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
 
         {{-- Pending --}}
@@ -85,6 +158,21 @@
 
     {{-- ── Filter + Sort bar ──────────────────────────────────────────────────── --}}
     <div class="flex flex-wrap items-center gap-3">
+
+        @if($teams->isNotEmpty())
+            <div class="flex items-center gap-2">
+                <label class="text-xs font-medium text-gray-500">Working in</label>
+                <select wire:model.live="filterTeam"
+                        class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    <option value="0">All my teams</option>
+                    @foreach($teams as $team)
+                        <option value="{{ $team->id }}">
+                            {{ $team->name }}@if($team->project) / {{ $team->project->name }}@endif
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+        @endif
 
         {{-- Project filter --}}
         @if($projects->isNotEmpty())
@@ -179,8 +267,8 @@
                 @foreach($tasks as $task)
                     @php
                         $today       = now()->toDateString();
-                        $isOverdue   = $task->due_date && $task->due_date->toDateString() < $today && $task->status !== 'done';
-                        $isDueToday  = $task->due_date && $task->due_date->toDateString() === $today && $task->status !== 'done';
+                        $isOverdue   = $task->due_date && $task->due_date->toDateString() < $today && $task->personal_status !== 'done';
+                        $isDueToday  = $task->due_date && $task->due_date->toDateString() === $today && $task->personal_status !== 'done';
                         $daysLeft    = $task->due_date ? (int) now()->startOfDay()->diffInDays($task->due_date, false) : null;
                         $isExpanded  = $expandedTaskId === $task->id;
 
@@ -217,7 +305,7 @@
                                             </svg>
 
                                             <h3 class="text-sm font-semibold text-gray-900 group-hover:text-indigo-700 transition
-                                                       {{ $task->status === 'done' ? 'line-through text-gray-400' : '' }}">
+                                                       {{ $task->personal_status === 'done' ? 'line-through text-gray-400' : '' }}">
                                                 {{ $task->title }}
                                             </h3>
 
@@ -249,7 +337,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                       d="M3 7h18M3 12h18M3 17h18"/>
                                             </svg>
-                                            <span>{{ $task->project->name }}</span>
+                                            <span>{{ $task->project?->name ?? 'No Project' }}</span>
                                             <span class="text-gray-300">/</span>
                                             <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -283,16 +371,16 @@
 
                                         {{-- Quick-action buttons (compact, always visible) --}}
                                         <div class="flex flex-wrap items-center justify-end gap-1.5">
-                                            @if($task->status !== 'done')
-                                                @if(! in_array($task->status, ['in_progress', 'review'], true))
+                                            @if($task->personal_status !== 'done')
+                                                @if(! in_array($task->personal_status, ['in_progress', 'review'], true))
                                                     <button wire:click="setStatus({{ $task->id }}, 'in_progress')"
                                                             title="Mark In Progress"
                                                             class="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition">
-                                                        {{ $task->status === 'pending' ? 'Start' : 'Resume' }}
+                                                        {{ $task->personal_status === 'pending' ? 'Start' : 'Resume' }}
                                                     </button>
                                                 @endif
 
-                                                @if($task->status === 'in_progress')
+                                                @if($task->personal_status === 'in_progress')
                                                     <button wire:click="setStatus({{ $task->id }}, 'review')"
                                                             title="Send for Review"
                                                             class="px-2.5 py-1 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition">
@@ -300,7 +388,7 @@
                                                     </button>
                                                 @endif
 
-                                                @if($task->status === 'review')
+                                                @if($task->personal_status === 'review')
                                                     <button wire:click="setStatus({{ $task->id }}, 'in_progress')"
                                                             title="Back to In Progress"
                                                             class="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition">
@@ -362,40 +450,40 @@
                                                 <button wire:click="setStatus({{ $task->id }}, 'pending')"
                                                         @class([
                                                             'px-3 py-1.5 text-xs font-medium rounded-lg border transition',
-                                                            'bg-gray-700 border-gray-700 text-white cursor-default' => $task->status === 'pending',
-                                                            'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' => $task->status !== 'pending',
+                                                            'bg-gray-700 border-gray-700 text-white cursor-default' => $task->personal_status === 'pending',
+                                                            'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' => $task->personal_status !== 'pending',
                                                         ])
-                                                        @disabled($task->status === 'pending')>
+                                                        @disabled($task->personal_status === 'pending')>
                                                     Pending
                                                 </button>
 
                                                 <button wire:click="setStatus({{ $task->id }}, 'in_progress')"
                                                         @class([
                                                             'px-3 py-1.5 text-xs font-medium rounded-lg border transition',
-                                                            'bg-blue-600 border-blue-600 text-white cursor-default' => $task->status === 'in_progress',
-                                                            'bg-white border-blue-200 text-blue-600 hover:bg-blue-50' => $task->status !== 'in_progress',
+                                                            'bg-blue-600 border-blue-600 text-white cursor-default' => $task->personal_status === 'in_progress',
+                                                            'bg-white border-blue-200 text-blue-600 hover:bg-blue-50' => $task->personal_status !== 'in_progress',
                                                         ])
-                                                        @disabled($task->status === 'in_progress')>
+                                                        @disabled($task->personal_status === 'in_progress')>
                                                     In Progress
                                                 </button>
 
                                                 <button wire:click="setStatus({{ $task->id }}, 'review')"
                                                         @class([
                                                             'px-3 py-1.5 text-xs font-medium rounded-lg border transition',
-                                                            'bg-amber-500 border-amber-500 text-white cursor-default' => $task->status === 'review',
-                                                            'bg-white border-amber-200 text-amber-800 hover:bg-amber-50' => $task->status !== 'review',
+                                                            'bg-amber-500 border-amber-500 text-white cursor-default' => $task->personal_status === 'review',
+                                                            'bg-white border-amber-200 text-amber-800 hover:bg-amber-50' => $task->personal_status !== 'review',
                                                         ])
-                                                        @disabled($task->status === 'review')>
+                                                        @disabled($task->personal_status === 'review')>
                                                     Review
                                                 </button>
 
                                                 <button wire:click="setStatus({{ $task->id }}, 'done')"
                                                         @class([
                                                             'px-3 py-1.5 text-xs font-medium rounded-lg border transition',
-                                                            'bg-green-600 border-green-600 text-white cursor-default' => $task->status === 'done',
-                                                            'bg-white border-green-200 text-green-600 hover:bg-green-50' => $task->status !== 'done',
+                                                            'bg-green-600 border-green-600 text-white cursor-default' => $task->personal_status === 'done',
+                                                            'bg-white border-green-200 text-green-600 hover:bg-green-50' => $task->personal_status !== 'done',
                                                         ])
-                                                        @disabled($task->status === 'done')>
+                                                        @disabled($task->personal_status === 'done')>
                                                     Done
                                                 </button>
 
@@ -431,7 +519,7 @@
                                         <dl class="space-y-2 text-sm">
                                             <div class="flex justify-between gap-2">
                                                 <dt class="text-gray-400">Project</dt>
-                                                <dd class="font-medium text-gray-800 text-right">{{ $task->project->name }}</dd>
+                                                <dd class="font-medium text-gray-800 text-right">{{ $task->project?->name ?? 'No Project' }}</dd>
                                             </div>
                                             <div class="flex justify-between gap-2">
                                                 <dt class="text-gray-400">Team</dt>
@@ -446,9 +534,17 @@
                                                 </dd>
                                             </div>
                                             @if($task->start_date)
+                                                @php
+                                                    $myProgress = $task->memberProgress->firstWhere('user_id', auth()->id());
+                                                @endphp
                                                 <div class="flex justify-between gap-2">
                                                     <dt class="text-gray-400">Start Date</dt>
-                                                    <dd class="font-medium text-gray-800">{{ $task->start_date->format('M d, Y') }}</dd>
+                                                    <dd class="font-medium text-gray-800">
+                                                        {{ $task->start_date->format('M d, Y') }}
+                                                        @if($myProgress && $myProgress->started_at)
+                                                            <div class="text-xs text-gray-500">Started at {{ $myProgress->started_at->format('M d, Y h:i A') }}</div>
+                                                        @endif
+                                                    </dd>
                                                 </div>
                                             @endif
                                             <div class="flex justify-between gap-2">
@@ -461,19 +557,19 @@
                                                 <dt class="text-gray-400">Status</dt>
                                                 <dd>
                                                     @php
-                                                        $statusBadge = match($task->status) {
+                                                        $statusBadge = match($task->personal_status) {
                                                             'pending'     => 'bg-gray-100 text-gray-600',
                                                             'in_progress' => 'bg-blue-100 text-blue-700',
                                                             'review'      => 'bg-amber-100 text-amber-800',
                                                             'done'        => 'bg-green-100 text-green-700',
                                                             default       => 'bg-gray-100 text-gray-500',
                                                         };
-                                                        $statusLabel = match($task->status) {
+                                                        $statusLabel = match($task->personal_status) {
                                                             'pending'     => 'Pending',
                                                             'in_progress' => 'In Progress',
                                                             'review'      => 'Review',
                                                             'done'        => 'Done',
-                                                            default       => ucfirst($task->status),
+                                                            default       => ucfirst($task->personal_status),
                                                         };
                                                     @endphp
                                                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $statusBadge }}">

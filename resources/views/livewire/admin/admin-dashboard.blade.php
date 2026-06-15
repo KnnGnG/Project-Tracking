@@ -106,6 +106,94 @@
     @endif
 
     {{-- ── Main two-column row ──────────────────────────────────────────────── --}}
+    @php
+        $attentionTotal = $attention['overdueTasks']->count()
+            + $attention['endingSoonProjects']->count()
+            + $attention['projectsWithoutTeams']->count()
+            + $attention['teamsWithoutMembers']->count();
+    @endphp
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+            <div>
+                <h3 class="text-sm font-semibold text-gray-800">Needs Attention</h3>
+                <p class="mt-0.5 text-xs text-gray-400">Operational items that can block delivery.</p>
+            </div>
+            <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+                {{ $attentionTotal }} item{{ $attentionTotal !== 1 ? 's' : '' }}
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 divide-y divide-gray-100 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
+            <div class="p-4">
+                <div class="mb-3 flex items-center justify-between">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-red-600">Overdue Tasks</p>
+                    <span class="text-xs font-bold text-red-600">{{ $attention['overdueTasks']->count() }}</span>
+                </div>
+                <div class="space-y-2">
+                    @forelse($attention['overdueTasks'] as $task)
+                        <div class="rounded-lg bg-red-50 px-3 py-2">
+                            <p class="truncate text-sm font-semibold text-red-900">{{ $task->title }}</p>
+                            <p class="mt-0.5 truncate text-xs text-red-500">{{ $task->project?->name }} / Due {{ $task->due_date?->format('M d') }}</p>
+                        </div>
+                    @empty
+                        <p class="rounded-lg bg-gray-50 px-3 py-4 text-center text-xs text-gray-400">No overdue tasks.</p>
+                    @endforelse
+                </div>
+            </div>
+
+            <div class="p-4">
+                <div class="mb-3 flex items-center justify-between">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Ending Soon</p>
+                    <span class="text-xs font-bold text-amber-700">{{ $attention['endingSoonProjects']->count() }}</span>
+                </div>
+                <div class="space-y-2">
+                    @forelse($attention['endingSoonProjects'] as $project)
+                        <div class="rounded-lg bg-amber-50 px-3 py-2">
+                            <p class="truncate text-sm font-semibold text-amber-950">{{ $project->name }}</p>
+                            <p class="mt-0.5 text-xs text-amber-600">Due {{ $project->end_date->format('M d') }} / {{ $project->tasks_count }} tasks</p>
+                        </div>
+                    @empty
+                        <p class="rounded-lg bg-gray-50 px-3 py-4 text-center text-xs text-gray-400">No projects due this week.</p>
+                    @endforelse
+                </div>
+            </div>
+
+            <div class="p-4">
+                <div class="mb-3 flex items-center justify-between">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">No Teams</p>
+                    <span class="text-xs font-bold text-indigo-700">{{ $attention['projectsWithoutTeams']->count() }}</span>
+                </div>
+                <div class="space-y-2">
+                    @forelse($attention['projectsWithoutTeams'] as $project)
+                        <div class="rounded-lg bg-indigo-50 px-3 py-2">
+                            <p class="truncate text-sm font-semibold text-indigo-950">{{ $project->name }}</p>
+                            <p class="mt-0.5 truncate text-xs text-indigo-500">{{ $project->client?->name ?? 'No client' }}</p>
+                        </div>
+                    @empty
+                        <p class="rounded-lg bg-gray-50 px-3 py-4 text-center text-xs text-gray-400">Every project has a team.</p>
+                    @endforelse
+                </div>
+            </div>
+
+            <div class="p-4">
+                <div class="mb-3 flex items-center justify-between">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-700">Empty Teams</p>
+                    <span class="text-xs font-bold text-gray-700">{{ $attention['teamsWithoutMembers']->count() }}</span>
+                </div>
+                <div class="space-y-2">
+                    @forelse($attention['teamsWithoutMembers'] as $team)
+                        <div class="rounded-lg bg-gray-50 px-3 py-2">
+                            <p class="truncate text-sm font-semibold text-gray-900">{{ $team->name }}</p>
+                            <p class="mt-0.5 truncate text-xs text-gray-500">{{ $team->project?->name }} / {{ $team->lead?->name ?? 'No lead' }}</p>
+                        </div>
+                    @empty
+                        <p class="rounded-lg bg-gray-50 px-3 py-4 text-center text-xs text-gray-400">Every team has members.</p>
+                    @endforelse
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
         {{-- ── New registrations (role approval) ──────────────────────────── --}}

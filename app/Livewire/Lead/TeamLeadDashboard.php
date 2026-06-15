@@ -21,6 +21,8 @@ class TeamLeadDashboard extends Component
 
     public int $year = 1970;
 
+    public array $timelineKinds = ['project', 'task', 'member', 'actual'];
+
     // ── Event form state ──────────────────────────────────────────────────────
     public bool $showEventForm = false;
 
@@ -94,7 +96,7 @@ class TeamLeadDashboard extends Component
 
         $allowed = Team::query()
             ->whereKey($this->selectedTeamId)
-            ->where('lead_id', auth()->id())
+            ->whereHas('leads', fn ($q) => $q->whereKey(auth()->id()))
             ->whereHas('members', fn ($q) => $q->whereKey($userId))
             ->exists();
 
@@ -110,6 +112,21 @@ class TeamLeadDashboard extends Component
     {
         $this->showMemberTasksModal = false;
         $this->modalMemberId = null;
+    }
+
+    public function toggleTimelineKind(string $kind): void
+    {
+        if (! in_array($kind, ['project', 'task', 'member', 'actual'], true)) {
+            return;
+        }
+
+        if (in_array($kind, $this->timelineKinds, true)) {
+            $this->timelineKinds = array_values(array_diff($this->timelineKinds, [$kind]));
+            return;
+        }
+
+        $this->timelineKinds[] = $kind;
+        $this->timelineKinds = array_values(array_unique($this->timelineKinds));
     }
 
     // ── Event CRUD ────────────────────────────────────────────────────────────
@@ -443,6 +460,9 @@ class TeamLeadDashboard extends Component
             $visibleEnd = $end->copy()->min($monthEnd);
             $span = (int) $visibleStart->diffInDays($visibleEnd) + 1;
 
+            $dateRange = $start->format('M d, Y').' - '.$end->format('M d, Y');
+            $tooltipLines = [$label, $title, $dateRange];
+
             return [
                 'kind' => $kind,
                 'label' => $label,
@@ -452,6 +472,8 @@ class TeamLeadDashboard extends Component
                 'span' => max(1, $span),
                 'left' => round(($monthStart->diffInDays($visibleStart) / $totalDays) * 100, 2),
                 'width' => max(2.5, round(($span / $totalDays) * 100, 2)),
+                'tooltip' => implode("\n", $tooltipLines),
+                'tooltipLines' => $tooltipLines,
             ];
         };
 
@@ -469,6 +491,17 @@ class TeamLeadDashboard extends Component
                 $taskRow = $makeRow('task', 'Task', $task->title, $start, $end);
 
                 if ($taskRow) {
+                    $taskRow['statusLabel'] = ucwords(str_replace('_', ' ', $task->status));
+                    $taskRow['tooltipLines'] = [
+                        'Task',
+                        $task->title,
+                        'Status: '.$taskRow['statusLabel'],
+                        'Priority: '.ucfirst($task->priority ?? 'normal'),
+                        'Start: '.($task->start_date ? $task->start_date->format('M d, Y') : 'Not set'),
+                        'Due: '.($task->due_date ? $task->due_date->format('M d, Y') : 'No due date'),
+                    ];
+                    $taskRow['tooltip'] = implode("\n", $taskRow['tooltipLines']);
+
                     $rows->push($taskRow);
                 }
 
@@ -530,10 +563,24 @@ class TeamLeadDashboard extends Component
                     );
 
                     if ($actualStartRow) {
+                        // expose the precise started timestamp for the UI hover
+                        $actualStartRow['startedAt'] = $progress->started_at?->format('M d, Y h:i A') ?? null;
+                        $actualStartRow['tooltipLines'] = [
+                            $progress->user->name,
+                            'Task: '.$task->title,
+                            'Started: '.($progress->started_at?->format('M d, Y h:i A') ?? $memberStart->format('M d, Y')),
+                            'Due: '.($task->due_date ? $task->due_date->format('M d, Y') : 'No due date'),
+                            $timing,
+                        ];
+                        $actualStartRow['tooltip'] = implode("\n", $actualStartRow['tooltipLines']);
+
                         $rows->push($actualStartRow);
                     }
                 });
             });
+
+        $today = now();
+        $todayDay = $today->betweenIncluded($monthStart, $monthEnd) ? $today->day : null;
 
         $tickDays = collect(range(1, $monthEnd->day))
             ->map(function (int $day) use ($monthStart, $totalDays) {
@@ -551,6 +598,7 @@ class TeamLeadDashboard extends Component
             'rows' => $rows->values(),
             'ticks' => $tickDays,
             'totalDays' => $totalDays,
+            'todayDay' => $todayDay,
         ];
     }
 
@@ -574,10 +622,12 @@ class TeamLeadDashboard extends Component
         $progressPct = 0;
         $calendarGrid = [];
         $calendarWeekBars = [];
+        $atRiskTasks = collect();
         $timelineGraph = [
             'rows' => collect(),
             'ticks' => collect(),
             'totalDays' => 30,
+            'todayDay' => null,
         ];
         $monthLabel = Carbon::create($this->year, $this->month, 1)->format('F Y');
 
@@ -600,6 +650,9 @@ class TeamLeadDashboard extends Component
                 );
                 $calendarWeekBars = $this->buildCalendarWeekBars($project, $tasks, $calendarGrid);
                 $timelineGraph = $this->buildTimelineGraph($project, $tasks, $monthStart, $monthEnd);
+                $timelineGraph['rows'] = $timelineGraph['rows']
+                    ->filter(fn ($row) => in_array($row['kind'], $this->timelineKinds, true))
+                    ->values();
 
                 $total = $tasks->count();
                 $done = $tasks->where('status', 'done')->count();
@@ -616,6 +669,14 @@ class TeamLeadDashboard extends Component
                 ];
 
                 $tasksByPriority = $tasks->groupBy('priority');
+                $atRiskTasks = $tasks
+                    ->filter(fn ($task) => $task->status !== 'done'
+                        && $task->due_date
+                        && ! $task->isExceededDeadline()
+                        && now()->startOfDay()->diffInDays($task->due_date, false) <= 3)
+                    ->sortBy('due_date')
+                    ->take(5)
+                    ->values();
                 $memberTasksMap = collect();
                 $tasks
                     ->sortBy(fn ($task) => optional($task->due_date)->timestamp ?? PHP_INT_MAX)
@@ -666,7 +727,7 @@ class TeamLeadDashboard extends Component
         return view('livewire.lead.team-lead-dashboard', compact(
             'teams', 'selectedTeam', 'project', 'stats',
             'tasksByPriority', 'memberTasksMap', 'memberStartActivities', 'events', 'daysRemaining', 'progressPct',
-            'modalMember', 'modalMemberTasks', 'calendarGrid', 'calendarWeekBars', 'timelineGraph', 'monthLabel',
+            'modalMember', 'modalMemberTasks', 'calendarGrid', 'calendarWeekBars', 'timelineGraph', 'monthLabel', 'atRiskTasks',
         ));
     }
 }

@@ -30,50 +30,109 @@
                 <p class="text-sm">No tasks yet for this team — analytics will populate once tasks exist.</p>
             </div>
         @else
-            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {{-- Burndown --}}
-                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                    <h2 class="text-sm font-semibold text-gray-800 mb-1">Task completion (burndown)</h2>
-                    <p class="text-xs text-gray-500 mb-4">
-                        Open tasks versus calendar time. The dashed grey line shows a linear pace to your project deadline;
-                        overlap with teal means you are trending on track.
-                        Orange shows calendar days remaining (right axis).
-                    </p>
+            <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                {{-- Completed tasks --}}
+                <div class="xl:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                    <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-sm font-semibold text-gray-900">Completed Tasks Over Time</h2>
+                            <p class="mt-1 text-xs text-gray-500">Counts tasks completed each day using the task completion date.</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select wire:model.live="completionDays"
+                                    class="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 focus:border-indigo-400 focus:ring-indigo-400">
+                                <option value="7">Last 7 days</option>
+                                <option value="14">Last 14 days</option>
+                                <option value="30">Last 30 days</option>
+                                <option value="60">Last 60 days</option>
+                            </select>
+
+                            <select wire:model.live="completionMemberId"
+                                    class="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 focus:border-indigo-400 focus:ring-indigo-400">
+                                <option value="0">All members</option>
+                                @foreach($selectedTeam->members as $member)
+                                    <option value="{{ $member->id }}">{{ $member->name }}</option>
+                                @endforeach
+                            </select>
+
+                            <select wire:model.live="completionPriority"
+                                    class="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 focus:border-indigo-400 focus:ring-indigo-400">
+                                <option value="all">All priorities</option>
+                                <option value="high">High priority</option>
+                                <option value="medium">Medium priority</option>
+                                <option value="low">Low priority</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="relative h-72">
-                        <canvas id="chart-burndown-lead-{{ $selectedTeamId }}"></canvas>
+                        <canvas id="chart-completed-lead-{{ $selectedTeamId }}"></canvas>
                     </div>
                 </div>
 
-                {{-- Donut --}}
-                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                    <h2 class="text-sm font-semibold text-gray-800 mb-1">Early / on-time vs overdue burden</h2>
-                    <p class="text-xs text-gray-500 mb-4">
-                        <strong>Early / on-time</strong>: finished by the due date, or still open before the deadline.
-                        <strong>Overdue</strong>: delivered late after the due date, or still incomplete past the deadline.
-                    </p>
+                {{-- Late split --}}
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                    <div class="mb-3">
+                        <h2 class="text-sm font-semibold text-gray-900">On Time vs Late</h2>
+                        <p class="mt-1 text-xs text-gray-500">Green is good. Red needs follow-up.</p>
+                    </div>
                     <div class="relative max-w-sm mx-auto h-64 flex items-center justify-center">
                         <canvas id="chart-donut-lead-{{ $selectedTeamId }}"></canvas>
                     </div>
                 </div>
 
-                {{-- CFD full width --}}
-                <div class="xl:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                    <h2 class="text-sm font-semibold text-gray-800 mb-1">Cumulative flow (by stage)</h2>
-                    <p class="text-xs text-gray-500 mb-4">
-                        Stacked area shows where work accumulates across <strong>To do</strong> (pending),
-                        <strong>In progress</strong>, <strong>Review</strong>, and <strong>Done</strong>.
-                    </p>
-                    <div class="relative h-80">
-                        <canvas id="chart-cfd-lead-{{ $selectedTeamId }}"></canvas>
+                {{-- Velocity --}}
+                <div class="xl:col-span-3 bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                    <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-sm font-semibold text-gray-900">Hours Logged by Member</h2>
+                            <p class="mt-1 text-xs text-gray-500">
+                                Y-axis is total hours logged. General work is included when status is set to all.
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select wire:model.live="velocityDays"
+                                    class="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 focus:border-indigo-400 focus:ring-indigo-400">
+                                <option value="7">Last 7 days</option>
+                                <option value="14">Last 14 days</option>
+                                <option value="30">Last 30 days</option>
+                                <option value="60">Last 60 days</option>
+                            </select>
+
+                            <select wire:model.live="velocityMemberId"
+                                    class="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 focus:border-indigo-400 focus:ring-indigo-400">
+                                <option value="0">All members</option>
+                                @foreach($selectedTeam->members as $member)
+                                    <option value="{{ $member->id }}">{{ $member->name }}</option>
+                                @endforeach
+                            </select>
+
+                            <select wire:model.live="velocityTaskStatus"
+                                    class="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 focus:border-indigo-400 focus:ring-indigo-400">
+                                <option value="all">All task statuses</option>
+                                <option value="pending">Pending tasks</option>
+                                <option value="in_progress">In progress tasks</option>
+                                <option value="review">Review tasks</option>
+                                <option value="done">Done tasks</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="relative h-64">
+                        @if($velocity)
+                            <canvas id="chart-velocity-lead-{{ $selectedTeamId }}"></canvas>
+                        @else
+                            <div class="flex h-full items-center justify-center rounded-lg bg-gray-50 text-sm text-gray-400">
+                                No journal hours logged for these filters yet.
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
 
             <script type="application/json" id="lead-analytics-chart-data-{{ $selectedTeamId }}">
                 {!! json_encode([
-                    'burndown' => $burndown,
-                    'cfd' => $cfd,
+                    'completed' => $completedTasks,
                     'donut' => $punctuality,
+                    'velocity' => $velocity,
                 ]) !!}
             </script>
         @endif
@@ -110,76 +169,69 @@
         return nodes[nodes.length - 1];
     }
 
+    function formatHours(value) {
+        var totalMinutes = Math.round((Number(value) || 0) * 60);
+        var hours = Math.floor(totalMinutes / 60);
+        var minutes = totalMinutes % 60;
+
+        if (hours > 0 && minutes > 0) {
+            return hours + 'h ' + minutes + 'm';
+        }
+
+        if (hours > 0) {
+            return hours + 'h';
+        }
+
+        return minutes + 'm';
+    }
+
     function buildChartsFromPayload(payload) {
         destroyCharts();
 
         var p = palette();
         if (!payload || !window.Chart) return;
 
-        /* Burndown */
-        var bd = payload.burndown;
-        if (bd && bd.labels && bd.labels.length && document.getElementById('chart-burndown-lead-' + window.__leadAnalyticsTeamKey)) {
-            var ctxBd = document.getElementById('chart-burndown-lead-' + window.__leadAnalyticsTeamKey);
-            charts.push(new Chart(ctxBd.getContext('2d'), {
+        /* Completed tasks */
+        var completed = payload.completed;
+        var completedEl = document.getElementById('chart-completed-lead-' + window.__leadAnalyticsTeamKey);
+        if (completed && completed.labels && completed.labels.length && completedEl) {
+            charts.push(new Chart(completedEl.getContext('2d'), {
                 type: 'line',
                 data: {
-                    labels: bd.labels,
-                    datasets: [
-                        {
-                            label: 'Open tasks (actual)',
-                            data: bd.actual,
-                            borderColor: p.teal,
-                            backgroundColor: 'rgba(13,148,136,0.06)',
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0.15,
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'Ideal pace to deadline',
-                            data: bd.ideal,
-                            borderColor: p.slate400,
-                            borderDash: [6, 6],
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0,
-                            pointRadius: 0,
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'Days until project end',
-                            data: bd.days_remaining,
-                            borderColor: p.amber,
-                            backgroundColor: 'rgba(217,119,6,0.05)',
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0.25,
-                            yAxisID: 'y1'
-                        }
-                    ]
+                    labels: completed.labels,
+                    datasets: [{
+                        label: 'Completed tasks',
+                        data: completed.values,
+                        borderColor: p.emerald,
+                        backgroundColor: 'rgba(5,150,105,0.16)',
+                        borderWidth: 2.5,
+                        fill: true,
+                        stepped: true,
+                        tension: 0,
+                        pointRadius: 2.5,
+                        pointHoverRadius: 5
+                    }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
                     scales: {
+                        x: {
+                            grid: { color: 'rgba(148,163,184,0.12)' },
+                            ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }
+                        },
                         y: {
                             type: 'linear',
                             display: true,
                             position: 'left',
-                            title: { display: true, text: 'Open tasks' },
-                            ticks: { precision: 0 }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            grid: { drawOnChartArea: false },
-                            title: { display: true, text: 'Days left' },
-                            ticks: { precision: 0 }
+                            title: { display: true, text: 'Completed tasks' },
+                            beginAtZero: true,
+                            ticks: { precision: 0 },
+                            grid: { color: 'rgba(148,163,184,0.18)' }
                         }
                     },
-                    plugins: { legend: { position: 'bottom' } }
+                    plugins: { legend: { display: false } }
                 }
             }));
         }
@@ -219,72 +271,42 @@
             }));
         }
 
-        /* CFD */
-        var cfd = payload.cfd;
-        var cfdEl = document.getElementById('chart-cfd-lead-' + window.__leadAnalyticsTeamKey);
-        if (cfd && cfd.labels && cfd.labels.length && cfdEl) {
-            charts.push(new Chart(cfdEl.getContext('2d'), {
-                type: 'line',
+        /* Velocity */
+        var velocity = payload.velocity;
+        var velocityEl = document.getElementById('chart-velocity-lead-' + window.__leadAnalyticsTeamKey);
+        if (velocity && velocity.labels && velocity.labels.length && velocity.datasets && velocityEl) {
+            charts.push(new Chart(velocityEl.getContext('2d'), {
+                type: 'bar',
                 data: {
-                    labels: cfd.labels,
-                    datasets: [
-                        {
-                            label: 'To do',
-                            data: cfd.to_do,
-                            stack: 'cfd',
-                            borderColor: 'rgba(100,116,139,0.95)',
-                            backgroundColor: 'rgba(226,232,240,0.75)',
-                            fill: true,
-                            tension: 0.05,
-                            pointRadius: 0
-                        },
-                        {
-                            label: 'In progress',
-                            data: cfd.in_progress,
-                            stack: 'cfd',
-                            borderColor: 'rgba(37,99,235,0.95)',
-                            backgroundColor: 'rgba(147,197,253,0.45)',
-                            fill: true,
-                            tension: 0.05,
-                            pointRadius: 0
-                        },
-                        {
-                            label: 'Review',
-                            data: cfd.review,
-                            stack: 'cfd',
-                            borderColor: 'rgba(245,158,11,0.95)',
-                            backgroundColor: 'rgba(251,191,36,0.45)',
-                            fill: true,
-                            tension: 0.05,
-                            pointRadius: 0
-                        },
-                        {
-                            label: 'Done',
-                            data: cfd.done,
-                            stack: 'cfd',
-                            borderColor: 'rgba(5,150,105,0.95)',
-                            backgroundColor: 'rgba(5,150,105,0.35)',
-                            fill: true,
-                            tension: 0.05,
-                            pointRadius: 0
-                        }
-                    ]
+                    labels: velocity.labels,
+                    datasets: velocity.datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
                     scales: {
                         x: {
-                            stacked: true,
-                            ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }
+                            grid: { display: false },
+                            ticks: { color: '#64748b', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
                         },
                         y: {
-                            stacked: true,
-                            title: { display: true, text: 'Tasks' },
-                            ticks: { precision: 0 }
+                            beginAtZero: true,
+                            title: { display: true, text: 'Hours logged' },
+                            ticks: { precision: 0 },
+                            grid: { color: 'rgba(148,163,184,0.18)' }
                         }
                     },
-                    plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', intersect: false } }
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    return ctx.dataset.label + ': ' + formatHours(ctx.raw);
+                                }
+                            }
+                        }
+                    }
                 }
             }));
         }

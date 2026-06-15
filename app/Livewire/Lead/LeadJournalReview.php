@@ -46,10 +46,10 @@ class LeadJournalReview extends Component
             ->orderBy('title')
             ->get();
 
-        $query = JournalLog::with(['user', 'task.project', 'task.team'])
-            ->whereHas('task', fn ($q) => $q->whereIn('team_id', $teamIds))
+        $query = JournalLog::with(['user', 'task.project', 'task.team', 'team.project'])
+            ->whereIn('team_id', $teamIds)
             ->when($this->logDate, fn ($q) => $q->whereDate('log_date', $this->logDate))
-            ->when($this->teamId !== '', fn ($q) => $q->whereHas('task', fn ($task) => $task->where('team_id', $this->teamId)))
+            ->when($this->teamId !== '', fn ($q) => $q->where('team_id', $this->teamId))
             ->when($this->memberId !== '', fn ($q) => $q->where('user_id', $this->memberId))
             ->when($this->taskId !== '', fn ($q) => $q->where('task_id', $this->taskId));
 

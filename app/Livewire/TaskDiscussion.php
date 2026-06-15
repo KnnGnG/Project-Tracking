@@ -69,9 +69,13 @@ class TaskDiscussion extends Component
                 if ($user->isMember()) {
                     $q->where('assigned_to', $user->id)
                         ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($user->id));
-                } elseif ($user->isTeamLead()) {
-                    $q->whereIn('team_id', $user->ledTeams()->pluck('id'));
-                } elseif (! $user->isAdmin()) {
+                }
+
+                if ($user->isTeamLead()) {
+                    $q->orWhereIn('team_id', $user->ledTeams()->pluck('id'));
+                }
+
+                if (! $user->isAdmin() && ! $user->isMember() && ! $user->isTeamLead()) {
                     $q->whereRaw('0 = 1');
                 }
             })
@@ -80,9 +84,13 @@ class TaskDiscussion extends Component
 
     private function notifyComment(Task $task): void
     {
+        $leadIds = $task->team
+            ? $task->team->leads()->pluck('users.id')->push($task->team->lead_id)
+            : collect();
+
         $recipientIds = $task->assignees->pluck('id')
             ->push($task->assigned_to)
-            ->push($task->team?->lead_id)
+            ->merge($leadIds)
             ->filter()
             ->unique()
             ->reject(fn ($userId) => $userId === auth()->id());

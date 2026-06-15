@@ -46,9 +46,11 @@
             <article class="border-b border-gray-100 px-5 py-4 last:border-b-0">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <p class="text-sm font-semibold text-gray-900">{{ $log->task?->title }}</p>
+                        <p class="text-sm font-semibold text-gray-900">{{ $log->task?->title ?? 'General work' }}</p>
                         <p class="mt-0.5 text-xs text-gray-500">
-                            {{ $log->user?->name ?? 'Deleted user' }} / {{ $log->task?->team?->name }} / {{ $log->task?->project?->name }}
+                            {{ $log->user?->name ?? 'Deleted user' }}
+                            / {{ $log->task?->team?->name ?? $log->team?->name ?? 'No team' }}
+                            / {{ $log->task?->project?->name ?? $log->team?->project?->name ?? 'No project' }}
                         </p>
                     </div>
                     <div class="text-right">

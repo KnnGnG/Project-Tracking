@@ -351,7 +351,7 @@ class LeadTaskManager extends Component
         $leadTeams = auth()->user()->ledTeams()->with('project')->get();
 
         // Tasks visible to this lead — filtered
-        $tasks = Task::with(['assignee', 'assignees', 'team', 'project'])
+        $tasks = Task::with(['assignee', 'assignees', 'team', 'project', 'memberProgress.user'])
             ->whereIn('team_id', $leadTeams->pluck('id'))
             ->when($this->filterTeamId, fn ($q) => $q->where('team_id', $this->filterTeamId))
             ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))

@@ -96,6 +96,90 @@
             @endif
         </div>
 
+        @if($projectHealth)
+            @php
+                $healthClasses = match($projectHealth['healthTone']) {
+                    'red' => 'bg-red-50 text-red-700 border-red-100',
+                    'amber' => 'bg-amber-50 text-amber-800 border-amber-100',
+                    default => 'bg-green-50 text-green-700 border-green-100',
+                };
+            @endphp
+            <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                <div class="xl:col-span-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Project Health</p>
+                            <div class="mt-2 flex flex-wrap items-center gap-3">
+                                <span class="rounded-full border px-3 py-1 text-sm font-bold {{ $healthClasses }}">
+                                    {{ $projectHealth['healthLabel'] }}
+                                </span>
+                                <p class="text-sm text-gray-500">
+                                    {{ $projectHealth['doneTasks'] }} of {{ $projectHealth['totalTasks'] }} deliverables completed.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-3xl font-extrabold text-indigo-600">{{ $projectHealth['completion'] }}%</p>
+                            <p class="text-xs text-gray-400">Complete</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                        <div class="rounded-lg bg-gray-50 p-3">
+                            <p class="text-lg font-bold text-gray-900">{{ $projectHealth['activeTasks'] }}</p>
+                            <p class="text-xs font-medium text-gray-400">Active</p>
+                        </div>
+                        <div class="rounded-lg bg-amber-50 p-3">
+                            <p class="text-lg font-bold text-amber-800">{{ $projectHealth['reviewTasks'] }}</p>
+                            <p class="text-xs font-medium text-amber-700">In Review</p>
+                        </div>
+                        <div class="rounded-lg bg-red-50 p-3">
+                            <p class="text-lg font-bold text-red-700">{{ $projectHealth['delayedTasks'] }}</p>
+                            <p class="text-xs font-medium text-red-600">Delayed</p>
+                        </div>
+                        <div class="rounded-lg bg-indigo-50 p-3">
+                            <p class="text-lg font-bold text-indigo-700">{{ $selectedProject->teams->count() }}</p>
+                            <p class="text-xs font-medium text-indigo-600">Teams</p>
+                        </div>
+                    </div>
+
+                    @if($projectHealth['nextMilestone'])
+                        <div class="mt-4 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-indigo-500">Next Milestone</p>
+                            <div class="mt-1 flex flex-wrap items-center justify-between gap-2">
+                                <p class="text-sm font-semibold text-indigo-950">{{ $projectHealth['nextMilestone']->title }}</p>
+                                <p class="text-xs font-semibold text-indigo-700">{{ $projectHealth['nextMilestone']->event_date->format('M d, Y') }}</p>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                    <div class="border-b border-gray-100 px-5 py-4">
+                        <h3 class="text-sm font-semibold text-gray-800">Recent Updates</h3>
+                        <p class="mt-0.5 text-xs text-gray-400">Latest visible progress on this project.</p>
+                    </div>
+                    @if($recentUpdates->isEmpty())
+                        <div class="px-5 py-8 text-center text-sm text-gray-400">No updates yet.</div>
+                    @else
+                        <ul class="divide-y divide-gray-50">
+                            @foreach($recentUpdates as $update)
+                                <li class="px-5 py-3">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <p class="truncate text-sm font-semibold text-gray-900">{{ $update['title'] }}</p>
+                                            <p class="mt-0.5 text-xs text-gray-400">{{ $update['label'] }}</p>
+                                        </div>
+                                        <p class="shrink-0 text-xs font-medium text-gray-400">{{ $update['date']?->format('M d') }}</p>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         {{-- ── Calendar + Upcoming events ───────────────────────────────────── --}}
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 

@@ -20,7 +20,16 @@ class RoleMiddleware
             return redirect()->route('login');
         }
 
-        if (! in_array($request->user()->role, $roles)) {
+        $user = $request->user();
+        $allowed = collect($roles)->contains(function (string $role) use ($user): bool {
+            return match ($role) {
+                'team_lead' => $user->isTeamLead(),
+                'member' => $user->isMember(),
+                default => $user->role === $role,
+            };
+        });
+
+        if (! $allowed) {
             abort(403, 'You do not have permission to access this page.');
         }
 

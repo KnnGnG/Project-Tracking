@@ -1,4 +1,4 @@
-<div class="space-y-6" @if(!$showEventForm && !$showMemberTasksModal) wire:poll.visible.10s @endif>
+<div class="space-y-3 text-[14px]" @if(!$showEventForm && !$showMemberTasksModal) wire:poll.visible.10s @endif>
 
     {{-- Flash message --}}
     @if(session('event_success'))
@@ -10,7 +10,7 @@
         <div class="flex gap-2 flex-wrap">
             @foreach($teams as $team)
                 <button wire:click="selectTeam({{ $team->id }})"
-                        class="px-4 py-2 rounded-lg text-sm font-medium transition border
+                        class="px-3.5 py-2 rounded-lg text-sm font-semibold transition border
                                {{ $selectedTeamId === $team->id
                                   ? 'bg-indigo-600 text-white border-indigo-600'
                                   : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-400 hover:text-indigo-600' }}">
@@ -28,18 +28,18 @@
     @else
 
     {{-- ── Row 1: Project summary + Progress ──────────────────────────────── --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {{-- Project summary card --}}
-        <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <div class="flex items-start justify-between gap-4 mb-4">
+        <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+            <div class="flex items-start justify-between gap-4 mb-3">
                 <div>
-                    <p class="text-xs font-semibold text-indigo-500 uppercase tracking-wider mb-1">
+                    <p class="text-[11px] font-semibold text-indigo-500 uppercase tracking-wider mb-1">
                         {{ $selectedTeam->name }}
                     </p>
-                    <h2 class="text-2xl font-bold text-gray-900">{{ $project->name }}</h2>
+                    <h2 class="text-xl font-bold text-gray-900 leading-tight">{{ $project->name }}</h2>
                     @if($project->description)
-                        <p class="text-sm text-gray-500 mt-1">{{ $project->description }}</p>
+                        <p class="text-xs text-gray-500 mt-1 line-clamp-1">{{ $project->description }}</p>
                     @endif
                 </div>
                 @php
@@ -56,7 +56,7 @@
             </div>
 
             {{-- Date range + days remaining --}}
-            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-5">
+            <div class="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-4">
                 <span class="flex items-center gap-1.5">
                     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -84,45 +84,45 @@
 
             {{-- Stat chips --}}
             @if($stats)
-                <div class="grid grid-cols-3 sm:grid-cols-7 gap-3">
-                    <div class="bg-gray-50 rounded-xl px-3 py-3 text-center">
-                        <p class="text-xl font-bold text-gray-800">{{ $stats['total'] }}</p>
-                        <p class="text-xs text-gray-400 mt-0.5">Total</p>
+                <div class="grid grid-cols-3 sm:grid-cols-7 gap-2">
+                    <div class="bg-gray-50 rounded-lg px-2 py-2.5 text-center">
+                        <p class="text-lg font-bold text-gray-800 leading-none">{{ $stats['total'] }}</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Total</p>
                     </div>
-                    <div class="bg-gray-50 rounded-xl px-3 py-3 text-center">
-                        <p class="text-xl font-bold text-gray-600">{{ $stats['pending'] }}</p>
-                        <p class="text-xs text-gray-400 mt-0.5">Pending</p>
+                    <div class="bg-gray-50 rounded-lg px-2 py-2.5 text-center">
+                        <p class="text-lg font-bold text-gray-600 leading-none">{{ $stats['pending'] }}</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Pending</p>
                     </div>
-                    <div class="bg-blue-50 rounded-xl px-3 py-3 text-center">
-                        <p class="text-xl font-bold text-blue-700">{{ $stats['inProgress'] }}</p>
-                        <p class="text-xs text-blue-500 mt-0.5">In Progress</p>
+                    <div class="bg-blue-50 rounded-lg px-2 py-2.5 text-center">
+                        <p class="text-lg font-bold text-blue-700 leading-none">{{ $stats['inProgress'] }}</p>
+                        <p class="text-[11px] text-blue-500 mt-1">In Progress</p>
                     </div>
-                    <div class="bg-amber-50 rounded-xl px-3 py-3 text-center">
-                        <p class="text-xl font-bold text-amber-800">{{ $stats['review'] }}</p>
-                        <p class="text-xs text-amber-600 mt-0.5">Review</p>
+                    <div class="bg-amber-50 rounded-lg px-2 py-2.5 text-center">
+                        <p class="text-lg font-bold text-amber-800 leading-none">{{ $stats['review'] }}</p>
+                        <p class="text-[11px] text-amber-600 mt-1">Review</p>
                     </div>
-                    <div class="bg-green-50 rounded-xl px-3 py-3 text-center">
-                        <p class="text-xl font-bold text-green-700">{{ $stats['done'] }}</p>
-                        <p class="text-xs text-green-500 mt-0.5">Done</p>
+                    <div class="bg-green-50 rounded-lg px-2 py-2.5 text-center">
+                        <p class="text-lg font-bold text-green-700 leading-none">{{ $stats['done'] }}</p>
+                        <p class="text-[11px] text-green-500 mt-1">Done</p>
                     </div>
-                    <div class="bg-red-50 rounded-xl px-3 py-3 text-center">
-                        <p class="text-xl font-bold text-red-600">{{ $stats['overdue'] }}</p>
-                        <p class="text-xs text-red-400 mt-0.5">Overdue</p>
+                    <div class="bg-red-50 rounded-lg px-2 py-2.5 text-center">
+                        <p class="text-lg font-bold text-red-600 leading-none">{{ $stats['overdue'] }}</p>
+                        <p class="text-[11px] text-red-400 mt-1">Overdue</p>
                     </div>
-                    <div class="bg-indigo-50 rounded-xl px-3 py-3 text-center">
-                        <p class="text-xl font-bold text-indigo-700">{{ $stats['members'] }}</p>
-                        <p class="text-xs text-indigo-400 mt-0.5">Members</p>
+                    <div class="bg-indigo-50 rounded-lg px-2 py-2.5 text-center">
+                        <p class="text-lg font-bold text-indigo-700 leading-none">{{ $stats['members'] }}</p>
+                        <p class="text-[11px] text-indigo-400 mt-1">Members</p>
                     </div>
                 </div>
             @endif
         </div>
 
         {{-- Progress card --}}
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col justify-between">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-col justify-between">
             <div>
-                <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Team Progress</h3>
-                <p class="text-5xl font-extrabold text-indigo-600 leading-none mb-1">
-                    {{ $progressPct }}<span class="text-2xl font-bold text-indigo-400">%</span>
+                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Team Progress</h3>
+                <p class="text-4xl font-extrabold text-indigo-600 leading-none mb-1">
+                    {{ $progressPct }}<span class="text-xl font-bold text-indigo-400">%</span>
                 </p>
                 <p class="text-xs text-gray-400">
                     {{ $stats['done'] ?? 0 }} of {{ $stats['total'] ?? 0 }} tasks completed
@@ -130,9 +130,9 @@
             </div>
 
             {{-- Circular-style progress bar (stacked bar) --}}
-            <div class="mt-5">
+            <div class="mt-4">
                 @if(($stats['total'] ?? 0) > 0)
-                    <div class="flex h-4 rounded-full overflow-hidden gap-px bg-gray-100">
+                    <div class="flex h-3 rounded-full overflow-hidden gap-px bg-gray-100">
                         @if($stats['done'] > 0)
                             <div class="bg-green-500 transition-all duration-700"
                                  style="width: {{ round(($stats['done'] / $stats['total']) * 100) }}%"
@@ -154,21 +154,21 @@
                                  title="Pending: {{ $stats['pending'] }}"></div>
                         @endif
                     </div>
-                    <div class="flex flex-wrap items-center gap-4 mt-3 text-xs text-gray-500">
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-2 mt-3 text-[11px] text-gray-500">
                         <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>Done</span>
                         <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span>In Progress</span>
                         <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>Review</span>
                         <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-gray-200 border border-gray-300"></span>Pending</span>
                     </div>
                 @else
-                    <div class="h-4 bg-gray-100 rounded-full"></div>
+                    <div class="h-3 bg-gray-100 rounded-full"></div>
                     <p class="text-xs text-gray-400 mt-2">No tasks assigned yet.</p>
                 @endif
             </div>
 
             {{-- Priority breakdown --}}
             @if($tasksByPriority->isNotEmpty())
-                <div class="mt-5 pt-5 border-t border-gray-100 space-y-2">
+                <div class="mt-4 pt-4 border-t border-gray-100 space-y-2">
                     <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">By Priority</p>
                     @foreach(['high' => ['bg-red-500','text-red-600'], 'medium' => ['bg-yellow-400','text-yellow-600'], 'low' => ['bg-gray-300','text-gray-500']] as $priority => [$bar, $text])
                         @php $count = $tasksByPriority->get($priority, collect())->count(); @endphp
@@ -189,29 +189,29 @@
     </div>
 
     {{-- ── Row 2: Timeline + Team members ─────────────────────────────────── --}}
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
 
         {{-- Timeline graph (takes 2/3) --}}
-        <div class="xl:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-[560px]">
-            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div class="xl:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-[430px]">
+            <div class="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
                 <button wire:click="previousMonth"
-                        class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition"
+                        class="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition"
                         aria-label="Previous month">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                     </svg>
                 </button>
 
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2.5">
                     <h3 class="text-base font-semibold text-gray-800">{{ $monthLabel }}</h3>
                     <button wire:click="goToToday"
-                            class="px-3 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition">
+                            class="px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition">
                         Today
                     </button>
                 </div>
 
                 <button wire:click="nextMonth"
-                        class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition"
+                        class="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition"
                         aria-label="Next month">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
@@ -219,23 +219,40 @@
                 </button>
             </div>
 
-            <div class="px-6 pt-5">
+            <div class="flex flex-wrap items-center justify-between gap-3 px-5 pt-3">
                 <h3 class="text-sm font-semibold text-gray-800">Project Timeline</h3>
+                <div class="flex flex-wrap items-center gap-1.5">
+                    @foreach([
+                        'project' => ['label' => 'Project', 'class' => 'bg-indigo-600'],
+                        'task' => ['label' => 'Tasks', 'class' => 'bg-amber-500'],
+                        'member' => ['label' => 'Members', 'class' => 'bg-sky-500'],
+                        'actual' => ['label' => 'Actual', 'class' => 'bg-emerald-500'],
+                    ] as $kind => $meta)
+                        @php $activeKind = in_array($kind, $timelineKinds, true); @endphp
+                        <button type="button"
+                                wire:click="toggleTimelineKind('{{ $kind }}')"
+                                class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition
+                                       {{ $activeKind ? 'border-gray-200 bg-white text-gray-700 shadow-sm' : 'border-gray-100 bg-gray-50 text-gray-400' }}">
+                            <span class="h-2 w-2 rounded-full {{ $activeKind ? $meta['class'] : 'bg-gray-300' }}"></span>
+                            {{ $meta['label'] }}
+                        </button>
+                    @endforeach
+                </div>
             </div>
 
-            <div class="flex-1 px-4 py-5">
+            <div class="flex-1 px-3.5 py-3">
                 @if($timelineGraph['rows']->isEmpty())
-                    <div class="py-16 text-center text-sm text-gray-400">
+                    <div class="py-12 text-center text-sm text-gray-400">
                         No project, task, or member dates in this month.
                     </div>
                 @else
-                    <div class="max-h-[430px] w-full overflow-auto pb-2 pr-2">
+                    <div class="max-h-[calc(100vh-390px)] min-h-[270px] w-full overflow-auto pb-2 pr-2">
                         <div class="min-w-[960px]">
-                        <div class="border-b border-gray-100 pb-4">
-                            <div class="grid h-10"
+                        <div class="border-b border-gray-100 pb-2.5">
+                            <div class="grid h-8"
                                  style="grid-template-columns: repeat({{ $timelineGraph['totalDays'] }}, minmax(0, 1fr));">
                                 @foreach($timelineGraph['ticks'] as $tick)
-                                    <div class="text-center text-[10px] leading-tight {{ $tick['major'] ? 'font-semibold text-gray-700' : 'font-medium text-gray-400' }}">
+                                    <div class="text-center text-[10px] leading-tight {{ ($timelineGraph['todayDay'] ?? null) === $tick['day'] ? 'font-bold text-rose-600' : ($tick['major'] ? 'font-semibold text-gray-700' : 'font-medium text-gray-400') }}">
                                         <span class="block">{{ $tick['day'] }}</span>
                                         <span class="block">{{ substr($tick['weekday'], 0, 1) }}</span>
                                     </div>
@@ -254,18 +271,62 @@
                                         default => 'bg-gray-400 border-gray-500',
                                     };
                                 @endphp
-                                <div class="py-3">
-                                    <div class="grid h-10 rounded-lg bg-gray-50 ring-1 ring-gray-100 overflow-hidden"
+                                <div class="py-2">
+                                    <div class="grid h-8 rounded-md bg-gray-50 ring-1 ring-gray-100 overflow-visible"
                                          style="grid-template-columns: repeat({{ $timelineGraph['totalDays'] }}, minmax(0, 1fr)); grid-template-rows: 1fr;">
                                         @foreach($timelineGraph['ticks'] as $tick)
                                             <div class="border-r {{ $tick['major'] ? 'border-gray-300' : 'border-gray-200/60' }}"
                                                  style="grid-column: {{ $tick['day'] }}; grid-row: 1;"></div>
                                         @endforeach
 
-                                        <div class="z-10 self-center h-8 rounded-md border px-3 text-xs font-semibold leading-8 text-white shadow-sm truncate {{ $barClass }}"
+                                        @if($timelineGraph['todayDay'] ?? null)
+                                            <div class="pointer-events-none z-10 self-stretch border-l-2 border-rose-400/80"
+                                                 style="grid-column: {{ $timelineGraph['todayDay'] }}; grid-row: 1;"></div>
+                                        @endif
+
+                                        <div x-data="{
+                                                open: false,
+                                                x: 0,
+                                                y: 0,
+                                                place(event) {
+                                                    const tipWidth = this.$refs.tip?.offsetWidth || 260;
+                                                    const tipHeight = this.$refs.tip?.offsetHeight || 120;
+                                                    this.x = Math.min(event.clientX + 14, window.innerWidth - tipWidth - 12);
+                                                    this.y = Math.min(event.clientY + 14, window.innerHeight - tipHeight - 12);
+                                                }
+                                            }"
+                                             @mouseenter="open = true; $nextTick(() => place($event))"
+                                             @mousemove="place($event)"
+                                             @mouseleave="open = false"
+                                             @focus="open = true; $nextTick(() => { const rect = $el.getBoundingClientRect(); place({ clientX: rect.left, clientY: rect.bottom }) })"
+                                             @blur="open = false"
+                                             class="group relative z-20 self-center h-6 rounded-md border px-2.5 text-[11px] font-semibold leading-6 text-white shadow-sm outline-none {{ $barClass }}"
                                              style="grid-column: {{ $row['startDay'] }} / span {{ $row['span'] }}; grid-row: 1;"
-                                             title="{{ $row['title'] }} ({{ $row['dateRange'] }})">
-                                            {{ $row['title'] }}
+                                             tabindex="0"
+                                             aria-label="{{ $row['tooltip'] }}">
+                                            <div class="flex min-w-0 items-center gap-1.5 truncate">
+                                                <span class="rounded bg-white/20 px-1.5 py-0.5 text-[9px] uppercase tracking-wide leading-none">
+                                                    {{ $row['label'] }}
+                                                </span>
+                                                <span class="truncate">{{ $row['title'] }}</span>
+                                                @if(!empty($row['statusLabel']))
+                                                    <span class="hidden rounded bg-white/20 px-1.5 py-0.5 text-[9px] uppercase tracking-wide leading-none sm:inline">
+                                                        {{ $row['statusLabel'] }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            <template x-teleport="body">
+                                                <div x-ref="tip"
+                                                     x-cloak
+                                                     x-show="open"
+                                                     x-transition.opacity.duration.100ms
+                                                     class="pointer-events-none fixed z-[99999] w-max max-w-xs rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-[11px] font-medium leading-5 text-gray-600 shadow-xl ring-1 ring-black/5"
+                                                     :style="`left: ${x}px; top: ${y}px;`">
+                                                    @foreach(($row['tooltipLines'] ?? [$row['tooltip']]) as $line)
+                                                        <p class="{{ $loop->first ? 'font-semibold text-gray-900' : '' }}">{{ $line }}</p>
+                                                    @endforeach
+                                                </div>
+                                            </template>
                                         </div>
                                     </div>
                                 </div>
@@ -276,7 +337,7 @@
                 @endif
             </div>
 
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-4 border-t border-gray-100 bg-gray-50 text-xs text-gray-500">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500">
                 <span class="flex items-center gap-1.5">
                     <span class="w-4 h-3 rounded bg-indigo-600"></span> Project timeline
                 </span>
@@ -501,7 +562,7 @@
                                         <div class="flex-1 min-w-0">
                                             <div class="flex items-center gap-2 flex-wrap mb-0.5">
                                                 <p class="text-sm font-semibold text-gray-900">
-                                                    {{ $task->assignee->name }} started {{ $task->title }}
+                                                    {{ $task->assignee?->name ?? 'Unassigned' }} started {{ $task->title }}
                                                 </p>
                                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                                                     Task Started
@@ -526,17 +587,17 @@
         @endif
 
         {{-- Team members sidebar --}}
-        <div class="space-y-4">
+        <div class="space-y-3">
 
             {{-- Members list --}}
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <h3 class="text-sm font-semibold text-gray-700">Team Members</h3>
                     <span class="text-xs text-gray-400">{{ $stats['members'] ?? 0 }} member{{ ($stats['members'] ?? 0) !== 1 ? 's' : '' }}</span>
                 </div>
 
                 @if($selectedTeam->members->isEmpty())
-                    <div class="px-5 py-8 text-center text-gray-400 text-xs">
+                    <div class="px-4 py-7 text-center text-gray-400 text-xs">
                         No members assigned yet.
                     </div>
                 @else
@@ -551,7 +612,7 @@
                             <li class="relative">
                                 <button type="button"
                                         wire:click="openMemberTasks({{ $member->id }})"
-                                        class="w-full px-5 py-3 text-left flex items-center gap-3 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-inset transition cursor-pointer">
+                                        class="w-full px-4 py-2.5 text-left flex items-center gap-3 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-inset transition cursor-pointer">
                                     <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold flex-shrink-0">
                                         {{ strtoupper(substr($member->name, 0, 1)) }}
                                     </div>
@@ -644,6 +705,35 @@
 
             @endif
 
+            @if($atRiskTasks->isNotEmpty())
+                <div class="bg-amber-50 rounded-xl border border-amber-200 overflow-hidden">
+                    <div class="px-4 py-3 border-b border-amber-200 flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <h3 class="text-sm font-semibold text-amber-800">At Risk</h3>
+                        </div>
+                        <span class="text-xs font-semibold text-amber-700">{{ $atRiskTasks->count() }}</span>
+                    </div>
+                    <ul class="divide-y divide-amber-100">
+                        @foreach($atRiskTasks as $task)
+                            @php $daysLeft = (int) now()->startOfDay()->diffInDays($task->due_date, false); @endphp
+                            <li class="px-4 py-2.5">
+                                <p class="text-sm font-medium text-amber-950 truncate">{{ $task->title }}</p>
+                                <div class="flex items-center justify-between mt-0.5">
+                                    <p class="text-xs text-amber-700">{{ ucfirst(str_replace('_', ' ', $task->status)) }}</p>
+                                    <p class="text-xs text-amber-600">
+                                        {{ $daysLeft === 0 ? 'Due today' : 'Due in '.$daysLeft.'d' }}
+                                    </p>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             {{-- Recent overdue tasks warning --}}
             @php
                 $overdueTasks = $selectedTeam->tasks
@@ -653,7 +743,7 @@
             @endphp
             @if($overdueTasks->isNotEmpty())
                 <div class="bg-red-50 rounded-xl border border-red-200 overflow-hidden">
-                    <div class="px-5 py-4 border-b border-red-200 flex items-center gap-2">
+                    <div class="px-4 py-3 border-b border-red-200 flex items-center gap-2">
                         <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
@@ -662,10 +752,10 @@
                     </div>
                     <ul class="divide-y divide-red-100">
                         @foreach($overdueTasks as $task)
-                            <li class="px-5 py-3">
+                            <li class="px-4 py-2.5">
                                 <p class="text-sm font-medium text-red-800 truncate">{{ $task->title }}</p>
                                 <div class="flex items-center justify-between mt-0.5">
-                                    <p class="text-xs text-red-500">{{ $task->assignee->name }}</p>
+                                    <p class="text-xs text-red-500">{{ $task->assignee?->name ?? '-' }}</p>
                                     <p class="text-xs text-red-400">Due {{ $task->due_date ? $task->due_date->format('M d') : '—' }}</p>
                                 </div>
                             </li>

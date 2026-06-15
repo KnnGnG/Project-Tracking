@@ -4,6 +4,7 @@ namespace App\Livewire\Lead;
 
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\JournalLog;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
@@ -16,6 +17,18 @@ use Livewire\Component;
 class TeamLeadAnalytics extends Component
 {
     public ?int $selectedTeamId = null;
+
+    public int $velocityDays = 14;
+
+    public int $velocityMemberId = 0;
+
+    public string $velocityTaskStatus = 'all';
+
+    public int $completionDays = 30;
+
+    public int $completionMemberId = 0;
+
+    public string $completionPriority = 'all';
 
     public function mount(): void
     {
@@ -32,6 +45,8 @@ class TeamLeadAnalytics extends Component
         }
 
         $this->selectedTeamId = $id;
+        $this->velocityMemberId = 0;
+        $this->completionMemberId = 0;
     }
 
     public function render()
@@ -40,20 +55,52 @@ class TeamLeadAnalytics extends Component
 
         $selectedTeam = null;
         $project = null;
-        $burndown = null;
+        $completedTasks = null;
         $cfd = null;
         $punctuality = null;
+        $summary = null;
+        $velocity = null;
 
         if ($this->selectedTeamId) {
-            $selectedTeam = auth()->user()->ledTeams()->with(['project', 'tasks'])->find($this->selectedTeamId);
+            $selectedTeam = auth()->user()->ledTeams()->with(['project', 'tasks.assignees', 'members'])->find($this->selectedTeamId);
 
             if ($selectedTeam) {
                 $project = $selectedTeam->project;
                 $tasks = $selectedTeam->tasks;
 
-                $burndown = $this->buildBurndownDataset($project, $tasks);
+                $validMemberIds = $selectedTeam->members->pluck('id');
+                if ($this->completionMemberId !== 0 && ! $validMemberIds->contains($this->completionMemberId)) {
+                    $this->completionMemberId = 0;
+                }
+
+                $completedTasks = $this->buildCompletedTasksDataset(
+                    $tasks,
+                    $this->completionDays,
+                    $this->completionMemberId,
+                    $this->completionPriority,
+                );
                 $cfd = $this->buildCfdDataset($project, $tasks);
                 $punctuality = $this->buildPunctualitySplit($tasks);
+                $summary = $this->buildSummary($tasks);
+                if ($this->velocityMemberId !== 0 && ! $validMemberIds->contains($this->velocityMemberId)) {
+                    $this->velocityMemberId = 0;
+                }
+
+                $velocityMembers = $this->velocityMemberId === 0
+                    ? $selectedTeam->members
+                    : $selectedTeam->members->where('id', $this->velocityMemberId)->values();
+
+                $velocityTasks = in_array($this->velocityTaskStatus, ['pending', 'in_progress', 'review', 'done'], true)
+                    ? $tasks->where('status', $this->velocityTaskStatus)->values()
+                    : $tasks;
+
+                $velocity = $this->buildVelocityDataset(
+                    $velocityMembers,
+                    $velocityTasks,
+                    $this->velocityDays,
+                    $this->velocityTaskStatus === 'all',
+                    $selectedTeam->id,
+                );
             }
         }
 
@@ -61,10 +108,147 @@ class TeamLeadAnalytics extends Component
             'teams',
             'selectedTeam',
             'project',
-            'burndown',
+            'completedTasks',
             'cfd',
             'punctuality',
+            'summary',
+            'velocity',
         ));
+    }
+
+    /** @return array<string, mixed> */
+    private function buildSummary(Collection $tasks): array
+    {
+        $total = $tasks->count();
+        $done = $tasks->where('status', 'done')->count();
+        $open = $tasks->whereIn('status', ['pending', 'in_progress', 'review'])->count();
+        $review = $tasks->where('status', 'review')->count();
+        $overdue = $tasks->filter(fn (Task $task) => $task->isExceededDeadline())->count();
+        $dueSoon = $tasks
+            ->filter(fn (Task $task) => $task->status !== 'done'
+                && $task->due_date
+                && ! $task->isExceededDeadline()
+                && now()->startOfDay()->diffInDays($task->due_date, false) <= 3)
+            ->count();
+        $progress = $total > 0 ? (int) round(($done / $total) * 100) : 0;
+
+        [$health, $tone, $message] = match (true) {
+            $overdue > 0 => ['Needs Attention', 'red', "{$overdue} overdue task".($overdue !== 1 ? 's' : '').' need follow-up.'],
+            $review > 0 => ['Review Queue', 'amber', "{$review} task".($review !== 1 ? 's are' : ' is').' waiting for review.'],
+            $dueSoon > 0 => ['Due Soon', 'amber', "{$dueSoon} task".($dueSoon !== 1 ? 's are' : ' is').' due within 3 days.'],
+            $progress === 100 => ['Complete', 'green', 'All tasks are complete.'],
+            default => ['On Track', 'green', 'No urgent blockers found.'],
+        };
+
+        return compact('total', 'done', 'open', 'review', 'overdue', 'dueSoon', 'progress', 'health', 'tone', 'message');
+    }
+
+    /** @return array{labels:string[],values:int[],total:int}|null */
+    private function buildCompletedTasksDataset(Collection $tasks, int $days, int $memberId, string $priority): ?array
+    {
+        $days = in_array($days, [7, 14, 30, 60], true) ? $days : 30;
+        $start = now()->startOfDay()->subDays($days - 1);
+        $end = now()->startOfDay();
+
+        $completed = $tasks
+            ->filter(fn (Task $task) => $task->status === 'done')
+            ->filter(fn (Task $task) => Carbon::parse($task->updated_at)->betweenIncluded($start, $end->copy()->endOfDay()));
+
+        if ($memberId !== 0) {
+            $completed = $completed->filter(function (Task $task) use ($memberId) {
+                $assigneeIds = $task->assignees->pluck('id');
+
+                if ($assigneeIds->isEmpty() && $task->assigned_to) {
+                    $assigneeIds = collect([$task->assigned_to]);
+                }
+
+                return $assigneeIds->contains($memberId);
+            });
+        }
+
+        if (in_array($priority, ['high', 'medium', 'low'], true)) {
+            $completed = $completed->where('priority', $priority);
+        }
+
+        $byDate = $completed->groupBy(fn (Task $task) => Carbon::parse($task->updated_at)->format('M j'));
+
+        $labels = collect(CarbonPeriod::create($start, $end))
+            ->map(fn (Carbon $date) => $date->format('M j'))
+            ->values();
+
+        $values = $labels
+            ->map(fn (string $label) => $byDate->get($label, collect())->count())
+            ->values();
+
+        return [
+            'labels' => $labels->all(),
+            'values' => $values->all(),
+            'total' => $completed->count(),
+        ];
+    }
+
+    /** @return array{labels:string[],datasets:array<int, array<string, mixed>>,includesGeneral:bool}|null */
+    private function buildVelocityDataset(Collection $members, Collection $tasks, int $days, bool $includeGeneralWork, int $teamId): ?array
+    {
+        $taskIds = $tasks->pluck('id');
+
+        if ($members->isEmpty() || ($taskIds->isEmpty() && ! $includeGeneralWork)) {
+            return null;
+        }
+
+        $days = in_array($days, [7, 14, 30, 60], true) ? $days : 14;
+        $start = now()->startOfDay()->subDays($days - 1);
+        $end = now()->startOfDay();
+
+        $labels = collect(CarbonPeriod::create($start, $end))
+            ->map(fn (Carbon $date) => $date->format('M j'))
+            ->values();
+
+        $logs = JournalLog::query()
+            ->whereIn('user_id', $members->pluck('id'))
+            ->where(function ($query) use ($taskIds, $includeGeneralWork, $teamId) {
+                if ($taskIds->isNotEmpty()) {
+                    $query->whereIn('task_id', $taskIds);
+                }
+
+                if ($includeGeneralWork) {
+                    $query->{$taskIds->isNotEmpty() ? 'orWhere' : 'where'}(function ($general) use ($teamId) {
+                        $general->whereNull('task_id')
+                            ->where('team_id', $teamId);
+                    });
+                }
+            })
+            ->whereBetween('log_date', [$start->toDateString(), $end->toDateString()])
+            ->get()
+            ->groupBy(fn (JournalLog $log) => $log->user_id.'|'.$log->log_date->format('M j'));
+
+        $colors = ['#2563eb', '#059669', '#f59e0b', '#e11d48', '#7c3aed', '#0891b2', '#4b5563'];
+
+        $datasets = $members->values()
+            ->map(function ($member, int $index) use ($labels, $logs, $colors) {
+                return [
+                    'label' => $member->name,
+                    'data' => $labels
+                        ->map(fn (string $label) => round(($logs->get($member->id.'|'.$label, collect())->sum('minutes') / 60), 2))
+                        ->all(),
+                    'backgroundColor' => $colors[$index % count($colors)],
+                    'borderRadius' => 6,
+                    'maxBarThickness' => 28,
+                ];
+            })
+            ->filter(fn (array $dataset) => collect($dataset['data'])->sum() > 0)
+            ->values()
+            ->all();
+
+        if ($datasets === []) {
+            return null;
+        }
+
+        return [
+            'labels' => $labels->all(),
+            'datasets' => $datasets,
+            'includesGeneral' => $includeGeneralWork,
+        ];
     }
 
     /** @return array{labels:string[],actual:float[],ideal:float[],days_remaining:int[],meta:array}|null */

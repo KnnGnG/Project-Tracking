@@ -83,7 +83,7 @@ class ClientDashboard extends Component
         }
 
         $project = $this->clientProjects()
-            ->with(['tasks', 'events', 'teams'])
+            ->with(['tasks', 'events', 'teams.lead'])
             ->find($this->selectedProjectId);
 
         if ($project) {
@@ -97,7 +97,7 @@ class ClientDashboard extends Component
         }
 
         return $this->clientProjects()
-            ->with(['tasks', 'events', 'teams'])
+            ->with(['tasks', 'events', 'teams.lead'])
             ->find($this->selectedProjectId);
     }
 
@@ -218,6 +218,8 @@ class ClientDashboard extends Component
 
         $itemsByDay = collect();
         $upcomingItems = collect();
+        $projectHealth = null;
+        $recentUpdates = collect();
 
         if ($selectedProject) {
             $monthStart = Carbon::create($this->year, $this->month, 1)->startOfDay();
@@ -264,6 +266,67 @@ class ClientDashboard extends Component
                 ->sortBy('date')
                 ->take($n)
                 ->values();
+
+            $tasks = $selectedProject->tasks;
+            $totalTasks = $tasks->count();
+            $doneTasks = $tasks->where('status', 'done')->count();
+            $activeTasks = $tasks->whereIn('status', ['pending', 'in_progress', 'review'])->count();
+            $delayedTasks = $tasks->filter(fn ($t) => $t->isExceededDeadline())->count();
+            $reviewTasks = $tasks->where('status', 'review')->count();
+            $completion = $totalTasks > 0 ? (int) round(($doneTasks / $totalTasks) * 100) : 0;
+
+            [$healthLabel, $healthTone] = match (true) {
+                $delayedTasks > 0 => ['Delayed', 'red'],
+                $selectedProject->end_date && now()->addDays(7)->gte($selectedProject->end_date) && $completion < 80 => ['At Risk', 'amber'],
+                $selectedProject->status === 'completed' || $completion === 100 => ['Complete', 'green'],
+                default => ['On Track', 'green'],
+            };
+
+            $nextMilestone = $selectedProject->events
+                ->filter(fn ($event) => $event->type === 'milestone'
+                    && $event->event_date
+                    && $event->event_date->gte(now()->startOfDay()))
+                ->sortBy('event_date')
+                ->first();
+
+            $recentTaskUpdates = $tasks
+                ->where('status', 'done')
+                ->sortByDesc('updated_at')
+                ->take(3)
+                ->map(fn ($task) => [
+                    'title' => $task->title,
+                    'label' => 'Task completed',
+                    'date' => $task->updated_at,
+                    'tone' => 'green',
+                ]);
+
+            $recentEventUpdates = $selectedProject->events
+                ->sortByDesc('event_date')
+                ->take(3)
+                ->map(fn ($event) => [
+                    'title' => $event->title,
+                    'label' => ucfirst(str_replace('_', ' ', $event->type)),
+                    'date' => $event->event_date,
+                    'tone' => $event->type === 'deadline' ? 'red' : ($event->type === 'milestone' ? 'indigo' : 'green'),
+                ]);
+
+            $recentUpdates = $recentTaskUpdates
+                ->concat($recentEventUpdates)
+                ->sortByDesc('date')
+                ->take(5)
+                ->values();
+
+            $projectHealth = compact(
+                'healthLabel',
+                'healthTone',
+                'completion',
+                'totalTasks',
+                'doneTasks',
+                'activeTasks',
+                'delayedTasks',
+                'reviewTasks',
+                'nextMilestone',
+            );
         }
 
         $calendarGrid = $this->buildCalendarGrid($itemsByDay);
@@ -285,6 +348,8 @@ class ClientDashboard extends Component
             'selectedProject' => $selectedProject,
             'calendarGrid' => $calendarGrid,
             'upcomingItems' => $upcomingItems,
+            'projectHealth' => $projectHealth,
+            'recentUpdates' => $recentUpdates,
             'stats' => $stats,
             'monthLabel' => Carbon::create($this->year, $this->month, 1)->format('F Y'),
         ]);

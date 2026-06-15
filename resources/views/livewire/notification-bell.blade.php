@@ -35,7 +35,7 @@
 
         <div class="max-h-96 overflow-y-auto">
             @forelse($overdueTasks as $task)
-                <a href="{{ auth()->user()->isMember() ? route('member.dashboard', ['tab' => 'exceeded']) : (auth()->user()->isTeamLead() ? route('lead.tasks') : route('dashboard')) }}"
+                <a href="{{ auth()->user()->isTeamLead() ? route('lead.tasks') : (auth()->user()->isMember() ? route('member.dashboard', ['tab' => 'exceeded']) : route('dashboard')) }}"
                    class="block border-b border-gray-100 bg-red-50 px-4 py-3 transition hover:bg-red-100">
                     <div class="flex items-start gap-3">
                         <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">

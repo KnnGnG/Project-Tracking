@@ -23,7 +23,15 @@
         {{-- Navigation --}}
         <nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
             @auth
-                @if(auth()->user()->isAdmin())
+                @php
+                    $authUser = auth()->user();
+                    $isAdmin = $authUser->isAdmin();
+                    $isClient = $authUser->isClient();
+                    $isTeamLead = $authUser->isTeamLead();
+                    $isMember = $authUser->isMember();
+                @endphp
+
+                @if($isAdmin)
                     <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</p>
                     <a href="{{ route('admin.dashboard') }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
@@ -69,7 +77,7 @@
                         </svg>
                         Task oversight
                     </a>
-                @elseif(auth()->user()->isClient())
+                @elseif($isClient)
                     <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Client</p>
                     <a href="{{ route('client.dashboard') }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
@@ -80,7 +88,8 @@
                         </svg>
                         My Projects
                     </a>
-                @elseif(auth()->user()->isTeamLead())
+                @else
+                    @if($isTeamLead)
                     <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Team Lead</p>
                     <a href="{{ route('lead.dashboard') }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
@@ -118,7 +127,9 @@
                         </svg>
                         Journal Review
                     </a>
-                @elseif(auth()->user()->isMember())
+                    @endif
+
+                    @if($isMember)
                     <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Member</p>
                     <a href="{{ route('member.dashboard') }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
@@ -138,6 +149,7 @@
                         </svg>
                         Logs and Journal
                     </a>
+                    @endif
                 @endif
             @endauth
         </nav>
@@ -145,13 +157,42 @@
         {{-- User info --}}
         @auth
         <div class="px-4 py-4 border-t border-gray-700">
+            @php
+                $activeRoleLabel = match (true) {
+                    request()->routeIs('admin.*') => 'Admin',
+                    request()->routeIs('client.*') => 'Client',
+                    request()->routeIs('lead.*') => 'Team Lead',
+                    request()->routeIs('member.*') => 'Member',
+                    default => null,
+                };
+
+                $contextRoles = collect();
+
+                if ($isAdmin) {
+                    $contextRoles->push('Admin');
+                }
+
+                if ($isClient) {
+                    $contextRoles->push('Client');
+                }
+
+                if ($isTeamLead) {
+                    $contextRoles->push('Team Lead');
+                }
+
+                if ($isMember) {
+                    $contextRoles->push('Member');
+                }
+
+                $roleLabel = $activeRoleLabel ?? ($contextRoles->join(' / ') ?: $authUser->roleName());
+            @endphp
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-sm font-semibold">
-                    {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                    {{ strtoupper(substr($authUser->name, 0, 1)) }}
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-white truncate">{{ auth()->user()->name }}</p>
-                    <p class="text-xs text-gray-400 capitalize">{{ str_replace('_', ' ', auth()->user()->role) }}</p>
+                    <p class="text-sm font-medium text-white truncate">{{ $authUser->name }}</p>
+                    <p class="text-xs text-gray-400">{{ $roleLabel }}</p>
                 </div>
             </div>
             <form method="POST" action="{{ route('logout') }}" class="mt-3">
