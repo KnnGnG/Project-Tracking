@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\UserProjectController;
 use App\Livewire\Admin\AdminDashboard;
 use App\Livewire\Admin\ProjectManager;
 use App\Livewire\Admin\TaskAssigner;
@@ -39,6 +40,8 @@ Route::middleware(['auth', 'throttle:300,1'])->group(function () {
 
     // Role-based dashboard redirect
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/my-projects', [UserProjectController::class, 'index'])->name('projects.index');
+    Route::get('/my-projects/{project}', [UserProjectController::class, 'open'])->name('projects.open');
 
     /*
     |----------------------------------------------------------------------

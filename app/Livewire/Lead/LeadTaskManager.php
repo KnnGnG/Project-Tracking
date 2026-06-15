@@ -52,7 +52,14 @@ class LeadTaskManager extends Component
     public function mount(): void
     {
         // Default filter to first led team
-        $first = auth()->user()->ledTeams()->first();
+        $requestedTeamId = request()->integer('team') ?: session('active_team_id');
+
+        $first = auth()->user()
+            ->ledTeams()
+            ->when($requestedTeamId, fn ($query) => $query->whereKey($requestedTeamId))
+            ->first()
+            ?? auth()->user()->ledTeams()->first();
+
         if ($first) {
             $this->filterTeamId = $first->id;
         }

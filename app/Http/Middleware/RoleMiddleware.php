@@ -21,10 +21,10 @@ class RoleMiddleware
         }
 
         $user = $request->user();
-        $allowed = collect($roles)->contains(function (string $role) use ($user): bool {
+        $allowed = collect($roles)->contains(function (string $role) use ($user, $request): bool {
             return match ($role) {
-                'team_lead' => $user->isTeamLead(),
-                'member' => $user->isMember(),
+                'team_lead' => $this->hasTeamRole($request, 'lead') || $user->role === 'team_lead',
+                'member' => $this->hasTeamRole($request, 'member') || $user->role === 'member',
                 default => $user->role === $role,
             };
         });
@@ -34,5 +34,23 @@ class RoleMiddleware
         }
 
         return $next($request);
+    }
+
+    private function hasTeamRole(Request $request, string $role): bool
+    {
+        $teamId = $request->integer('team') ?: session('active_team_id');
+
+        if ($teamId) {
+            return $request->user()
+                ->teams()
+                ->whereKey($teamId)
+                ->wherePivot('role', $role)
+                ->exists();
+        }
+
+        return $request->user()
+            ->teams()
+            ->wherePivot('role', $role)
+            ->exists();
     }
 }
