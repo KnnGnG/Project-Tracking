@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\Team;
 use App\Models\Task;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -71,30 +72,32 @@ class TeamManager extends Component
     {
         $data = $this->validate();
 
-        $payload = [
-            'name'       => $data['name'],
-            'project_id' => $data['projectId'],
-            'lead_id'    => $data['leadId'],
-        ];
+        DB::transaction(function () use ($data): void {
+            $payload = [
+                'name'       => $data['name'],
+                'project_id' => $data['projectId'],
+                'lead_id'    => $data['leadId'],
+            ];
 
-        if ($this->editingId) {
-            $team = Team::findOrFail($this->editingId);
-            $team->update($payload);
-            session()->flash('success', 'Team updated successfully.');
-        } else {
-            $team = Team::create($payload);
-            session()->flash('success', 'Team created successfully.');
-        }
+            if ($this->editingId) {
+                $team = Team::findOrFail($this->editingId);
+                $team->update($payload);
+                session()->flash('success', 'Team updated successfully.');
+            } else {
+                $team = Team::create($payload);
+                session()->flash('success', 'Team created successfully.');
+            }
 
-        $projectTeamIds = collect($data['projectTeamIds'] ?? [])
-            ->map(fn ($id) => (int) $id)
-            ->push($team->id)
-            ->unique()
-            ->values();
+            $projectTeamIds = collect($data['projectTeamIds'] ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->push($team->id)
+                ->unique()
+                ->values();
 
-        Team::whereIn('id', $projectTeamIds->all())->update(['project_id' => $team->project_id]);
+            Team::whereIn('id', $projectTeamIds->all())->update(['project_id' => $team->project_id]);
 
-        $this->syncTeamPeople($team, (int) $data['leadId'], $data['memberIds'] ?? []);
+            $this->syncTeamPeople($team, (int) $data['leadId'], $data['memberIds'] ?? []);
+        });
 
         $this->resetForm();
         $this->showForm = false;

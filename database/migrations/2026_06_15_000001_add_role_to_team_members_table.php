@@ -25,6 +25,11 @@ return new class extends Migration
                 $now = now();
 
                 foreach ($teams as $team) {
+                    $existing = DB::table('team_members')
+                        ->where('team_id', $team->id)
+                        ->where('user_id', $team->lead_id)
+                        ->exists();
+
                     DB::table('team_members')->updateOrInsert(
                         [
                             'team_id' => $team->id,
@@ -32,7 +37,7 @@ return new class extends Migration
                         ],
                         [
                             'role' => 'lead',
-                            'created_at' => $now,
+                            ...($existing ? [] : ['created_at' => $now]),
                             'updated_at' => $now,
                         ]
                     );

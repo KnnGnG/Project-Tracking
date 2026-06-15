@@ -18,26 +18,20 @@
 
 @if($href)
     <a href="{{ $href }}" {{ $attributes->merge(['class' => 'block rounded-xl border bg-white p-4 shadow-sm transition hover:border-indigo-200']) }}>
-        <div class="flex items-center justify-between gap-3">
-            <div>
-                <p class="text-2xl font-extrabold leading-none text-gray-900">{{ $value }}</p>
-                <p class="mt-1 text-xs font-medium text-gray-400">{{ $label }}</p>
-            </div>
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl border {{ $toneClasses }}">
-                {{ $slot }}
-            </div>
-        </div>
-    </a>
 @else
     <div {{ $attributes->merge(['class' => 'block rounded-xl border bg-white p-4 shadow-sm transition hover:border-indigo-200']) }}>
-        <div class="flex items-center justify-between gap-3">
-            <div>
-                <p class="text-2xl font-extrabold leading-none text-gray-900">{{ $value }}</p>
-                <p class="mt-1 text-xs font-medium text-gray-400">{{ $label }}</p>
-            </div>
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl border {{ $toneClasses }}">
-                {{ $slot }}
-            </div>
+@endif
+    <div class="flex items-center justify-between gap-3">
+        <div>
+            <p class="text-2xl font-extrabold leading-none text-gray-900">{{ $value }}</p>
+            <p class="mt-1 text-xs font-medium text-gray-400">{{ $label }}</p>
         </div>
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl border {{ $toneClasses }}">
+            {{ $slot }}
+        </div>
+    </div>
+@if($href)
+    </a>
+@else
     </div>
 @endif

@@ -369,21 +369,6 @@ class MemberDashboard extends Component
             default => collect(),
         };
 
-        $tabQuery = clone $base;
-
-        // ── Apply sort ───────────────────────────────────────────────────────────
-        if (false && $this->sortBy === 'priority') {
-            // high → medium → low (portable CASE; replaces MySQL FIELD)
-            $dir = $this->sortDir === 'asc' ? 'asc' : 'desc';
-            $tabQuery->orderByRaw(
-                "CASE WHEN priority = 'high' THEN 0 WHEN priority = 'medium' THEN 1 WHEN priority = 'low' THEN 2 ELSE 3 END ".($dir === 'asc' ? 'ASC' : 'DESC')
-            );
-        } elseif ($this->sortBy === 'title') {
-            $tabQuery->orderBy('title', $this->sortDir);
-        } else {
-            // Default: due_date (NULLs last)
-            $tabQuery->orderByRaw("due_date IS NULL, due_date {$this->sortDir}");
-        }
 
         $tasks = $this->sortTaskCollection($tasks);
 

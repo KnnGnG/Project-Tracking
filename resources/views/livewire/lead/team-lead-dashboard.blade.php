@@ -562,7 +562,7 @@
                                         <div class="flex-1 min-w-0">
                                             <div class="flex items-center gap-2 flex-wrap mb-0.5">
                                                 <p class="text-sm font-semibold text-gray-900">
-                                                    {{ $task->assignee->name }} started {{ $task->title }}
+                                                    {{ $task->assignee?->name ?? 'Unassigned' }} started {{ $task->title }}
                                                 </p>
                                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                                                     Task Started
@@ -755,7 +755,7 @@
                             <li class="px-4 py-2.5">
                                 <p class="text-sm font-medium text-red-800 truncate">{{ $task->title }}</p>
                                 <div class="flex items-center justify-between mt-0.5">
-                                    <p class="text-xs text-red-500">{{ $task->assignee->name }}</p>
+                                    <p class="text-xs text-red-500">{{ $task->assignee?->name ?? '-' }}</p>
                                     <p class="text-xs text-red-400">Due {{ $task->due_date ? $task->due_date->format('M d') : '—' }}</p>
                                 </div>
                             </li>

@@ -44,7 +44,7 @@
                         <select id="selectedTaskId"
                                 wire:model="selectedTaskId"
                                 class="mt-1 w-full border border-gray-300 rounded-lg text-sm px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500">
-                            <option value="">{{ $filterTeam > 0 ? 'Choose a task in this team' : 'General work / no task' }}</option>
+                            <option value="">{{ $filterTeam > 0 ? 'General work for selected team' : 'General work / no task' }}</option>
                             @foreach($tasks as $task)
                                 <option value="{{ $task->id }}">
                                     {{ $task->title }}@if($task->team) - {{ $task->team->name }}@endif @if($task->project) / {{ $task->project->name }}@endif
@@ -188,11 +188,11 @@
                                 </p>
                                 <p class="text-xs text-gray-500">
                                     {{ $log->task?->title ?? 'General work' }}
-                                    @if($log->task?->team)
-                                        <span class="text-gray-300">/</span> {{ $log->task->team->name }}
+                                    @if($log->task?->team || $log->team)
+                                        <span class="text-gray-300">/</span> {{ $log->task?->team?->name ?? $log->team?->name }}
                                     @endif
-                                    @if($log->task?->project)
-                                        <span class="text-gray-300">/</span> {{ $log->task->project->name }}
+                                    @if($log->task?->project || $log->team?->project)
+                                        <span class="text-gray-300">/</span> {{ $log->task?->project?->name ?? $log->team?->project?->name }}
                                     @endif
                                 </p>
                             </div>
@@ -231,8 +231,8 @@
                     <div>
                         <p class="text-sm font-semibold text-gray-900">
                             {{ $log->log_date->format('M d, Y') }} - {{ $log->task?->title ?? 'General work' }}
-                            @if($log->task?->team)
-                                <span class="text-gray-300">/</span> {{ $log->task->team->name }}
+                            @if($log->task?->team || $log->team)
+                                <span class="text-gray-300">/</span> {{ $log->task?->team?->name ?? $log->team?->name }}
                             @endif
                         </p>
                         @if($log->notes)

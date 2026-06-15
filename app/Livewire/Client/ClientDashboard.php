@@ -283,7 +283,9 @@ class ClientDashboard extends Component
             };
 
             $nextMilestone = $selectedProject->events
-                ->filter(fn ($event) => $event->event_date && $event->event_date->gte(now()->startOfDay()))
+                ->filter(fn ($event) => $event->type === 'milestone'
+                    && $event->event_date
+                    && $event->event_date->gte(now()->startOfDay()))
                 ->sortBy('event_date')
                 ->first();
 

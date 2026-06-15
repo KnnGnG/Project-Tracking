@@ -49,7 +49,7 @@ class NotificationBell extends Component
         $user = auth()->user();
 
         $query = Task::with(['project', 'team'])
-            ->whereIn('status', ['pending', 'in_progress'])
+            ->whereIn('status', ['pending', 'in_progress', 'review'])
             ->where('due_date', '<', $today);
 
         if ($user->isMember() || $user->isTeamLead()) {

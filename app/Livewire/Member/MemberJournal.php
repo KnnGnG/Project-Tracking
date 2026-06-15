@@ -77,16 +77,13 @@ class MemberJournal extends Component
             return;
         }
 
-        if ($this->filterTeam > 0 && blank($validated['selectedTaskId'] ?? null)) {
-            $this->addError('selectedTaskId', 'Choose a task from the selected team.');
-            return;
-        }
-
         $totalMinutes = (int) ceil($seconds / 60);
+        $taskId = ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null;
 
         JournalLog::create([
             'user_id' => auth()->id(),
-            'task_id' => ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null,
+            'task_id' => $taskId,
+            'team_id' => $this->teamIdForLog($taskId),
             'log_date' => $validated['logDate'],
             'minutes' => $totalMinutes,
             'notes' => $validated['notes'] ?: null,
@@ -114,11 +111,6 @@ class MemberJournal extends Component
             return;
         }
 
-        if ($this->filterTeam > 0 && blank($validated['selectedTaskId'] ?? null)) {
-            $this->addError('selectedTaskId', 'Choose a task from the selected team.');
-            return;
-        }
-
         $totalMinutes = ($validated['hours'] * 60) + $validated['minutes'];
 
         if ($totalMinutes < 1) {
@@ -126,9 +118,12 @@ class MemberJournal extends Component
             return;
         }
 
+        $taskId = ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null;
+
         JournalLog::create([
             'user_id' => auth()->id(),
-            'task_id' => ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null,
+            'task_id' => $taskId,
+            'team_id' => $this->teamIdForLog($taskId),
             'log_date' => $validated['logDate'],
             'minutes' => $totalMinutes,
             'notes' => $validated['notes'] ?: null,
@@ -227,6 +222,15 @@ class MemberJournal extends Component
             ->exists();
     }
 
+    private function teamIdForLog(?int $taskId): ?int
+    {
+        if ($taskId) {
+            return Task::whereKey($taskId)->value('team_id');
+        }
+
+        return $this->filterTeam > 0 ? $this->filterTeam : null;
+    }
+
     public function render()
     {
         $this->normalizeLogDate();
@@ -252,19 +256,19 @@ class MemberJournal extends Component
             ->orderBy('title')
             ->get();
 
-        $logs = JournalLog::with(['task.project', 'task.team'])
+        $logs = JournalLog::with(['task.project', 'task.team', 'team.project'])
             ->where('user_id', $userId)
             ->whereDate('log_date', $this->logDate)
-            ->when($this->filterTeam > 0, fn ($q) => $q->whereHas('task', fn ($task) => $task->where('team_id', $this->filterTeam)))
+            ->when($this->filterTeam > 0, fn ($q) => $q->where('team_id', $this->filterTeam))
             ->latest()
             ->get();
 
         $dailyMinutes = $logs->sum('minutes');
 
-        $recentLogs = JournalLog::with(['task.project', 'task.team'])
+        $recentLogs = JournalLog::with(['task.project', 'task.team', 'team.project'])
             ->where('user_id', $userId)
             ->whereDate('log_date', '!=', $this->logDate)
-            ->when($this->filterTeam > 0, fn ($q) => $q->whereHas('task', fn ($task) => $task->where('team_id', $this->filterTeam)))
+            ->when($this->filterTeam > 0, fn ($q) => $q->where('team_id', $this->filterTeam))
             ->latest('log_date')
             ->latest()
             ->limit(8)

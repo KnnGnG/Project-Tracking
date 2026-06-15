@@ -10,6 +10,7 @@ class JournalLog extends Model
     protected $fillable = [
         'user_id',
         'task_id',
+        'team_id',
         'log_date',
         'minutes',
         'notes',
@@ -31,5 +32,10 @@ class JournalLog extends Model
     public function task(): BelongsTo
     {
         return $this->belongsTo(Task::class);
+    }
+
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
     }
 }

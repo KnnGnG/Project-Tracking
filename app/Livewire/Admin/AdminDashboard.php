@@ -74,7 +74,7 @@ class AdminDashboard extends Component
                 ->take(5)
                 ->get(),
             'teamsWithoutMembers' => Team::with(['project', 'lead'])
-                ->whereDoesntHave('members')
+                ->whereDoesntHave('regularMembers')
                 ->orderBy('name')
                 ->take(5)
                 ->get(),

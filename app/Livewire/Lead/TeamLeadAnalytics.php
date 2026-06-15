@@ -81,7 +81,7 @@ class TeamLeadAnalytics extends Component
                 );
                 $cfd = $this->buildCfdDataset($project, $tasks);
                 $punctuality = $this->buildPunctualitySplit($tasks);
-                $summary = $this->buildSummary($project, $tasks);
+                $summary = $this->buildSummary($tasks);
                 if ($this->velocityMemberId !== 0 && ! $validMemberIds->contains($this->velocityMemberId)) {
                     $this->velocityMemberId = 0;
                 }
@@ -99,6 +99,7 @@ class TeamLeadAnalytics extends Component
                     $velocityTasks,
                     $this->velocityDays,
                     $this->velocityTaskStatus === 'all',
+                    $selectedTeam->id,
                 );
             }
         }
@@ -116,7 +117,7 @@ class TeamLeadAnalytics extends Component
     }
 
     /** @return array<string, mixed> */
-    private function buildSummary(?Project $project, Collection $tasks): array
+    private function buildSummary(Collection $tasks): array
     {
         $total = $tasks->count();
         $done = $tasks->where('status', 'done')->count();
@@ -187,7 +188,7 @@ class TeamLeadAnalytics extends Component
     }
 
     /** @return array{labels:string[],datasets:array<int, array<string, mixed>>,includesGeneral:bool}|null */
-    private function buildVelocityDataset(Collection $members, Collection $tasks, int $days, bool $includeGeneralWork): ?array
+    private function buildVelocityDataset(Collection $members, Collection $tasks, int $days, bool $includeGeneralWork, int $teamId): ?array
     {
         $taskIds = $tasks->pluck('id');
 
@@ -205,14 +206,16 @@ class TeamLeadAnalytics extends Component
 
         $logs = JournalLog::query()
             ->whereIn('user_id', $members->pluck('id'))
-            ->where(function ($query) use ($taskIds, $includeGeneralWork) {
+            ->where(function ($query) use ($taskIds, $includeGeneralWork, $teamId) {
                 if ($taskIds->isNotEmpty()) {
                     $query->whereIn('task_id', $taskIds);
                 }
 
                 if ($includeGeneralWork) {
-                    $method = $taskIds->isNotEmpty() ? 'orWhereNull' : 'whereNull';
-                    $query->{$method}('task_id');
+                    $query->{$taskIds->isNotEmpty() ? 'orWhere' : 'where'}(function ($general) use ($teamId) {
+                        $general->whereNull('task_id')
+                            ->where('team_id', $teamId);
+                    });
                 }
             })
             ->whereBetween('log_date', [$start->toDateString(), $end->toDateString()])

@@ -43,7 +43,7 @@
                         <div class="mb-3 flex items-start justify-between gap-3">
                             <div class="min-w-0">
                                 <p class="truncate text-sm font-semibold text-gray-900">{{ $task->title }}</p>
-                                <p class="mt-0.5 truncate text-xs text-gray-400">{{ $task->project->name }} / {{ $task->team->name }}</p>
+                                <p class="mt-0.5 truncate text-xs text-gray-400">{{ $task->project?->name ?? 'No Project' }} / {{ $task->team?->name ?? 'No Team' }}</p>
                             </div>
                             <span class="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold {{ $toneClass }}">
                                 @if($isOverdue)
@@ -337,7 +337,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                       d="M3 7h18M3 12h18M3 17h18"/>
                                             </svg>
-                                            <span>{{ $task->project->name }}</span>
+                                            <span>{{ $task->project?->name ?? 'No Project' }}</span>
                                             <span class="text-gray-300">/</span>
                                             <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -519,7 +519,7 @@
                                         <dl class="space-y-2 text-sm">
                                             <div class="flex justify-between gap-2">
                                                 <dt class="text-gray-400">Project</dt>
-                                                <dd class="font-medium text-gray-800 text-right">{{ $task->project->name }}</dd>
+                                                <dd class="font-medium text-gray-800 text-right">{{ $task->project?->name ?? 'No Project' }}</dd>
                                             </div>
                                             <div class="flex justify-between gap-2">
                                                 <dt class="text-gray-400">Team</dt>
