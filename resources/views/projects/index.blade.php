@@ -71,7 +71,14 @@
 
                             <div class="mt-5 flex items-center justify-between border-t border-gray-100 pt-4 text-sm">
                                 <span class="text-gray-500">
-                                    {{ $project->start_date?->format('M d, Y') }} - {{ $project->end_date?->format('M d, Y') }}
+                                    `@if`($project->start_date || $project->end_date)
+                                        {{ $project->start_date?->format('M d, Y') ?? 'TBD' }}
+                                        `@if`($project->end_date)
+                                            - {{ $project->end_date->format('M d, Y') }}
+                                        `@endif`
+                                    `@else`
+                                        Dates not set
+                                    `@endif`
                                 </span>
                                 <span class="font-semibold text-indigo-600 group-hover:text-indigo-700">
                                     Open

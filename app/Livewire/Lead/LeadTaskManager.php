@@ -203,6 +203,7 @@ class LeadTaskManager extends Component
     public function delete(int $id): void
     {
         $this->ownedTask($id)->delete();
+        $this->refreshActiveSelfAssignedTaskContext();
         session()->flash('success', 'Task deleted.');
     }
 
