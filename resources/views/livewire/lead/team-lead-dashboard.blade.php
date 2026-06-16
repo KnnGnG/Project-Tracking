@@ -1,4 +1,4 @@
-<div class="space-y-3 text-[14px]" @if(!$showEventForm && !$showMemberTasksModal) wire:poll.visible.10s @endif>
+<div class="space-y-3 text-[14px]" @if(!$showEventForm && !$showMemberTasksModal) wire:poll.visible.30s @endif>
 
     {{-- Flash message --}}
     @if(session('event_success'))

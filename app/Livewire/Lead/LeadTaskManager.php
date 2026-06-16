@@ -195,6 +195,7 @@ class LeadTaskManager extends Component
             session()->flash('success', 'Task created and assigned.');
         }
 
+        $this->refreshActiveSelfAssignedTaskContext();
         $this->resetForm();
         $this->showForm = false;
     }
@@ -348,6 +349,27 @@ class LeadTaskManager extends Component
             'user_id' => auth()->id(),
             'type' => $type,
             'description' => $description,
+        ]);
+    }
+
+    private function refreshActiveSelfAssignedTaskContext(): void
+    {
+        $teamId = (int) ($this->filterTeamId ?: session('active_team_id', 0));
+
+        if ($teamId < 1) {
+            return;
+        }
+
+        $hasSelfAssignedTask = Task::query()
+            ->where('team_id', $teamId)
+            ->where(fn ($query) => $query
+                ->where('assigned_to', auth()->id())
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey(auth()->id())))
+            ->exists();
+
+        session([
+            'active_team_id' => $teamId,
+            'active_has_self_assigned_task' => $hasSelfAssignedTask,
         ]);
     }
 

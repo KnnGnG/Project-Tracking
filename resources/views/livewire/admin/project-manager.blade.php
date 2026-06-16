@@ -102,7 +102,7 @@
     @endif
 
     {{-- Projects table --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" @if(!$showForm) wire:poll.visible.15s @endif>
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" @if(!$showForm) wire:poll.visible.60s @endif>
         @if($projects->isEmpty())
             <div class="py-16 text-center text-gray-400">
                 <svg class="w-10 h-10 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">

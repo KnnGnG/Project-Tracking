@@ -4,6 +4,7 @@ namespace App\Livewire\Member;
 
 use App\Models\JournalLog;
 use App\Models\Task;
+use App\Models\Team;
 use Carbon\Carbon;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -238,9 +239,15 @@ class MemberJournal extends Component
 
         $userId = auth()->id();
 
-        $teams = auth()->user()
-            ->memberTeams()
+        $teams = Team::query()
             ->with('project')
+            ->where(fn ($query) => $query
+                ->whereHas('members', fn ($members) => $members
+                    ->whereKey($userId)
+                    ->where('team_members.role', 'member'))
+                ->orWhereHas('tasks', fn ($tasks) => $tasks
+                    ->where('assigned_to', $userId)
+                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId))))
             ->orderBy('name')
             ->get();
 

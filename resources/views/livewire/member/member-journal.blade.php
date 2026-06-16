@@ -1,4 +1,4 @@
-<div class="space-y-6" wire:poll.visible.15s>
+<div class="space-y-6" wire:poll.visible.45s>
 
     @if($flash)
         <x-floating-notification :message="$flash" dismiss="dismissFlash" />

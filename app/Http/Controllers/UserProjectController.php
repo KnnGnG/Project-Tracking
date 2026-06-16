@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\Team;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,6 +52,7 @@ class UserProjectController extends Controller
             'active_project_id' => $project->id,
             'active_team_id' => $team->id,
             'active_project_role' => $role,
+            'active_has_self_assigned_task' => $this->hasSelfAssignedTask($request, $project->id, $team->id),
         ]);
 
         return $role === 'lead'
@@ -69,5 +71,18 @@ class UserProjectController extends Controller
     private function roleForTeam(Team $team): string
     {
         return $team->members->first()?->pivot?->role ?? 'member';
+    }
+
+    private function hasSelfAssignedTask(Request $request, int $projectId, int $teamId): bool
+    {
+        $userId = $request->user()->id;
+
+        return Task::query()
+            ->where('project_id', $projectId)
+            ->where('team_id', $teamId)
+            ->where(fn ($query) => $query
+                ->where('assigned_to', $userId)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+            ->exists();
     }
 }

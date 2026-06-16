@@ -7,6 +7,7 @@ use App\Models\Task;
 use App\Models\InAppNotification;
 use App\Models\TaskActivity;
 use App\Models\TaskMemberProgress;
+use App\Models\Team;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -285,9 +286,15 @@ class MemberDashboard extends Component
         $userId = auth()->id();
         $today = now()->toDateString();
 
-        $teams = auth()->user()
-            ->memberTeams()
+        $teams = Team::query()
             ->with('project')
+            ->where(fn ($query) => $query
+                ->whereHas('members', fn ($members) => $members
+                    ->whereKey($userId)
+                    ->where('team_members.role', 'member'))
+                ->orWhereHas('tasks', fn ($tasks) => $tasks
+                    ->where('assigned_to', $userId)
+                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId))))
             ->orderBy('name')
             ->get();
 

@@ -179,7 +179,7 @@
     @endif
 
     {{-- Teams list --}}
-    <div class="space-y-3" @if(!$showForm) wire:poll.visible.15s @endif>
+    <div class="space-y-3" @if(!$showForm) wire:poll.visible.60s @endif>
         @forelse($teams as $team)
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 {{-- Team row --}}
