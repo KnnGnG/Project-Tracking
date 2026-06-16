@@ -27,8 +27,16 @@
                     $authUser = auth()->user();
                     $isAdmin = $authUser->isAdmin();
                     $isClient = $authUser->isClient();
-                    $isTeamLead = $authUser->isTeamLead();
-                    $isMember = $authUser->isMember();
+                    $activeProjectRole = match (true) {
+                        request()->routeIs('lead.*') => 'lead',
+                        request()->routeIs('member.*') => 'member',
+                        default => session('active_project_role'),
+                    };
+
+                    $showTeamLeadNav = $activeProjectRole === 'lead'
+                        || (! $activeProjectRole && $authUser->role === 'team_lead');
+                    $showMemberNav = $activeProjectRole === 'member'
+                        || (! $activeProjectRole && $authUser->role === 'member');
                 @endphp
 
                 @if($isAdmin)
@@ -89,7 +97,18 @@
                         My Projects
                     </a>
                 @else
-                    @if($isTeamLead)
+                    <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Projects</p>
+                    <a href="{{ route('projects.index') }}"
+                       class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
+                              {{ request()->routeIs('projects.*') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+                        </svg>
+                        My Projects
+                    </a>
+
+                    @if($showTeamLeadNav)
                     <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Team Lead</p>
                     <a href="{{ route('lead.dashboard') }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
@@ -129,7 +148,7 @@
                     </a>
                     @endif
 
-                    @if($isMember)
+                    @if($showMemberNav)
                     <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Member</p>
                     <a href="{{ route('member.dashboard') }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
@@ -176,11 +195,11 @@
                     $contextRoles->push('Client');
                 }
 
-                if ($isTeamLead) {
+                if ($showTeamLeadNav) {
                     $contextRoles->push('Team Lead');
                 }
 
-                if ($isMember) {
+                if ($showMemberNav) {
                     $contextRoles->push('Member');
                 }
 

@@ -42,6 +42,16 @@ class MemberDashboard extends Component
     /** Flash message */
     public ?string $flash = null;
 
+    public function mount(): void
+    {
+        $this->filterTeam = request()->has('team')
+            ? request()->integer('team')
+            : (int) session('active_team_id', 0);
+        $this->filterProject = request()->has('project')
+            ? request()->integer('project')
+            : (int) session('active_project_id', 0);
+    }
+
     public function setTab(string $tab): void
     {
         $this->activeTab = $tab;
