@@ -40,7 +40,9 @@ class MemberJournal extends Component
 
     public function mount(): void
     {
-        $this->filterTeam = request()->integer('team') ?: (int) session('active_team_id', 0);
+        $this->filterTeam = request()->has('team')
+            ? request()->integer('team')
+            : (int) session('active_team_id', 0);
         $this->normalizeLogDate();
     }
 

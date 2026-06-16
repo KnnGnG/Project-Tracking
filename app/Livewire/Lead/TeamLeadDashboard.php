@@ -45,7 +45,9 @@ class TeamLeadDashboard extends Component
         $this->month = now()->month;
         $this->year = now()->year;
 
-        $requestedTeamId = request()->integer('team') ?: session('active_team_id');
+        $requestedTeamId = request()->has('team')
+            ? request()->integer('team')
+            : session('active_team_id');
 
         $first = auth()->user()
             ->ledTeams()

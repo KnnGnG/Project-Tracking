@@ -44,8 +44,12 @@ class MemberDashboard extends Component
 
     public function mount(): void
     {
-        $this->filterTeam = request()->integer('team') ?: (int) session('active_team_id', 0);
-        $this->filterProject = request()->integer('project') ?: (int) session('active_project_id', 0);
+        $this->filterTeam = request()->has('team')
+            ? request()->integer('team')
+            : (int) session('active_team_id', 0);
+        $this->filterProject = request()->has('project')
+            ? request()->integer('project')
+            : (int) session('active_project_id', 0);
     }
 
     public function setTab(string $tab): void
