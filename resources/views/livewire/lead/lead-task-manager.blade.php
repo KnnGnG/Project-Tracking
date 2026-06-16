@@ -205,7 +205,7 @@
     @endif
 
     {{-- ── Task list ─────────────────────────────────────────────────────────── --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" @if(!$showForm) wire:poll.visible.10s @endif>
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" @if(!$showForm) wire:poll.visible.30s @endif>
         @if($tasks->isEmpty())
             <div class="py-16 text-center text-gray-400">
                 <svg class="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,4 +1,4 @@
-<div class="space-y-6" wire:poll.visible.10s>
+<div class="space-y-6" wire:poll.visible.30s>
 
     {{-- ── Flash message ─────────────────────────────────────────────────────── --}}
     @if($flash)

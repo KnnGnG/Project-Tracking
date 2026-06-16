@@ -27,16 +27,27 @@
                     $authUser = auth()->user();
                     $isAdmin = $authUser->isAdmin();
                     $isClient = $authUser->isClient();
+                    $activeTeamId = (int) (request()->integer('team') ?: session('active_team_id', 0));
+                    $activeProjectId = (int) (request()->integer('project') ?: session('active_project_id', 0));
                     $activeProjectRole = match (true) {
                         request()->routeIs('lead.*') => 'lead',
                         request()->routeIs('member.*') => 'member',
                         default => session('active_project_role'),
                     };
+                    $hasSelfAssignedTask = (bool) session('active_has_self_assigned_task', false);
 
                     $showTeamLeadNav = $activeProjectRole === 'lead'
                         || (! $activeProjectRole && $authUser->role === 'team_lead');
                     $showMemberNav = $activeProjectRole === 'member'
-                        || (! $activeProjectRole && $authUser->role === 'member');
+                        || (! $activeProjectRole && $authUser->role === 'member')
+                        || ($hasSelfAssignedTask && $showTeamLeadNav);
+                    $activeMemberRouteParams = array_filter([
+                        'team' => $activeTeamId ?: null,
+                        'project' => $activeProjectId ?: null,
+                    ]);
+                    $activeLeadRouteParams = array_filter([
+                        'team' => $activeTeamId ?: null,
+                    ]);
                 @endphp
 
                 @if($isAdmin)
@@ -110,7 +121,7 @@
 
                     @if($showTeamLeadNav)
                     <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Team Lead</p>
-                    <a href="{{ route('lead.dashboard') }}"
+                    <a href="{{ route('lead.dashboard', $activeLeadRouteParams) }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
                               {{ request()->routeIs('lead.dashboard') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,7 +130,7 @@
                         </svg>
                         Dashboard
                     </a>
-                    <a href="{{ route('lead.analytics') }}"
+                    <a href="{{ route('lead.analytics', $activeLeadRouteParams) }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
                               {{ request()->routeIs('lead.analytics') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,7 +139,7 @@
                         </svg>
                         Analytics
                     </a>
-                    <a href="{{ route('lead.tasks') }}"
+                    <a href="{{ route('lead.tasks', $activeLeadRouteParams) }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
                               {{ request()->routeIs('lead.tasks') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,7 +148,7 @@
                         </svg>
                         Manage Tasks
                     </a>
-                    <a href="{{ route('lead.journals') }}"
+                    <a href="{{ route('lead.journals', $activeLeadRouteParams) }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
                               {{ request()->routeIs('lead.journals') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,7 +161,7 @@
 
                     @if($showMemberNav)
                     <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Member</p>
-                    <a href="{{ route('member.dashboard') }}"
+                    <a href="{{ route('member.dashboard', $activeMemberRouteParams) }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
                               {{ request()->routeIs('member.dashboard') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -159,7 +170,7 @@
                         </svg>
                         My Tasks
                     </a>
-                    <a href="{{ route('member.logs') }}"
+                    <a href="{{ route('member.logs', $activeMemberRouteParams) }}"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition
                               {{ request()->routeIs('member.logs') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

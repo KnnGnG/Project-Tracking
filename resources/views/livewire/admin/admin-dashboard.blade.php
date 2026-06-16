@@ -1,4 +1,4 @@
-<div class="space-y-6" wire:poll.visible.15s>
+<div class="space-y-6" wire:poll.visible.60s>
 
     {{-- Flash --}}
     @if(session('success'))

@@ -1,4 +1,4 @@
-<div x-data="{ open: false }" class="relative" wire:poll.visible.20s>
+<div x-data="{ open: false }" class="relative" wire:poll.visible.60s>
     <button type="button"
             @click="open = ! open"
             :aria-expanded="open.toString()"

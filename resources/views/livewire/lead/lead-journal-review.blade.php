@@ -1,4 +1,4 @@
-<div class="space-y-6" wire:poll.visible.20s>
+<div class="space-y-6" wire:poll.visible.60s>
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
         <div>
             <label for="logDate" class="sr-only">Log date</label>
