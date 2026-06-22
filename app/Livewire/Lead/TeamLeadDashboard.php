@@ -5,6 +5,7 @@ namespace App\Livewire\Lead;
 use App\Models\Project;
 use App\Models\ProjectEvent;
 use App\Models\Team;
+use App\Models\JournalLog;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
@@ -21,7 +22,7 @@ class TeamLeadDashboard extends Component
 
     public int $year = 1970;
 
-    public array $timelineKinds = ['project', 'task', 'member', 'actual'];
+    public array $timelineKinds = ['project', 'task', 'actual'];
 
     // ── Event form state ──────────────────────────────────────────────────────
     public bool $showEventForm = false;
@@ -125,7 +126,7 @@ class TeamLeadDashboard extends Component
 
     public function toggleTimelineKind(string $kind): void
     {
-        if (! in_array($kind, ['project', 'task', 'member', 'actual'], true)) {
+        if (! in_array($kind, ['project', 'task', 'actual'], true)) {
             return;
         }
 
@@ -446,8 +447,13 @@ class TeamLeadDashboard extends Component
             ->all();
     }
 
-    private function buildTimelineGraph(Project $project, Collection $tasks, Carbon $monthStart, Carbon $monthEnd): array
-    {
+    private function buildTimelineGraph(
+        Project $project,
+        Collection $tasks,
+        Carbon $monthStart,
+        Carbon $monthEnd,
+        Collection $generalLogs,
+    ): array {
         $totalDays = max(1, (int) $monthStart->diffInDays($monthEnd) + 1);
 
         $makeRow = function (
@@ -483,6 +489,8 @@ class TeamLeadDashboard extends Component
                 'width' => max(2.5, round(($span / $totalDays) * 100, 2)),
                 'tooltip' => implode("\n", $tooltipLines),
                 'tooltipLines' => $tooltipLines,
+                'rawStart' => $start->copy(),
+                'rawEnd' => $end->copy(),
             ];
         };
 
@@ -496,6 +504,11 @@ class TeamLeadDashboard extends Component
             ->each(function ($task) use ($rows, $makeRow) {
                 $start = $task->start_date ?? $task->due_date;
                 $end = $task->due_date ?? $task->start_date;
+                $assigneeNames = $task->assignees->pluck('name');
+
+                if ($assigneeNames->isEmpty() && $task->assignee) {
+                    $assigneeNames = collect([$task->assignee->name]);
+                }
 
                 $taskRow = $makeRow('task', 'Task', $task->title, $start, $end);
 
@@ -504,54 +517,83 @@ class TeamLeadDashboard extends Component
                     $taskRow['tooltipLines'] = [
                         'Task',
                         $task->title,
+                        'Members: '.($assigneeNames->isNotEmpty() ? $assigneeNames->join(', ') : 'Unassigned'),
                         'Status: '.$taskRow['statusLabel'],
                         'Priority: '.ucfirst($task->priority ?? 'normal'),
-                        'Start: '.($task->start_date ? $task->start_date->format('M d, Y') : 'Not set'),
+                        'Scheduled start: '.($task->start_date ? $task->start_date->format('M d, Y') : 'Not set'),
                         'Due: '.($task->due_date ? $task->due_date->format('M d, Y') : 'No due date'),
                     ];
                     $taskRow['tooltip'] = implode("\n", $taskRow['tooltipLines']);
-
-                    $rows->push($taskRow);
                 }
 
-                $assigneeNames = $task->assignees->pluck('name');
+                $actualSegments = collect();
+                $journalLogs = $task->journalLogs ?? collect();
+                $progressRows = $task->memberProgress
+                    ->filter(fn ($progress) => $progress->user)
+                    ->each(fn ($progress) => $progress->hasProgressRecord = true)
+                    ->values();
+                $progressUserIds = $progressRows->pluck('user.id')->filter()->all();
 
-                if ($assigneeNames->isEmpty() && $task->assignee) {
-                    $assigneeNames = collect([$task->assignee->name]);
+                $fallbackUsers = $task->assignees;
+
+                if ($fallbackUsers->isEmpty() && $task->assignee) {
+                    $fallbackUsers = collect([$task->assignee]);
                 }
 
-                if ($assigneeNames->isNotEmpty()) {
-                    $memberRow = $makeRow('member', 'Member', $assigneeNames->join(', '), $start, $end);
+                $fallbackUsers
+                    ->reject(fn ($user) => in_array($user->id, $progressUserIds, true))
+                    ->each(function ($user) use ($progressRows, $task, &$progressUserIds) {
+                        $progressRows->push((object) [
+                            'user' => $user,
+                            'started_at' => null,
+                            'completed_at' => null,
+                            'status' => $task->status,
+                            'updated_at' => $task->updated_at,
+                            'hasProgressRecord' => false,
+                        ]);
+                        $progressUserIds[] = $user->id;
+                    });
 
-                    if ($memberRow) {
-                        $rows->push($memberRow);
-                    }
-                }
+                $journalLogs
+                    ->filter(fn ($log) => $log->user && ! in_array($log->user_id, $progressUserIds, true))
+                    ->unique('user_id')
+                    ->each(function ($log) use ($progressRows, $task, &$progressUserIds) {
+                        $progressRows->push((object) [
+                            'user' => $log->user,
+                            'started_at' => null,
+                            'completed_at' => null,
+                            'status' => $task->status,
+                            'updated_at' => $task->updated_at,
+                            'hasProgressRecord' => false,
+                        ]);
+                        $progressUserIds[] = $log->user_id;
+                    });
 
-                $progressRows = $task->memberProgress->filter(fn ($progress) => $progress->user);
+                $progressRows->each(function ($progress) use ($actualSegments, $makeRow, $task, $journalLogs) {
+                    $userLogs = $journalLogs
+                        ->where('user_id', $progress->user->id)
+                        ->sortBy('log_date');
+                    $startCandidates = collect([
+                        $progress->started_at,
+                        optional($userLogs->first())->log_date,
+                        ($progress->hasProgressRecord ?? false) && $progress->status !== 'pending' ? $progress->updated_at : null,
+                    ])->filter()->map(fn ($date) => Carbon::parse($date));
 
-                if ($progressRows->isEmpty() && $task->assignee) {
-                    $progressRows = collect([(object) [
-                        'user' => $task->assignee,
-                        'started_at' => $task->start_date,
-                        'completed_at' => null,
-                        'status' => $task->status,
-                        'updated_at' => $task->updated_at,
-                    ]]);
-                }
-
-                $progressRows->each(function ($progress) use ($rows, $makeRow, $task) {
-                    $memberStart = $progress->started_at
-                        ?? ($progress->status !== 'pending' ? $progress->updated_at : null)
-                        ?? $task->start_date;
-
-                    if (! $memberStart) {
+                    if ($startCandidates->isEmpty()) {
                         return;
                     }
 
-                    $memberEnd = $task->due_date ?? $memberStart;
+                    $memberStart = $startCandidates->sortBy(fn (Carbon $date) => $date->timestamp)->first();
+                    $endCandidates = collect([
+                        $progress->completed_at,
+                        optional($userLogs->last())->log_date,
+                        $memberStart,
+                    ])->filter()->map(fn ($date) => Carbon::parse($date));
+                    $memberEnd = $endCandidates->sortByDesc(fn (Carbon $date) => $date->timestamp)->first();
                     $dueLabel = $task->due_date ? $task->due_date->format('M d') : 'No due date';
                     $startedLabel = $memberStart->format('M d');
+                    $endLabel = $memberEnd->format('M d');
+                    $loggedMinutes = $userLogs->sum('minutes');
                     $timing = match (true) {
                         $task->due_date && $progress->completed_at && $progress->completed_at->gt($task->due_date->copy()->endOfDay()) => 'Completed late',
                         $task->due_date && $progress->completed_at && $progress->completed_at->lte($task->due_date->copy()->endOfDay()) => 'Completed on time',
@@ -565,8 +607,8 @@ class TeamLeadDashboard extends Component
 
                     $actualStartRow = $makeRow(
                         'actual',
-                        'Actual',
-                        $progress->user->name.' - Started '.$startedLabel.' / Due '.$dueLabel.' / '.$timing,
+                        'Start to End',
+                        $progress->user->name.' - '.$startedLabel.' to '.$endLabel.' / Due '.$dueLabel.' / '.$timing,
                         $memberStart,
                         $memberEnd,
                     );
@@ -574,18 +616,120 @@ class TeamLeadDashboard extends Component
                     if ($actualStartRow) {
                         // expose the precise started timestamp for the UI hover
                         $actualStartRow['startedAt'] = $progress->started_at?->format('M d, Y h:i A') ?? null;
+                        $actualStartRow['memberName'] = $progress->user->name;
+                        $actualStartRow['loggedMinutes'] = $loggedMinutes;
                         $actualStartRow['tooltipLines'] = [
                             $progress->user->name,
                             'Task: '.$task->title,
-                            'Started: '.($progress->started_at?->format('M d, Y h:i A') ?? $memberStart->format('M d, Y')),
+                            'Start: '.$memberStart->format('M d, Y'),
+                            'End: '.$memberEnd->format('M d, Y'),
+                            'Logged: '.intdiv($loggedMinutes, 60).'h '.($loggedMinutes % 60).'m',
                             'Due: '.($task->due_date ? $task->due_date->format('M d, Y') : 'No due date'),
                             $timing,
                         ];
                         $actualStartRow['tooltip'] = implode("\n", $actualStartRow['tooltipLines']);
 
-                        $rows->push($actualStartRow);
+                        $actualSegments->push($actualStartRow);
                     }
                 });
+
+                if ($taskRow) {
+                    if ($actualSegments->count() > 1) {
+                        $combinedStart = $actualSegments
+                            ->pluck('rawStart')
+                            ->sortBy(fn (Carbon $date) => $date->timestamp)
+                            ->first();
+                        $combinedEnd = $actualSegments
+                            ->pluck('rawEnd')
+                            ->sortByDesc(fn (Carbon $date) => $date->timestamp)
+                            ->first();
+                        $memberNames = $actualSegments
+                            ->pluck('memberName')
+                            ->filter()
+                            ->unique()
+                            ->values();
+                        $totalLoggedMinutes = $actualSegments->sum('loggedMinutes');
+                        $combinedSegment = $makeRow(
+                            'actual',
+                            'Start to End',
+                            $memberNames->join(', ').' - '.$combinedStart->format('M d').' to '.$combinedEnd->format('M d'),
+                            $combinedStart,
+                            $combinedEnd,
+                        );
+
+                        if ($combinedSegment) {
+                            $combinedSegment['tooltipLines'] = [
+                                'Start to End',
+                                'Task: '.$task->title,
+                                'Members: '.$memberNames->join(', '),
+                                'Start: '.$combinedStart->format('M d, Y'),
+                                'End: '.$combinedEnd->format('M d, Y'),
+                                'Logged: '.intdiv($totalLoggedMinutes, 60).'h '.($totalLoggedMinutes % 60).'m',
+                                'Due: '.($task->due_date ? $task->due_date->format('M d, Y') : 'No due date'),
+                            ];
+                            $combinedSegment['tooltip'] = implode("\n", $combinedSegment['tooltipLines']);
+                            $taskRow['segments'] = collect([$combinedSegment]);
+                        } else {
+                            $taskRow['segments'] = collect();
+                        }
+                    } else {
+                        $taskRow['segments'] = $actualSegments->values();
+                    }
+
+                    $rows->push($taskRow);
+                }
+            });
+
+        $generalLogs
+            ->filter(fn (JournalLog $log) => $log->user && $log->log_date)
+            ->groupBy('user_id')
+            ->each(function (Collection $logs) use ($rows, $makeRow) {
+                $logs = $logs->sortBy('log_date');
+                $firstLog = $logs->first();
+                $lastLog = $logs->last();
+
+                if (! $firstLog || ! $lastLog) {
+                    return;
+                }
+
+                $start = Carbon::parse($firstLog->log_date);
+                $end = Carbon::parse($lastLog->log_date);
+                $minutes = $logs->sum('minutes');
+                $userName = $firstLog->user->name;
+
+                $row = $makeRow('general', 'General Work', $userName, $start, $end);
+
+                if (! $row) {
+                    return;
+                }
+
+                $segment = $makeRow(
+                    'actual',
+                    'Start to End',
+                    $userName.' - '.$start->format('M d').' to '.$end->format('M d').' / General work',
+                    $start,
+                    $end,
+                );
+
+                if (! $segment) {
+                    return;
+                }
+
+                $segment['tooltipLines'] = [
+                    $userName,
+                    'Type: General work',
+                    'Start: '.$start->format('M d, Y'),
+                    'End: '.$end->format('M d, Y'),
+                    'Logged: '.intdiv($minutes, 60).'h '.($minutes % 60).'m',
+                ];
+                $segment['tooltip'] = implode("\n", $segment['tooltipLines']);
+
+                $row['hidePrimary'] = true;
+                $row['segments'] = collect([$segment]);
+                $row['tooltipLines'] = $segment['tooltipLines'];
+                $row['tooltip'] = $segment['tooltip'];
+
+                $rows->push($row);
             });
 
         $today = now();
@@ -647,6 +791,7 @@ class TeamLeadDashboard extends Component
                 'tasks.assignee',
                 'tasks.assignees',
                 'tasks.memberProgress.user',
+                'tasks.journalLogs.user',
             ])->find($this->selectedTeamId);
 
             if ($selectedTeam) {
@@ -654,13 +799,43 @@ class TeamLeadDashboard extends Component
                 $tasks = $selectedTeam->tasks;
                 $monthStart = Carbon::create($this->year, $this->month, 1)->startOfDay();
                 $monthEnd = $monthStart->copy()->endOfMonth();
+                $generalLogs = JournalLog::with('user')
+                    ->where('team_id', $selectedTeam->id)
+                    ->whereNull('task_id')
+                    ->whereBetween('log_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+                    ->orderBy('log_date')
+                    ->get();
                 $calendarGrid = $this->buildCalendarGrid(
                     $this->calendarItemsByDay($project, $tasks, $monthStart, $monthEnd)
                 );
                 $calendarWeekBars = $this->buildCalendarWeekBars($project, $tasks, $calendarGrid);
-                $timelineGraph = $this->buildTimelineGraph($project, $tasks, $monthStart, $monthEnd);
+                $timelineGraph = $this->buildTimelineGraph($project, $tasks, $monthStart, $monthEnd, $generalLogs);
+                $showTaskTimeline = in_array('task', $this->timelineKinds, true);
+                $showActualTimeline = in_array('actual', $this->timelineKinds, true);
                 $timelineGraph['rows'] = $timelineGraph['rows']
-                    ->filter(fn ($row) => in_array($row['kind'], $this->timelineKinds, true))
+                    ->map(function ($row) use ($showActualTimeline, $showTaskTimeline) {
+                        if (($row['kind'] ?? null) === 'task') {
+                            $row['hidePrimary'] = ! $showTaskTimeline;
+                        }
+
+                        if (! $showActualTimeline) {
+                            $row['segments'] = collect();
+                        }
+
+                        return $row;
+                    })
+                    ->filter(function ($row) use ($showActualTimeline) {
+                        if (($row['kind'] ?? null) === 'task') {
+                            return in_array('task', $this->timelineKinds, true)
+                                || ($showActualTimeline && collect($row['segments'] ?? [])->isNotEmpty());
+                        }
+
+                        if (($row['kind'] ?? null) === 'general') {
+                            return $showActualTimeline && collect($row['segments'] ?? [])->isNotEmpty();
+                        }
+
+                        return in_array($row['kind'], $this->timelineKinds, true);
+                    })
                     ->values();
 
                 $total = $tasks->count();
