@@ -40,8 +40,11 @@ class UserProjectController extends Controller
 
     public function open(Request $request, Project $project): RedirectResponse
     {
+        $requestedTeamId = $request->integer('team');
+
         $team = $this->involvedTeams($request)
             ->where('project_id', $project->id)
+            ->when($requestedTeamId, fn ($query) => $query->whereKey($requestedTeamId))
             ->orderByRaw("CASE WHEN team_members.role = 'lead' THEN 0 ELSE 1 END")
             ->orderBy('teams.name')
             ->firstOrFail();
