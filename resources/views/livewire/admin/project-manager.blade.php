@@ -85,6 +85,46 @@
                     </select>
                 </div>
 
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Assign Existing Teams</label>
+                    <div class="rounded-lg border border-gray-300 bg-white p-3">
+                        <div class="mb-3 flex flex-wrap items-center gap-2">
+                            <input type="text"
+                                   wire:model.live.debounce.300ms="teamSearch"
+                                   placeholder="Search teams..."
+                                   class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+
+                        <div class="grid max-h-52 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
+                            @foreach($projectTeamOptions as $teamOption)
+                                <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm transition hover:bg-indigo-50">
+                                    <input type="checkbox"
+                                           wire:model="projectTeamIds"
+                                           value="{{ $teamOption->id }}"
+                                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block truncate font-medium text-gray-800">{{ $teamOption->name }}</span>
+                                        <span class="block text-xs text-gray-500">
+                                            {{ $teamOption->project?->name ?? 'No project' }} · {{ $teamOption->lead?->name ?? 'No lead' }}
+                                        </span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                        @error('projectTeamIds') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        @error('projectTeamIds.*') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                    </div>
+                    @if(!empty($selectedProjectTeams))
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            @foreach($selectedProjectTeams as $teamOption)
+                                <span class="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
+                                    {{ $teamOption->name }}
+                                </span>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+
             </div>
 
             {{-- Actions --}}

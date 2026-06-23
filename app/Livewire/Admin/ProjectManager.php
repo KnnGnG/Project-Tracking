@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Models\Project;
+use App\Models\Team;
 use App\Models\Task;
 use App\Models\User;
 use Livewire\Attributes\Layout;
@@ -19,6 +20,8 @@ class ProjectManager extends Component
     public string $endDate     = '';
     public string $status      = 'active';
     public ?int   $clientId    = null;
+    public array $projectTeamIds = [];
+    public string $teamSearch = '';
 
     public bool $showForm    = false;
     public ?int $editingId   = null;
@@ -40,6 +43,8 @@ class ProjectManager extends Component
             'endDate'     => 'required|date|after_or_equal:startDate',
             'status'      => 'required|in:active,on_hold,completed',
             'clientId'    => 'nullable|exists:users,id',
+            'projectTeamIds' => 'nullable|array',
+            'projectTeamIds.*' => 'integer|exists:teams,id',
         ];
     }
 
@@ -61,6 +66,7 @@ class ProjectManager extends Component
         $this->endDate     = $project->end_date->toDateString();
         $this->status      = $project->status;
         $this->clientId    = $project->client_id;
+        $this->projectTeamIds = $project->teams->pluck('id')->map(fn ($id) => (int) $id)->all();
         $this->showForm    = true;
     }
 
@@ -80,9 +86,33 @@ class ProjectManager extends Component
         if ($this->editingId) {
             $project = Project::findOrFail($this->editingId);
             $project->update($payload);
+            $selectedTeamIds = collect($this->projectTeamIds)
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values();
+
+            Team::where('project_id', $project->id)
+                ->when($selectedTeamIds->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $selectedTeamIds))
+                ->update(['project_id' => null]);
+
+            if ($selectedTeamIds->isNotEmpty()) {
+                Team::whereIn('id', $selectedTeamIds->all())
+                    ->update(['project_id' => $project->id]);
+            }
             session()->flash('success', 'Project updated successfully.');
         } else {
             $project = Project::create(array_merge($payload, ['created_by' => auth()->id()]));
+            $selectedTeamIds = collect($this->projectTeamIds)
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($selectedTeamIds->isNotEmpty()) {
+                Team::whereIn('id', $selectedTeamIds->all())
+                    ->update(['project_id' => $project->id]);
+            }
             session()->flash('success', 'Project created successfully.');
         }
 
@@ -142,8 +172,18 @@ class ProjectManager extends Component
         $this->endDate     = '';
         $this->status      = 'active';
         $this->clientId    = null;
+        $this->projectTeamIds = [];
+        $this->teamSearch = '';
         $this->editingId   = null;
         $this->resetValidation();
+    }
+
+    private function projectTeamOptions()
+    {
+        return Team::with(['project', 'lead'])
+            ->when($this->teamSearch, fn ($q) => $q->where('name', 'like', "%{$this->teamSearch}%"))
+            ->orderBy('name')
+            ->get();
     }
 
     public function render()
@@ -158,6 +198,11 @@ class ProjectManager extends Component
             ->get();
 
         $clients = User::where('role', 'client')->orderBy('name')->get();
+        $projectTeamOptions = $this->projectTeamOptions();
+        $selectedProjectTeams = Team::with(['project', 'lead'])
+            ->whereIn('id', array_map('intval', $this->projectTeamIds))
+            ->orderBy('name')
+            ->get();
         if ($this->detailsProjectId) {
             $detailsProject = Project::with([
                 'client',
@@ -178,6 +223,6 @@ class ProjectManager extends Component
         // expose the property as a local variable for compact() and the view
         $detailsProjectTasks = $this->detailsProjectTasks;
 
-        return view('livewire.admin.project-manager', compact('projects', 'clients', 'detailsProject', 'detailsProjectTasks'));
+        return view('livewire.admin.project-manager', compact('projects', 'clients', 'detailsProject', 'detailsProjectTasks', 'projectTeamOptions', 'selectedProjectTeams'));
     }
 }
