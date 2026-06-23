@@ -4,18 +4,21 @@ namespace App\Livewire\Lead;
 
 use App\Models\Project;
 use App\Models\ProjectEvent;
-use App\Models\Team;
 use App\Models\JournalLog;
+use App\Models\Task;
+use App\Models\Team;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('components.layouts.app')]
 #[Title('Team Dashboard')]
 class TeamLeadDashboard extends Component
 {
+    #[Url(as: 'team')]
     public ?int $selectedTeamId = null;
 
     public int $month = 1;
@@ -63,13 +66,36 @@ class TeamLeadDashboard extends Component
 
     public function selectTeam(int $id): void
     {
-        if (! auth()->user()->ledTeams()->whereKey($id)->exists()) {
+        $team = auth()->user()->ledTeams()->find($id);
+
+        if (! $team) {
             return;
         }
 
-        $this->selectedTeamId = $id;
+        $this->selectedTeamId = $team->id;
+        $this->refreshActiveTeamContext($team);
         $this->cancelEventForm();
         $this->closeMemberTasksModal();
+    }
+
+    private function refreshActiveTeamContext(Team $team): void
+    {
+        session([
+            'active_project_id' => $team->project_id,
+            'active_team_id' => $team->id,
+            'active_project_role' => 'lead',
+            'active_has_self_assigned_task' => $this->hasSelfAssignedTask($team->project_id),
+        ]);
+    }
+
+    private function hasSelfAssignedTask(int $projectId): bool
+    {
+        return Task::query()
+            ->where('project_id', $projectId)
+            ->where(fn ($query) => $query
+                ->where('assigned_to', auth()->id())
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey(auth()->id())))
+            ->exists();
     }
 
     public function previousMonth(): void
