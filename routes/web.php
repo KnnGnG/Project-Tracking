@@ -3,6 +3,7 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserProjectController;
 use App\Livewire\Admin\AdminDashboard;
+use App\Livewire\Admin\AssignTeams;
 use App\Livewire\Admin\ProjectManager;
 use App\Livewire\Admin\TaskAssigner;
 use App\Livewire\Admin\TeamManager;
@@ -56,6 +57,7 @@ Route::middleware(['auth', 'throttle:300,1'])->group(function () {
             Route::get('/users', UserManager::class)->name('users');
             Route::get('/projects', ProjectManager::class)->name('projects');
             Route::get('/teams', TeamManager::class)->name('teams');
+            Route::get('/assign-teams', AssignTeams::class)->name('assign-teams');
             Route::get('/tasks', TaskAssigner::class)->name('tasks');
         });
 

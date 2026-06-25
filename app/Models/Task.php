@@ -19,6 +19,7 @@ class Task extends Model
         'assigned_to',
         'created_by',
         'start_date',
+        'start_time',
         'due_date',
         'status',
         'priority',

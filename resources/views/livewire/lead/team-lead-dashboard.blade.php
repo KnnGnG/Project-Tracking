@@ -554,6 +554,9 @@
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <p class="text-sm font-medium text-gray-800 truncate">{{ $member->name }}</p>
+                                        @if($member->pivot?->notes)
+                                            <p class="mt-0.5 truncate text-xs text-gray-400">{{ $member->pivot->notes }}</p>
+                                        @endif
                                         <div class="flex items-center gap-2 mt-1">
                                             <div class="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                                 <div class="h-1.5 bg-indigo-500 rounded-full transition-all duration-500"

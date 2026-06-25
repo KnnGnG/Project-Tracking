@@ -121,7 +121,7 @@ class User extends Authenticatable
     public function ledTeams(): BelongsToMany
     {
         return $this->belongsToMany(Team::class, 'team_members', 'user_id', 'team_id')
-            ->withPivot('role')
+            ->withPivot('role', 'notes')
             ->wherePivot('role', 'lead')
             ->withTimestamps();
     }
@@ -129,14 +129,14 @@ class User extends Authenticatable
     public function teams(): BelongsToMany
     {
         return $this->belongsToMany(Team::class, 'team_members', 'user_id', 'team_id')
-            ->withPivot('role')
+            ->withPivot('role', 'notes')
             ->withTimestamps();
     }
 
     public function memberTeams(): BelongsToMany
     {
         return $this->belongsToMany(Team::class, 'team_members', 'user_id', 'team_id')
-            ->withPivot('role')
+            ->withPivot('role', 'notes')
             ->wherePivot('role', 'member')
             ->withTimestamps();
     }

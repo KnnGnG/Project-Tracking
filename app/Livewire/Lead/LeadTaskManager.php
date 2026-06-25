@@ -36,6 +36,8 @@ class LeadTaskManager extends Component
 
     public string $startDate = '';
 
+    public string $startTime = '';
+
     public string $dueDate = '';
 
     public string $status = 'pending';
@@ -58,9 +60,10 @@ class LeadTaskManager extends Component
 
         $first = auth()->user()
             ->ledTeams()
+            ->whereNotNull('project_id')
             ->when($requestedTeamId, fn ($query) => $query->whereKey($requestedTeamId))
             ->first()
-            ?? auth()->user()->ledTeams()->first();
+            ?? auth()->user()->ledTeams()->whereNotNull('project_id')->first();
 
         if ($first) {
             $this->filterTeamId = $first->id;
@@ -93,6 +96,7 @@ class LeadTaskManager extends Component
             ->values()
             ->all();
         $this->startDate = $task->start_date?->toDateString() ?? '';
+        $this->startTime = $task->start_time ? substr((string) $task->start_time, 0, 5) : '';
         $this->dueDate = $task->due_date->toDateString();
         $this->status = $task->status;
         $this->priority = $task->priority;
@@ -125,10 +129,23 @@ class LeadTaskManager extends Component
             'assignedTo' => 'required|array|min:1',
             'assignedTo.*' => 'integer|exists:users,id',
             'startDate' => 'nullable|date',
+            'startTime' => 'nullable|date_format:H:i',
             'dueDate' => 'required|date',
             'status' => 'required|in:pending,in_progress,review,done',
             'priority' => 'required|in:low,medium,high',
         ]);
+
+        if ($data['startTime'] && ! $data['startDate']) {
+            $this->addError('startDate', 'Choose a scheduled start date when setting a start time.');
+
+            return;
+        }
+
+        if ($data['startDate'] && $data['dueDate'] < $data['startDate']) {
+            $this->addError('dueDate', 'The due date must be on or after the scheduled start date.');
+
+            return;
+        }
 
         // Ensure the team belongs to this lead
         $team = $this->ownedTeam($data['teamId']);
@@ -150,7 +167,8 @@ class LeadTaskManager extends Component
             'project_id' => $team->project_id,
             'team_id' => $team->id,
             'assigned_to' => $assigneeIds->first(),
-            'start_date' => $this->editingId ? ($data['startDate'] ?: null) : null,
+            'start_date' => $data['startDate'] ?: null,
+            'start_time' => $data['startTime'] ?: null,
             'due_date' => $data['dueDate'],
             'status' => $data['status'],
             'priority' => $data['priority'],
@@ -268,7 +286,7 @@ class LeadTaskManager extends Component
     /** Returns a task only if it belongs to one of this lead's teams. */
     private function ownedTask(int $id): Task
     {
-        $teamIds = auth()->user()->ledTeams()->pluck('id');
+        $teamIds = auth()->user()->ledTeams()->whereNotNull('project_id')->pluck('id');
         $task = Task::whereIn('team_id', $teamIds)->findOrFail($id);
 
         return $task;
@@ -277,7 +295,7 @@ class LeadTaskManager extends Component
     /** Returns a team only if this user leads it. */
     private function ownedTeam(int $id): Team
     {
-        return auth()->user()->ledTeams()->findOrFail($id);
+        return auth()->user()->ledTeams()->whereNotNull('project_id')->findOrFail($id);
     }
 
     private function resetForm(): void
@@ -289,6 +307,7 @@ class LeadTaskManager extends Component
         $this->assignedTo = [];
         $this->memberSearch = '';
         $this->startDate = '';
+        $this->startTime = '';
         $this->dueDate = '';
         $this->status = 'pending';
         $this->priority = 'medium';
@@ -380,7 +399,7 @@ class LeadTaskManager extends Component
 
     public function render()
     {
-        $leadTeams = auth()->user()->ledTeams()->with('project')->get();
+        $leadTeams = auth()->user()->ledTeams()->whereNotNull('project_id')->with('project')->get();
 
         // Tasks visible to this lead — filtered
         $tasks = Task::with(['assignee', 'assignees', 'team', 'project', 'memberProgress.user'])

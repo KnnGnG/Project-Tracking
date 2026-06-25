@@ -125,18 +125,9 @@ class MemberDashboard extends Component
         }
 
         $oldStatus = $task->status;
-        $updates = [];
-
-        // Capture the real start moment: first time a member moves task to in progress.
-        if ($newStatus === 'in_progress' && ! $task->start_date) {
-            $updates['start_date'] = now()->toDateString();
-        }
 
         $this->updateMemberProgress($task, $newStatus);
         // Overall task status is derived from every assignee's progress below.
-        if ($updates !== []) {
-            $task->update($updates);
-        }
         $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
         $task = $task->fresh(['team']);
         $this->recordStatusActivity($task, $oldStatus, $task->status);
