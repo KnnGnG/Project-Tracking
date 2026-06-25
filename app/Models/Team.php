@@ -30,14 +30,14 @@ class Team extends Model
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'team_members', 'team_id', 'user_id')
-            ->withPivot('role')
+            ->withPivot('role', 'notes')
             ->withTimestamps();
     }
 
     public function leads(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'team_members', 'team_id', 'user_id')
-            ->withPivot('role')
+            ->withPivot('role', 'notes')
             ->wherePivot('role', 'lead')
             ->withTimestamps();
     }
@@ -45,7 +45,7 @@ class Team extends Model
     public function regularMembers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'team_members', 'team_id', 'user_id')
-            ->withPivot('role')
+            ->withPivot('role', 'notes')
             ->wherePivot('role', 'member')
             ->withTimestamps();
     }

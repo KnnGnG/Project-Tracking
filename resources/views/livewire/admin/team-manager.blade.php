@@ -71,25 +71,35 @@
                         @if($members->isEmpty())
                             <p class="py-4 text-center text-sm text-gray-400">No team leads or members found.</p>
                         @else
-                            <div class="grid max-h-44 grid-cols-1 gap-1 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
+                            <div class="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
                                 @foreach($members as $member)
-                                    <label class="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm transition hover:bg-indigo-50">
-                                        <input type="checkbox"
-                                               wire:model="memberIds"
-                                               value="{{ $member->id }}"
-                                               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                        <span class="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
-                                            {{ strtoupper(substr($member->name, 0, 1)) }}
-                                        </span>
-                                        <span class="min-w-0">
-                                            <span class="block truncate font-medium text-gray-700">{{ $member->name }}</span>
-                                        </span>
-                                    </label>
+                                    @php $isSelectedMember = in_array((string) $member->id, array_map('strval', $memberIds), true); @endphp
+                                    <div class="rounded-md px-2 py-2 text-sm transition hover:bg-indigo-50">
+                                        <label class="flex cursor-pointer items-center gap-3">
+                                            <input type="checkbox"
+                                                   wire:model.live="memberIds"
+                                                   value="{{ $member->id }}"
+                                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                            <span class="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+                                                {{ strtoupper(substr($member->name, 0, 1)) }}
+                                            </span>
+                                            <span class="min-w-0">
+                                                <span class="block truncate font-medium text-gray-700">{{ $member->name }}</span>
+                                            </span>
+                                        </label>
+                                        @if($isSelectedMember)
+                                            <textarea wire:model="memberNotes.{{ $member->id }}"
+                                                      rows="2"
+                                                      placeholder="Additional notes for this member..."
+                                                      class="mt-2 w-full resize-none rounded-lg border border-gray-200 px-2.5 py-2 text-xs text-gray-600 focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+                                            @error('memberNotes.'.$member->id) <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                        @endif
+                                    </div>
                                 @endforeach
                             </div>
                         @endif
                     </div>
-                    <p class="mt-1 text-xs text-gray-400">Select the people who belong to this team.</p>
+                    <p class="mt-1 text-xs text-gray-400">Select the people who belong to this team. Add optional notes for responsibilities, availability, or reminders.</p>
                     @error('memberIds') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                     @error('memberIds.*') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                 </div>
@@ -158,7 +168,7 @@
                             @endforeach
                         </div>
                     @endif
-                    <p class="mt-1 text-xs text-gray-400">Selected teams will be assigned to the chosen project when you save.</p>
+                    <p class="mt-1 text-xs text-gray-400">Selecting a team copies its name, lead, and members into the form. Selected teams will be assigned to the chosen project when you save.</p>
                     @error('projectTeamIds') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                     @error('projectTeamIds.*') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                 </div>
@@ -186,7 +196,7 @@
                 <div class="flex items-center gap-4 px-6 py-4">
                     <div class="flex-1 min-w-0">
                         <p class="font-semibold text-gray-900">{{ $team->name }}</p>
-                        <p class="text-xs text-gray-400 mt-0.5">{{ $team->project->name }}</p>
+                        <p class="text-xs text-gray-400 mt-0.5">{{ $team->project?->name ?? 'No project assigned' }}</p>
                     </div>
                     <div class="text-sm text-gray-600 hidden md:block">
                         Lead: <span class="font-medium text-gray-800">{{ $team->lead->name }}</span>
@@ -309,6 +319,9 @@
                                             <div class="min-w-0 flex-1">
                                                 <p class="truncate text-sm font-semibold text-gray-800">{{ $member->name }}</p>
                                                 <p class="truncate text-xs text-gray-400">{{ $member->email }}</p>
+                                                @if($member->pivot?->notes)
+                                                    <p class="mt-1 text-xs leading-5 text-gray-500">{{ $member->pivot->notes }}</p>
+                                                @endif
                                             </div>
                                             <span @class([
                                                 'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold',

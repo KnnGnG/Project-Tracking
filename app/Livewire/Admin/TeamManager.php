@@ -7,6 +7,8 @@ use App\Models\Team;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -15,12 +17,16 @@ use Livewire\Component;
 #[Title('Teams')]
 class TeamManager extends Component
 {
+    private const ALLOWED_TEAM_ROLES = ['team_lead', 'member'];
+
     // Team form fields
     public string $name      = '';
     public ?int   $projectId = null;
     public ?int   $leadId    = null;
     public array  $memberIds = [];
+    public array $memberNotes = [];
     public array $projectTeamIds = [];
+    public array $previousProjectTeamIds = [];
     public string $teamSearch = '';
 
     public bool $showForm  = false;
@@ -35,9 +41,11 @@ class TeamManager extends Component
         return [
             'name'      => 'required|string|max:255',
             'projectId' => 'required|exists:projects,id',
-            'leadId'    => 'required|exists:users,id',
+            'leadId'    => ['required', Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', self::ALLOWED_TEAM_ROLES))],
             'memberIds' => 'nullable|array',
-            'memberIds.*' => 'integer|exists:users,id',
+            'memberIds.*' => ['integer', Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', self::ALLOWED_TEAM_ROLES))],
+            'memberNotes' => 'nullable|array',
+            'memberNotes.*' => 'nullable|string|max:500',
             'projectTeamIds' => 'nullable|array',
             'projectTeamIds.*' => 'integer|exists:teams,id',
         ];
@@ -59,6 +67,10 @@ class TeamManager extends Component
         $this->projectId = $team->project_id;
         $this->leadId    = $team->lead_id;
         $this->memberIds = $team->regularMembers()->pluck('users.id')->map(fn ($id) => (int) $id)->all();
+        $this->memberNotes = $team->regularMembers()
+            ->get()
+            ->mapWithKeys(fn ($member) => [$member->id => $member->pivot?->notes ?? ''])
+            ->all();
         $this->loadProjectTeamSelection();
         $this->showForm  = true;
     }
@@ -66,6 +78,46 @@ class TeamManager extends Component
     public function updatedProjectId(): void
     {
         $this->loadProjectTeamSelection();
+    }
+
+    public function updatedProjectTeamIds(): void
+    {
+        $currentIds = collect($this->projectTeamIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+        $previousIds = collect($this->previousProjectTeamIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+        $addedIds = $currentIds->diff($previousIds)->values();
+
+        $this->previousProjectTeamIds = $currentIds->all();
+
+        if ($addedIds->count() === 1) {
+            $this->autofillFromTeam((int) $addedIds->first());
+        }
+    }
+
+    public function autofillFromTeam(int $teamId): void
+    {
+        $team = Team::with('regularMembers')->find($teamId);
+
+        if (! $team) {
+            return;
+        }
+
+        $this->name = $team->name;
+        $this->leadId = $team->lead_id;
+        $this->memberIds = $team->regularMembers
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $this->memberNotes = $team->regularMembers
+            ->mapWithKeys(fn ($member) => [$member->id => $member->pivot?->notes ?? ''])
+            ->all();
     }
 
     public function save(): void
@@ -96,7 +148,7 @@ class TeamManager extends Component
 
             Team::whereIn('id', $projectTeamIds->all())->update(['project_id' => $team->project_id]);
 
-            $this->syncTeamPeople($team, (int) $data['leadId'], $data['memberIds'] ?? []);
+            $this->syncTeamPeople($team, (int) $data['leadId'], $data['memberIds'] ?? [], $data['memberNotes'] ?? []);
         });
 
         $this->resetForm();
@@ -152,11 +204,13 @@ class TeamManager extends Component
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
+        $this->previousProjectTeamIds = $this->projectTeamIds;
     }
 
     public function clearProjectTeams(): void
     {
         $this->projectTeamIds = [];
+        $this->previousProjectTeamIds = [];
     }
 
     private function resetForm(): void
@@ -165,7 +219,9 @@ class TeamManager extends Component
         $this->projectId      = null;
         $this->leadId         = null;
         $this->memberIds      = [];
+        $this->memberNotes    = [];
         $this->projectTeamIds = [];
+        $this->previousProjectTeamIds = [];
         $this->teamSearch     = '';
         $this->editingId      = null;
         $this->resetValidation();
@@ -175,6 +231,7 @@ class TeamManager extends Component
     {
         if (! $this->projectId) {
             $this->projectTeamIds = [];
+            $this->previousProjectTeamIds = [];
             return;
         }
 
@@ -185,6 +242,7 @@ class TeamManager extends Component
             ->unique()
             ->values()
             ->all();
+        $this->previousProjectTeamIds = $this->projectTeamIds;
     }
 
     private function projectTeamOptions()
@@ -196,18 +254,38 @@ class TeamManager extends Component
             ->get();
     }
 
-    private function syncTeamPeople(Team $team, int $leadId, array $memberIds): void
+    private function syncTeamPeople(Team $team, int $leadId, array $memberIds, array $memberNotes): void
     {
+        $candidateIds = collect($memberIds)
+            ->map(fn ($id) => (int) $id)
+            ->push($leadId)
+            ->unique()
+            ->values();
+        $allowedIds = User::whereIn('role', self::ALLOWED_TEAM_ROLES)
+            ->whereIn('id', $candidateIds)
+            ->pluck('id');
+
+        if (! $allowedIds->contains($leadId)) {
+            throw ValidationException::withMessages([
+                'leadId' => 'Choose a valid team lead or member account.',
+            ]);
+        }
+
         $sync = [
-            $leadId => ['role' => 'lead'],
+            $leadId => ['role' => 'lead', 'notes' => null],
         ];
 
         collect($memberIds)
             ->map(fn ($id) => (int) $id)
             ->reject(fn ($id) => $id === $leadId)
+            ->filter(fn ($id) => $allowedIds->contains($id))
             ->unique()
-            ->each(function (int $memberId) use (&$sync): void {
-                $sync[$memberId] = ['role' => 'member'];
+            ->each(function (int $memberId) use (&$sync, $memberNotes): void {
+                $note = trim((string) ($memberNotes[$memberId] ?? ''));
+                $sync[$memberId] = [
+                    'role' => 'member',
+                    'notes' => $note !== '' ? $note : null,
+                ];
             });
 
         $team->members()->sync($sync);

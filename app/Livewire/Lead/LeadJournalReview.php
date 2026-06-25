@@ -35,7 +35,7 @@ class LeadJournalReview extends Component
 
     public function render()
     {
-        $leadTeams = auth()->user()->ledTeams()->with('project')->get();
+        $leadTeams = auth()->user()->ledTeams()->whereNotNull('project_id')->with('project')->get();
         $teamIds = $leadTeams->pluck('id');
 
         $members = User::whereHas('teams', fn ($q) => $q->whereIn('teams.id', $teamIds))

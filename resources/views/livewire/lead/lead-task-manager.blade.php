@@ -66,6 +66,9 @@
 
                 {{-- Team --}}
                 <div>
+                    @php
+                        $selectedFormTeam = $teamId ? $leadTeams->firstWhere('id', (int) $teamId) : null;
+                    @endphp
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Team <span class="text-red-500">*</span>
                     </label>
@@ -76,6 +79,14 @@
                             <option value="{{ $team->id }}">{{ $team->name }}</option>
                         @endforeach
                     </select>
+                    @if($selectedFormTeam?->project)
+                        <div class="mt-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
+                            <p class="font-semibold">{{ $selectedFormTeam->project->name }}</p>
+                            <p class="mt-0.5">
+                                Project starts {{ $selectedFormTeam->project->start_date?->format('M d, Y') ?? 'Not set' }}
+                            </p>
+                        </div>
+                    @endif
                     @error('teamId') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                 </div>
 
@@ -171,14 +182,20 @@
                     </div>
                 @endif
 
-                {{-- Actual start date (edit only) --}}
-                @if($editingId)
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Actual Start Date</label>
-                        <input wire:model="startDate" type="date"
-                               class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                @endif
+                {{-- Scheduled start --}}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Scheduled Start Date</label>
+                    <input wire:model="startDate" type="date"
+                           class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 @error('startDate') border-red-400 @enderror">
+                    @error('startDate') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Scheduled Start Time</label>
+                    <input wire:model="startTime" type="time"
+                           class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 @error('startTime') border-red-400 @enderror">
+                    @error('startTime') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                </div>
 
                 {{-- Due Date --}}
                 <div>
@@ -220,6 +237,7 @@
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Task</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Assigned To</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Scheduled Start</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Due Date</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Priority</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
@@ -250,6 +268,7 @@
                                 'done'        => 'bg-green-100 text-green-700',
                                 default       => 'bg-gray-100 text-gray-500',
                             };
+                            $taskStartTime = $task->start_time ? \Illuminate\Support\Carbon::parse($task->start_time)->format('h:i A') : null;
                         @endphp
                         <tr class="hover:bg-gray-50 transition {{ $isOverdue ? 'bg-red-50 hover:bg-red-50' : '' }}">
                             <td class="px-6 py-4">
@@ -268,6 +287,14 @@
                                         {{ $task->assignees->isNotEmpty() ? $task->assignees->pluck('name')->join(', ') : $task->assignee?->name }}
                                     </span>
                                 </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="text-gray-600">
+                                    {{ $task->start_date ? $task->start_date->format('M d, Y') : 'Not set' }}
+                                </span>
+                                @if($taskStartTime)
+                                    <span class="block text-xs text-gray-400">{{ $taskStartTime }}</span>
+                                @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="{{ $isOverdue ? 'text-red-600 font-semibold' : 'text-gray-600' }}">
@@ -341,7 +368,7 @@
                                 };
                             @endphp
                             <tr>
-                                <td colspan="6" class="bg-gray-50 px-6 py-4">
+                                <td colspan="7" class="bg-gray-50 px-6 py-4">
                                     <div class="rounded-xl border border-gray-200 bg-white p-4 space-y-4">
                                         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                             <div class="min-w-0 space-y-2">
@@ -365,7 +392,10 @@
                                                 <div class="flex flex-wrap items-center gap-4 text-xs text-gray-500">
                                                     <span><span class="font-semibold text-gray-700">Project:</span> {{ $task->project?->name ?? 'No project' }}</span>
                                                     <span><span class="font-semibold text-gray-700">Team:</span> {{ $task->team?->name ?? 'No team' }}</span>
-                                                    <span><span class="font-semibold text-gray-700">Start:</span> {{ $task->start_date?->format('M d, Y') ?? 'Not set' }}</span>
+                                                    <span>
+                                                        <span class="font-semibold text-gray-700">Scheduled Start:</span>
+                                                        {{ $task->start_date?->format('M d, Y') ?? 'Not set' }}{{ $taskStartTime ? ' at '.$taskStartTime : '' }}
+                                                    </span>
                                                     <span><span class="font-semibold text-gray-700">Due:</span> {{ $task->due_date?->format('M d, Y') ?? 'Not set' }}</span>
                                                 </div>
                                             </div>

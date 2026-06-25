@@ -1,26 +1,76 @@
-<x-app-layout>
-    <x-slot name="header">
-        <div>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('My Projects') }}
-            </h2>
-            <p class="mt-1 text-sm text-gray-500">
-                Choose a project to open the dashboard for your role in that project.
-            </p>
-        </div>
-    </x-slot>
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>My Projects</title>
+    @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @else
+        <link rel="stylesheet" href="{{ asset('css/fallback.css') }}">
+    @endif
+</head>
+<body class="min-h-screen bg-gray-100 font-sans antialiased text-gray-900">
+    <div class="min-h-screen">
+        <header class="border-b border-gray-200 bg-white">
+            <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-sm font-bold text-white">
+                        PT
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold text-gray-900">Project Tracker</p>
+                        <p class="text-xs text-gray-500">Project workspace</p>
+                    </div>
+                </div>
 
-    <div class="py-10">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                @auth
+                    <div class="flex items-center gap-4">
+                        <div class="hidden text-right sm:block">
+                            <p class="text-sm font-semibold text-gray-800">{{ auth()->user()->name }}</p>
+                            <p class="text-xs text-gray-500">{{ auth()->user()->email }}</p>
+                        </div>
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit"
+                                    class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 hover:text-gray-900">
+                                Sign out
+                            </button>
+                        </form>
+                    </div>
+                @endauth
+            </div>
+        </header>
+
+        <main class="mx-auto max-w-7xl px-6 py-8">
+            <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-gray-950">My Projects</h1>
+                    <p class="mt-2 text-sm text-gray-500">
+                        Choose a project to open the dashboard for your role in that project.
+                    </p>
+                </div>
+                <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-500 shadow-sm ring-1 ring-gray-200">
+                    {{ $projects->count() }} project{{ $projects->count() === 1 ? '' : 's' }}
+                </span>
+            </div>
+
             @if($projects->isEmpty())
-                <div class="bg-white border border-gray-200 shadow-sm sm:rounded-lg px-6 py-12 text-center">
-                    <h3 class="text-lg font-semibold text-gray-900">No assigned projects yet</h3>
+                <div class="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
+                    <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+                        </svg>
+                    </div>
+                    <h3 class="mt-4 text-base font-semibold text-gray-900">No assigned projects yet</h3>
                     <p class="mt-2 text-sm text-gray-500">
                         Projects will appear here once you are added as a team lead or member.
                     </p>
                 </div>
             @else
-                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
                     @foreach($projects as $item)
                         @php
                             $project = $item['project'];
@@ -32,10 +82,10 @@
                             };
                         @endphp
 
-                        <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                        <article class="group flex min-h-[260px] flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
-                                    <h3 class="truncate text-lg font-semibold text-gray-900">
+                                    <h3 class="truncate text-base font-semibold text-gray-900 group-hover:text-indigo-700">
                                         {{ $project->name }}
                                     </h3>
                                     <p class="mt-1 text-sm text-gray-500">
@@ -47,14 +97,12 @@
                                 </span>
                             </div>
 
-                            @if($project->description)
-                                <p class="mt-4 line-clamp-2 text-sm text-gray-600">
-                                    {{ $project->description }}
-                                </p>
-                            @endif
+                            <p class="mt-4 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-gray-600">
+                                {{ $project->description ?: 'No description provided.' }}
+                            </p>
 
-                            <div class="mt-5 space-y-2">
-                                @foreach($item['teams'] as $team)
+                            <div class="mt-5 max-h-40 space-y-2 overflow-y-auto pr-1">
+                                @foreach($item['teams']->take(4) as $team)
                                     @php
                                         $teamRole = $team->pivot->role ?? 'member';
                                         $roleLabel = $teamRole === 'lead' ? 'Team Lead' : 'Member';
@@ -77,9 +125,14 @@
                                         </span>
                                     </a>
                                 @endforeach
+                                @if($item['teams']->count() > 4)
+                                    <span class="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
+                                        +{{ $item['teams']->count() - 4 }} more
+                                    </span>
+                                @endif
                             </div>
 
-                            <div class="mt-5 border-t border-gray-100 pt-4 text-sm">
+                            <div class="mt-auto flex items-center justify-between gap-3 border-t border-gray-100 pt-4 text-sm">
                                 <span class="text-gray-500">
                                     @if($project->start_date || $project->end_date)
                                         {{ $project->start_date?->format('M d, Y') ?? 'TBD' }}
@@ -90,11 +143,16 @@
                                         Dates not set
                                     @endif
                                 </span>
+                                <a href="{{ route('projects.open', $project) }}"
+                                   class="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    Open project
+                                </a>
                             </div>
-                        </div>
+                        </article>
                     @endforeach
                 </div>
             @endif
-        </div>
+        </main>
     </div>
-</x-app-layout>
+</body>
+</html>

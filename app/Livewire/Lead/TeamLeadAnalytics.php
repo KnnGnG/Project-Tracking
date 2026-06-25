@@ -32,7 +32,7 @@ class TeamLeadAnalytics extends Component
 
     public function mount(): void
     {
-        $first = auth()->user()->ledTeams()->first();
+        $first = auth()->user()->ledTeams()->whereNotNull('project_id')->first();
         if ($first) {
             $this->selectedTeamId = $first->id;
         }
@@ -40,7 +40,7 @@ class TeamLeadAnalytics extends Component
 
     public function selectTeam(int $id): void
     {
-        if (! auth()->user()->ledTeams()->whereKey($id)->exists()) {
+        if (! auth()->user()->ledTeams()->whereNotNull('project_id')->whereKey($id)->exists()) {
             return;
         }
 
@@ -51,7 +51,7 @@ class TeamLeadAnalytics extends Component
 
     public function render()
     {
-        $teams = auth()->user()->ledTeams()->with('project')->get();
+        $teams = auth()->user()->ledTeams()->whereNotNull('project_id')->with('project')->get();
 
         $selectedTeam = null;
         $project = null;
@@ -62,7 +62,7 @@ class TeamLeadAnalytics extends Component
         $velocity = null;
 
         if ($this->selectedTeamId) {
-            $selectedTeam = auth()->user()->ledTeams()->with(['project', 'tasks.assignees', 'members'])->find($this->selectedTeamId);
+            $selectedTeam = auth()->user()->ledTeams()->whereNotNull('project_id')->with(['project', 'tasks.assignees', 'tasks.memberProgress', 'members'])->find($this->selectedTeamId);
 
             if ($selectedTeam) {
                 $project = $selectedTeam->project;
@@ -430,7 +430,16 @@ class TeamLeadAnalytics extends Component
     private function cfdNonReviewStage(Task $task, Carbon $day): string
     {
         // Path after done-day check in parent: behaves like undone task progressing toward completion
-        $ipBegin = $task->start_date?->copy()->startOfDay();
+        $actualStart = $task->memberProgress
+            ->pluck('started_at')
+            ->filter()
+            ->map(fn ($date) => Carbon::parse($date)->startOfDay())
+            ->sortBy(fn (Carbon $date) => $date->timestamp)
+            ->first();
+        $ipBegin = collect([$task->start_date?->copy()->startOfDay(), $actualStart])
+            ->filter()
+            ->sortBy(fn (Carbon $date) => $date->timestamp)
+            ->first();
         if ($ipBegin === null && in_array($task->status, ['in_progress', 'done'], true)) {
             $ipBegin = Carbon::parse($task->created_at)->startOfDay();
         }
