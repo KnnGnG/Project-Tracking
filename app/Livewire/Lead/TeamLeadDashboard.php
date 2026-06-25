@@ -55,9 +55,10 @@ class TeamLeadDashboard extends Component
 
         $first = auth()->user()
             ->ledTeams()
+            ->whereNotNull('project_id')
             ->when($requestedTeamId, fn ($query) => $query->whereKey($requestedTeamId))
             ->first()
-            ?? auth()->user()->ledTeams()->first();
+            ?? auth()->user()->ledTeams()->whereNotNull('project_id')->first();
 
         if ($first) {
             $this->selectedTeamId = $first->id;
@@ -286,6 +287,7 @@ class TeamLeadDashboard extends Component
     {
         $projectIds = auth()->user()
             ->ledTeams()
+            ->whereNotNull('project_id')
             ->pluck('project_id');
 
         abort_unless($projectIds->contains($event->project_id), 403);
@@ -294,7 +296,7 @@ class TeamLeadDashboard extends Component
     /** Returns the Project for the currently selected team. */
     private function currentProject()
     {
-        return auth()->user()->ledTeams()->findOrFail($this->selectedTeamId)->project;
+        return auth()->user()->ledTeams()->whereNotNull('project_id')->findOrFail($this->selectedTeamId)->project;
     }
 
     /**
@@ -539,6 +541,9 @@ class TeamLeadDashboard extends Component
                 $taskRow = $makeRow('task', 'Task', $task->title, $start, $end);
 
                 if ($taskRow) {
+                    $scheduledStart = $task->start_date
+                        ? $task->start_date->format('M d, Y').($task->start_time ? ' '.Carbon::parse($task->start_time)->format('h:i A') : '')
+                        : 'Not set';
                     $taskRow['statusLabel'] = ucwords(str_replace('_', ' ', $task->status));
                     $taskRow['tooltipLines'] = [
                         'Task',
@@ -546,7 +551,7 @@ class TeamLeadDashboard extends Component
                         'Members: '.($assigneeNames->isNotEmpty() ? $assigneeNames->join(', ') : 'Unassigned'),
                         'Status: '.$taskRow['statusLabel'],
                         'Priority: '.ucfirst($task->priority ?? 'normal'),
-                        'Scheduled start: '.($task->start_date ? $task->start_date->format('M d, Y') : 'Not set'),
+                        'Scheduled start: '.$scheduledStart,
                         'Due: '.($task->due_date ? $task->due_date->format('M d, Y') : 'No due date'),
                     ];
                     $taskRow['tooltip'] = implode("\n", $taskRow['tooltipLines']);
@@ -787,6 +792,7 @@ class TeamLeadDashboard extends Component
     {
         $teams = auth()->user()
             ->ledTeams()
+            ->whereNotNull('project_id')
             ->with('project')
             ->get();
 
@@ -811,7 +817,7 @@ class TeamLeadDashboard extends Component
         $monthLabel = Carbon::create($this->year, $this->month, 1)->format('F Y');
 
         if ($this->selectedTeamId) {
-            $selectedTeam = auth()->user()->ledTeams()->with([
+            $selectedTeam = auth()->user()->ledTeams()->whereNotNull('project_id')->with([
                 'project.events',
                 'members',
                 'tasks.assignee',

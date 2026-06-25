@@ -32,7 +32,7 @@ class TeamLeadAnalytics extends Component
 
     public function mount(): void
     {
-        $first = auth()->user()->ledTeams()->first();
+        $first = auth()->user()->ledTeams()->whereNotNull('project_id')->first();
         if ($first) {
             $this->selectedTeamId = $first->id;
         }
@@ -40,7 +40,7 @@ class TeamLeadAnalytics extends Component
 
     public function selectTeam(int $id): void
     {
-        if (! auth()->user()->ledTeams()->whereKey($id)->exists()) {
+        if (! auth()->user()->ledTeams()->whereNotNull('project_id')->whereKey($id)->exists()) {
             return;
         }
 
@@ -51,7 +51,7 @@ class TeamLeadAnalytics extends Component
 
     public function render()
     {
-        $teams = auth()->user()->ledTeams()->with('project')->get();
+        $teams = auth()->user()->ledTeams()->whereNotNull('project_id')->with('project')->get();
 
         $selectedTeam = null;
         $project = null;
@@ -62,7 +62,7 @@ class TeamLeadAnalytics extends Component
         $velocity = null;
 
         if ($this->selectedTeamId) {
-            $selectedTeam = auth()->user()->ledTeams()->with(['project', 'tasks.assignees', 'members'])->find($this->selectedTeamId);
+            $selectedTeam = auth()->user()->ledTeams()->whereNotNull('project_id')->with(['project', 'tasks.assignees', 'members'])->find($this->selectedTeamId);
 
             if ($selectedTeam) {
                 $project = $selectedTeam->project;

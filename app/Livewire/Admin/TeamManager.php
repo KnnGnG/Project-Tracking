@@ -20,6 +20,7 @@ class TeamManager extends Component
     public ?int   $projectId = null;
     public ?int   $leadId    = null;
     public array  $memberIds = [];
+    public array $memberNotes = [];
     public array $projectTeamIds = [];
     public string $teamSearch = '';
 
@@ -38,6 +39,8 @@ class TeamManager extends Component
             'leadId'    => 'required|exists:users,id',
             'memberIds' => 'nullable|array',
             'memberIds.*' => 'integer|exists:users,id',
+            'memberNotes' => 'nullable|array',
+            'memberNotes.*' => 'nullable|string|max:500',
             'projectTeamIds' => 'nullable|array',
             'projectTeamIds.*' => 'integer|exists:teams,id',
         ];
@@ -59,6 +62,10 @@ class TeamManager extends Component
         $this->projectId = $team->project_id;
         $this->leadId    = $team->lead_id;
         $this->memberIds = $team->regularMembers()->pluck('users.id')->map(fn ($id) => (int) $id)->all();
+        $this->memberNotes = $team->regularMembers()
+            ->get()
+            ->mapWithKeys(fn ($member) => [$member->id => $member->pivot?->notes ?? ''])
+            ->all();
         $this->loadProjectTeamSelection();
         $this->showForm  = true;
     }
@@ -66,6 +73,37 @@ class TeamManager extends Component
     public function updatedProjectId(): void
     {
         $this->loadProjectTeamSelection();
+    }
+
+    public function updatedProjectTeamIds(): void
+    {
+        $selectedTeamId = collect($this->projectTeamIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->last();
+
+        if ($selectedTeamId) {
+            $this->autofillFromTeam($selectedTeamId);
+        }
+    }
+
+    public function autofillFromTeam(int $teamId): void
+    {
+        $team = Team::with('regularMembers')->find($teamId);
+
+        if (! $team) {
+            return;
+        }
+
+        $this->name = $team->name;
+        $this->leadId = $team->lead_id;
+        $this->memberIds = $team->regularMembers
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $this->memberNotes = $team->regularMembers
+            ->mapWithKeys(fn ($member) => [$member->id => $member->pivot?->notes ?? ''])
+            ->all();
     }
 
     public function save(): void
@@ -96,7 +134,7 @@ class TeamManager extends Component
 
             Team::whereIn('id', $projectTeamIds->all())->update(['project_id' => $team->project_id]);
 
-            $this->syncTeamPeople($team, (int) $data['leadId'], $data['memberIds'] ?? []);
+            $this->syncTeamPeople($team, (int) $data['leadId'], $data['memberIds'] ?? [], $data['memberNotes'] ?? []);
         });
 
         $this->resetForm();
@@ -165,6 +203,7 @@ class TeamManager extends Component
         $this->projectId      = null;
         $this->leadId         = null;
         $this->memberIds      = [];
+        $this->memberNotes    = [];
         $this->projectTeamIds = [];
         $this->teamSearch     = '';
         $this->editingId      = null;
@@ -196,18 +235,22 @@ class TeamManager extends Component
             ->get();
     }
 
-    private function syncTeamPeople(Team $team, int $leadId, array $memberIds): void
+    private function syncTeamPeople(Team $team, int $leadId, array $memberIds, array $memberNotes): void
     {
         $sync = [
-            $leadId => ['role' => 'lead'],
+            $leadId => ['role' => 'lead', 'notes' => null],
         ];
 
         collect($memberIds)
             ->map(fn ($id) => (int) $id)
             ->reject(fn ($id) => $id === $leadId)
             ->unique()
-            ->each(function (int $memberId) use (&$sync): void {
-                $sync[$memberId] = ['role' => 'member'];
+            ->each(function (int $memberId) use (&$sync, $memberNotes): void {
+                $note = trim((string) ($memberNotes[$memberId] ?? ''));
+                $sync[$memberId] = [
+                    'role' => 'member',
+                    'notes' => $note !== '' ? $note : null,
+                ];
             });
 
         $team->members()->sync($sync);
