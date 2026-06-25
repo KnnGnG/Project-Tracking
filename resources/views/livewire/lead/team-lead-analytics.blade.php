@@ -1,4 +1,4 @@
-<div class="space-y-6" wire:key="lead-analytics-{{ $selectedTeamId ?? 'none' }}" wire:poll.visible.15s>
+<div class="space-y-6" wire:key="lead-analytics-{{ $selectedTeamId ?? 'none' }}" wire:poll.visible.60s>
 
     @if($teams->isEmpty())
         <div class="bg-white rounded-xl border border-gray-200 py-20 text-center text-gray-400">

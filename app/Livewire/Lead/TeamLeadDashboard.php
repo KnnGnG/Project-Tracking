@@ -67,7 +67,7 @@ class TeamLeadDashboard extends Component
 
     public function selectTeam(int $id): void
     {
-        $team = auth()->user()->ledTeams()->find($id);
+        $team = auth()->user()->ledTeams()->whereNotNull('project_id')->find($id);
 
         if (! $team) {
             return;

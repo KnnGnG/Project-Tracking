@@ -62,7 +62,7 @@ class TeamLeadAnalytics extends Component
         $velocity = null;
 
         if ($this->selectedTeamId) {
-            $selectedTeam = auth()->user()->ledTeams()->whereNotNull('project_id')->with(['project', 'tasks.assignees', 'members'])->find($this->selectedTeamId);
+            $selectedTeam = auth()->user()->ledTeams()->whereNotNull('project_id')->with(['project', 'tasks.assignees', 'tasks.memberProgress', 'members'])->find($this->selectedTeamId);
 
             if ($selectedTeam) {
                 $project = $selectedTeam->project;
@@ -430,7 +430,16 @@ class TeamLeadAnalytics extends Component
     private function cfdNonReviewStage(Task $task, Carbon $day): string
     {
         // Path after done-day check in parent: behaves like undone task progressing toward completion
-        $ipBegin = $task->start_date?->copy()->startOfDay();
+        $actualStart = $task->memberProgress
+            ->pluck('started_at')
+            ->filter()
+            ->map(fn ($date) => Carbon::parse($date)->startOfDay())
+            ->sortBy(fn (Carbon $date) => $date->timestamp)
+            ->first();
+        $ipBegin = collect([$task->start_date?->copy()->startOfDay(), $actualStart])
+            ->filter()
+            ->sortBy(fn (Carbon $date) => $date->timestamp)
+            ->first();
         if ($ipBegin === null && in_array($task->status, ['in_progress', 'done'], true)) {
             $ipBegin = Carbon::parse($task->created_at)->startOfDay();
         }

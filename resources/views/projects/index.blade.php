@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>My Projects</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @else
+        <link rel="stylesheet" href="{{ asset('css/fallback.css') }}">
+    @endif
 </head>
 <body class="min-h-screen bg-gray-100 font-sans antialiased text-gray-900">
     <div class="min-h-screen">
@@ -78,8 +82,7 @@
                             };
                         @endphp
 
-                        <a href="{{ route('projects.open', $project) }}"
-                           class="group flex min-h-[220px] flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <article class="group flex min-h-[260px] flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <h3 class="truncate text-base font-semibold text-gray-900 group-hover:text-indigo-700">
@@ -98,8 +101,8 @@
                                 {{ $project->description ?: 'No description provided.' }}
                             </p>
 
-                            <div class="mt-5 space-y-2">
-                                @foreach($item['teams'] as $team)
+                            <div class="mt-5 max-h-40 space-y-2 overflow-y-auto pr-1">
+                                @foreach($item['teams']->take(4) as $team)
                                     @php
                                         $teamRole = $team->pivot->role ?? 'member';
                                         $roleLabel = $teamRole === 'lead' ? 'Team Lead' : 'Member';
@@ -122,14 +125,14 @@
                                         </span>
                                     </a>
                                 @endforeach
-                                @if($item['teams']->count() > 2)
+                                @if($item['teams']->count() > 4)
                                     <span class="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
-                                        +{{ $item['teams']->count() - 2 }} more
+                                        +{{ $item['teams']->count() - 4 }} more
                                     </span>
                                 @endif
                             </div>
 
-                            <div class="mt-auto flex items-center justify-between border-t border-gray-100 pt-4 text-sm">
+                            <div class="mt-auto flex items-center justify-between gap-3 border-t border-gray-100 pt-4 text-sm">
                                 <span class="text-gray-500">
                                     @if($project->start_date || $project->end_date)
                                         {{ $project->start_date?->format('M d, Y') ?? 'TBD' }}
@@ -140,8 +143,12 @@
                                         Dates not set
                                     @endif
                                 </span>
+                                <a href="{{ route('projects.open', $project) }}"
+                                   class="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    Open project
+                                </a>
                             </div>
-                        </div>
+                        </article>
                     @endforeach
                 </div>
             @endif

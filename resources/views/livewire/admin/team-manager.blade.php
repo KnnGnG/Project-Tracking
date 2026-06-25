@@ -141,7 +141,6 @@
                                         <label class="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm transition hover:bg-indigo-50">
                                             <input type="checkbox"
                                                    wire:model="projectTeamIds"
-                                                   wire:click="autofillFromTeam({{ $teamOption->id }})"
                                                    value="{{ $teamOption->id }}"
                                                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                                             <span class="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">

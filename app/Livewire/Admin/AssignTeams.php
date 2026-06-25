@@ -6,6 +6,8 @@ use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -14,6 +16,8 @@ use Livewire\Component;
 #[Title('Assign Teams')]
 class AssignTeams extends Component
 {
+    private const ALLOWED_TEAM_ROLES = ['team_lead', 'member'];
+
     public bool $showForm = false;
 
     public ?int $editingId = null;
@@ -37,9 +41,9 @@ class AssignTeams extends Component
         return [
             'name' => ['required', 'string', 'max:255'],
             'projectId' => ['nullable', 'integer', 'exists:projects,id'],
-            'leadId' => ['required', 'integer', 'exists:users,id'],
+            'leadId' => ['required', 'integer', Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', self::ALLOWED_TEAM_ROLES))],
             'memberIds' => ['array'],
-            'memberIds.*' => ['integer', 'exists:users,id'],
+            'memberIds.*' => ['integer', Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', self::ALLOWED_TEAM_ROLES))],
             'memberNotes' => ['array'],
             'memberNotes.*' => ['nullable', 'string', 'max:500'],
         ];
@@ -141,6 +145,21 @@ class AssignTeams extends Component
 
     private function syncPeople(Team $team, int $leadId, array $memberIds, array $memberNotes): void
     {
+        $candidateIds = collect($memberIds)
+            ->map(fn ($id) => (int) $id)
+            ->push($leadId)
+            ->unique()
+            ->values();
+        $allowedIds = User::whereIn('role', self::ALLOWED_TEAM_ROLES)
+            ->whereIn('id', $candidateIds)
+            ->pluck('id');
+
+        if (! $allowedIds->contains($leadId)) {
+            throw ValidationException::withMessages([
+                'leadId' => 'Choose a valid team lead or member account.',
+            ]);
+        }
+
         $sync = [
             $leadId => ['role' => 'lead', 'notes' => null],
         ];
@@ -148,6 +167,7 @@ class AssignTeams extends Component
         collect($memberIds)
             ->map(fn ($id) => (int) $id)
             ->reject(fn ($id) => $id === $leadId)
+            ->filter(fn ($id) => $allowedIds->contains($id))
             ->unique()
             ->each(function (int $memberId) use (&$sync, $memberNotes): void {
                 $note = trim((string) ($memberNotes[$memberId] ?? ''));
