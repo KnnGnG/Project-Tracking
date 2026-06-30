@@ -798,7 +798,7 @@
                                         </div>
                                         <div class="rounded-lg bg-white px-3 py-2 ring-1 ring-gray-100">
                                             <p class="font-semibold text-gray-400">Priority</p>
-                                            <p class="mt-0.5 text-gray-700">{{ ucfirst($task->priority) }}</p>
+                                            <p class="mt-0.5 text-gray-700">{{ $task->priority ? ucfirst($task->priority) : 'Not set' }}</p>
                                         </div>
                                     </div>
                                 </li>

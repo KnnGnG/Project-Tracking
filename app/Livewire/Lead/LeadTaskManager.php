@@ -207,7 +207,7 @@ class LeadTaskManager extends Component
             DB::transaction(function () use ($payload, $assigneeIds) {
                 $task = Task::create(array_merge($payload, ['created_by' => auth()->id()]));
                 $task->assignees()->sync($assigneeIds->all());
-                $this->syncMemberProgressRows($task, $assigneeIds, $payload['status']);
+                $this->syncMemberProgressRows($task, $assigneeIds);
                 $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
                 $this->recordActivity($task, 'created', auth()->user()->name . ' assigned this task.');
                 $this->notifyAssignedMembers($task, $assigneeIds);
@@ -453,20 +453,14 @@ class LeadTaskManager extends Component
     {
         $leadTeams = auth()->user()->ledTeams()->whereNotNull('project_id')->with('project')->get();
 
-        // Tasks visible to this lead are synced from member progress before filtering.
+        // Tasks visible to this lead are read-only in render; status is synced when progress changes.
         $tasks = Task::with(['assignee', 'assignees', 'team', 'project', 'memberProgress.user'])
             ->whereIn('team_id', $leadTeams->pluck('id'))
             ->when($this->filterTeamId, fn ($q) => $q->where('team_id', $this->filterTeamId))
-            ->get()
-            ->each(fn (Task $task) => $this->syncOverallTaskStatus($task))
-            ->when($this->filterStatus, fn ($rows) => $rows->where('status', $this->filterStatus))
-            ->sortBy(function (Task $task): string {
-                $statusOrder = ['in_progress' => 0, 'review' => 1, 'pending' => 2, 'done' => 3][$task->status] ?? 4;
-                $dueOrder = $task->due_date?->timestamp ?? PHP_INT_MAX;
-
-                return sprintf('%02d-%012d-%010d', $statusOrder, $dueOrder, $task->id);
-            })
-            ->values();
+            ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))
+            ->orderByRaw("CASE WHEN status = 'in_progress' THEN 0 WHEN status = 'review' THEN 1 WHEN status = 'pending' THEN 2 WHEN status = 'done' THEN 3 ELSE 4 END")
+            ->orderBy('due_date')
+            ->get();
 
         // Members for the team selected in the form
         $membersForForm = $this->membersForSelectedTeam();

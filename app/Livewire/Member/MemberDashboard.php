@@ -186,12 +186,21 @@ class MemberDashboard extends Component
                     'type' => 'task_completed',
                     'title' => 'Task completed',
                     'body' => $task->title . ' was marked done.',
-                    'url' => route('lead.tasks', array_filter([
-                        'team' => $task->team_id,
-                    ])),
+                    'url' => $this->taskCompletionNotificationUrl($task, $userId),
                     'data' => ['task_id' => $task->id, 'team_id' => $task->team_id],
                 ]);
             });
+    }
+
+    private function taskCompletionNotificationUrl(Task $task, int $userId): string
+    {
+        $recipient = \App\Models\User::find($userId);
+
+        if ($recipient && $task->team_id && $recipient->ledTeams()->whereKey($task->team_id)->exists()) {
+            return route('lead.tasks', ['team' => $task->team_id]);
+        }
+
+        return route('dashboard');
     }
 
     private function updateMemberProgress(Task $task, string $status): void

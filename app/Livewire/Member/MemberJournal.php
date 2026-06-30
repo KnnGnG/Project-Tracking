@@ -86,7 +86,7 @@ class MemberJournal extends Component
         $taskId = ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null;
         $teamId = $this->teamIdForLog($taskId);
 
-        if (! $teamId) {
+        if (! $teamId || ! $this->memberCanLogToTeam($teamId)) {
             $this->addError('selectedTaskId', 'Choose a team before logging general work.');
             return;
         }
@@ -134,7 +134,7 @@ class MemberJournal extends Component
         $taskId = ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null;
         $teamId = $this->teamIdForLog($taskId);
 
-        if (! $teamId) {
+        if (! $teamId || ! $this->memberCanLogToTeam($teamId)) {
             $this->addError('selectedTaskId', 'Choose a team before logging general work.');
             return;
         }
@@ -266,6 +266,43 @@ class MemberJournal extends Component
         }
 
         $progress->save();
+
+        $this->syncParentTaskStatus($taskId);
+    }
+
+    private function syncParentTaskStatus(int $taskId): void
+    {
+        $task = Task::with('memberProgress')->find($taskId);
+
+        if (! $task || $task->memberProgress->isEmpty()) {
+            return;
+        }
+
+        $status = match (true) {
+            $task->memberProgress->every(fn ($item) => $item->status === 'done') => 'done',
+            $task->memberProgress->contains(fn ($item) => $item->status === 'review') => 'review',
+            $task->memberProgress->contains(fn ($item) => in_array($item->status, ['in_progress', 'done'], true)) => 'in_progress',
+            $task->memberProgress->every(fn ($item) => $item->status === 'pending') => 'pending',
+            default => 'pending',
+        };
+
+        if ($task->status !== $status) {
+            $task->update(['status' => $status]);
+        }
+    }
+
+    private function memberCanLogToTeam(int $teamId): bool
+    {
+        $userId = auth()->id();
+
+        return Team::query()
+            ->whereKey($teamId)
+            ->where(fn ($query) => $query
+                ->whereHas('members', fn ($members) => $members->whereKey($userId))
+                ->orWhereHas('tasks', fn ($tasks) => $tasks
+                    ->where('assigned_to', $userId)
+                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId))))
+            ->exists();
     }
 
     private function teamIdForLog(?int $taskId): ?int

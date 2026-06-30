@@ -61,9 +61,9 @@
                     $hasSelfAssignedTask = (bool) session('active_has_self_assigned_task', false);
 
                     $showTeamLeadNav = $activeProjectRole === 'lead'
-                        || (! $activeProjectRole && $authUser->role === 'team_lead');
+                        || (! $activeProjectRole && $authUser->isTeamLead());
                     $showMemberNav = $activeProjectRole === 'member'
-                        || (! $activeProjectRole && $authUser->role === 'member')
+                        || (! $activeProjectRole && $authUser->isMember())
                         || ($hasSelfAssignedTask && $showTeamLeadNav);
                     $activeMemberRouteParams = array_filter([
                         'team' => $activeTeamId ?: null,

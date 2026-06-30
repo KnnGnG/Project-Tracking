@@ -5,9 +5,11 @@ namespace App\Livewire\Lead;
 use App\Models\InAppNotification;
 use App\Models\JournalLog;
 use App\Models\Task;
+use App\Models\TaskMemberProgress;
 use App\Models\Team;
 use App\Models\TeamMemberEvaluation;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -148,25 +150,40 @@ class LeadMemberEvaluation extends Component
             return;
         }
 
-        if ($this->editingId) {
-            $evaluation = TeamMemberEvaluation::query()
-                ->where('evaluator_id', auth()->id())
-                ->whereKey($this->editingId)
-                ->firstOrFail();
+        try {
+            if ($this->editingId) {
+                $evaluation = TeamMemberEvaluation::query()
+                    ->where('evaluator_id', auth()->id())
+                    ->whereHas('team.leads', fn ($query) => $query->whereKey(auth()->id()))
+                    ->whereKey($this->editingId)
+                    ->firstOrFail();
 
-            $evaluation->fill($payload);
-            $shouldNotify = $evaluation->isDirty($this->evaluationNotificationFields());
-            $evaluation->save();
+                if (! $this->ownedTeam((int) $evaluation->team_id)) {
+                    $this->addError('selectedTeamId', 'You are no longer a lead for this team.');
+                    return;
+                }
 
-            if ($shouldNotify) {
-                $this->notifyMemberEvaluation($evaluation, true);
+                $evaluation->fill($payload);
+                $shouldNotify = $evaluation->isDirty($this->evaluationNotificationFields());
+                $evaluation->save();
+
+                if ($shouldNotify) {
+                    $this->notifyMemberEvaluation($evaluation, true);
+                }
+
+                $this->flash = 'Evaluation updated.';
+            } else {
+                $evaluation = TeamMemberEvaluation::create($payload);
+                $this->notifyMemberEvaluation($evaluation, false);
+                $this->flash = 'Evaluation saved.';
+            }
+        } catch (QueryException $exception) {
+            if (! $this->isDuplicateEvaluationCollision($exception)) {
+                throw $exception;
             }
 
-            $this->flash = 'Evaluation updated.';
-        } else {
-            $evaluation = TeamMemberEvaluation::create($payload);
-            $this->notifyMemberEvaluation($evaluation, false);
-            $this->flash = 'Evaluation saved.';
+            $this->addError('periodStart', 'An active evaluation already exists for this member, team, and period. Edit the existing evaluation instead.');
+            return;
         }
 
         $memberId = $this->selectedMemberId;
@@ -271,6 +288,12 @@ class LeadMemberEvaluation extends Component
             ->exists();
     }
 
+    private function isDuplicateEvaluationCollision(QueryException $exception): bool
+    {
+        return str_contains($exception->getMessage(), 'evaluations_unique_active_period')
+            || (($exception->errorInfo[1] ?? null) === 1062);
+    }
+
     private function evaluationNotificationFields(): array
     {
         return [
@@ -322,11 +345,16 @@ class LeadMemberEvaluation extends Component
                 ->where('assigned_to', $memberId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($memberId)));
 
+        $taskIds = (clone $taskQuery)->pluck('id');
+        $progressQuery = TaskMemberProgress::query()
+            ->where('user_id', $memberId)
+            ->whereIn('task_id', $taskIds);
+
         return [
-            'tasks' => (clone $taskQuery)->count(),
-            'done' => (clone $taskQuery)->where('status', 'done')->count(),
-            'review' => (clone $taskQuery)->where('status', 'review')->count(),
-            'active' => (clone $taskQuery)->whereIn('status', ['pending', 'in_progress'])->count(),
+            'tasks' => $taskIds->count(),
+            'done' => (clone $progressQuery)->where('status', 'done')->count(),
+            'review' => (clone $progressQuery)->where('status', 'review')->count(),
+            'active' => (clone $progressQuery)->whereIn('status', ['pending', 'in_progress'])->count(),
             'loggedMinutes' => JournalLog::query()
                 ->where('user_id', $memberId)
                 ->where(function ($query) use ($teamId) {

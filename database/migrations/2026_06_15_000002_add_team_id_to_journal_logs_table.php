@@ -29,7 +29,7 @@ return new class extends Migration
             ->chunkById(500, function ($logs): void {
                 foreach ($logs as $log) {
                     DB::table('journal_logs')
-                        ->whereKey($log->id)
+                        ->where('id', $log->id)
                         ->update(['team_id' => $log->team_id]);
                 }
             }, 'journal_logs.id', 'id');
