@@ -70,7 +70,7 @@
                     </p>
                 </div>
             @else
-                <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                <div class="project-card-grid">
                     @foreach($projects as $item)
                         @php
                             $project = $item['project'];
@@ -82,7 +82,7 @@
                             };
                         @endphp
 
-                        <article class="group flex min-h-[260px] flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md">
+                        <article class="project-card group flex min-h-[260px] flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <h3 class="truncate text-base font-semibold text-gray-900 group-hover:text-indigo-700">
@@ -156,3 +156,4 @@
     </div>
 </body>
 </html>
+

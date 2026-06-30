@@ -291,15 +291,10 @@
                                 </span>
                             </td>
                             <td class="px-6 py-4">
-                                {{-- Inline status switcher --}}
-                                <select wire:change="updateStatus({{ $task->id }}, $event.target.value)"
-                                        class="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 {{ $statusColor }}">
-                                    @foreach($statusOptions as $val => $label)
-                                        <option value="{{ $val }}" {{ $task->status === $val ? 'selected' : '' }}>
-                                            {{ $label }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $statusColor }}">
+                                    {{ $statusOptions[$task->status] ?? ucfirst(str_replace('_', ' ', $task->status)) }}
+                                </span>
+                                <span class="mt-1 block text-[11px] text-gray-400">From members</span>
                             </td>
                             <td class="px-4 py-4 text-right whitespace-nowrap">
                                 @if($expandedTaskId !== $task->id)

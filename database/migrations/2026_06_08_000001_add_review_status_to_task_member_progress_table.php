@@ -12,6 +12,10 @@ return new class extends Migration
             return;
         }
 
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement("ALTER TABLE task_member_progress MODIFY status ENUM('pending', 'in_progress', 'review', 'done') NOT NULL DEFAULT 'pending'");
     }
 
@@ -22,6 +26,12 @@ return new class extends Migration
         }
 
         DB::statement("UPDATE task_member_progress SET status = 'in_progress' WHERE status = 'review'");
+
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
         DB::statement("ALTER TABLE task_member_progress MODIFY status ENUM('pending', 'in_progress', 'done') NOT NULL DEFAULT 'pending'");
     }
 };
+
+

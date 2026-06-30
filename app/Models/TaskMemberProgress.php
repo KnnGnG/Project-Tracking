@@ -12,9 +12,9 @@ class TaskMemberProgress extends Model
     protected $fillable = [
         'task_id',
         'user_id',
-            'status',
-            'progress',
-        ];
+        'status',
+        'progress',
+    ];
 
     protected function casts(): array
     {

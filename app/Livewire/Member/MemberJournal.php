@@ -4,6 +4,7 @@ namespace App\Livewire\Member;
 
 use App\Models\JournalLog;
 use App\Models\Task;
+use App\Models\TaskMemberProgress;
 use App\Models\Team;
 use Carbon\Carbon;
 use Livewire\Attributes\Layout;
@@ -83,15 +84,23 @@ class MemberJournal extends Component
 
         $totalMinutes = (int) ceil($seconds / 60);
         $taskId = ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null;
+        $teamId = $this->teamIdForLog($taskId);
+
+        if (! $teamId) {
+            $this->addError('selectedTaskId', 'Choose a team before logging general work.');
+            return;
+        }
 
         JournalLog::create([
             'user_id' => auth()->id(),
             'task_id' => $taskId,
-            'team_id' => $this->teamIdForLog($taskId),
+            'team_id' => $teamId,
             'log_date' => $validated['logDate'],
             'minutes' => $totalMinutes,
             'notes' => $validated['notes'] ?: null,
         ]);
+
+        $this->syncActualStartFromLog($taskId, $validated['logDate']);
 
         $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
         $this->flash = 'Timer session added to your journal.';
@@ -123,15 +132,23 @@ class MemberJournal extends Component
         }
 
         $taskId = ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null;
+        $teamId = $this->teamIdForLog($taskId);
+
+        if (! $teamId) {
+            $this->addError('selectedTaskId', 'Choose a team before logging general work.');
+            return;
+        }
 
         JournalLog::create([
             'user_id' => auth()->id(),
             'task_id' => $taskId,
-            'team_id' => $this->teamIdForLog($taskId),
+            'team_id' => $teamId,
             'log_date' => $validated['logDate'],
             'minutes' => $totalMinutes,
             'notes' => $validated['notes'] ?: null,
         ]);
+
+        $this->syncActualStartFromLog($taskId, $validated['logDate']);
 
         $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
         $this->flash = 'Journal log added.';
@@ -224,6 +241,31 @@ class MemberJournal extends Component
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
             ->when($this->filterTeam > 0, fn ($q) => $q->where('team_id', $this->filterTeam))
             ->exists();
+    }
+
+    private function syncActualStartFromLog(?int $taskId, string $logDate): void
+    {
+        if (! $taskId) {
+            return;
+        }
+
+        $progress = TaskMemberProgress::firstOrCreate(
+            ['task_id' => $taskId, 'user_id' => auth()->id()],
+            ['status' => 'in_progress', 'progress' => 50]
+        );
+
+        $loggedAt = Carbon::parse($logDate)->startOfDay();
+
+        if (! $progress->started_at || $loggedAt->lt($progress->started_at)) {
+            $progress->started_at = $loggedAt;
+        }
+
+        if ($progress->status === 'pending') {
+            $progress->status = 'in_progress';
+            $progress->progress = max((int) $progress->progress, 50);
+        }
+
+        $progress->save();
     }
 
     private function teamIdForLog(?int $taskId): ?int

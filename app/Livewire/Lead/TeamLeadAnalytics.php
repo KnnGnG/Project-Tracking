@@ -32,7 +32,17 @@ class TeamLeadAnalytics extends Component
 
     public function mount(): void
     {
-        $first = auth()->user()->ledTeams()->whereNotNull('project_id')->first();
+        $requestedTeamId = request()->has('team')
+            ? request()->integer('team')
+            : session('active_team_id');
+
+        $first = auth()->user()
+            ->ledTeams()
+            ->whereNotNull('project_id')
+            ->when($requestedTeamId, fn ($query) => $query->whereKey($requestedTeamId))
+            ->first()
+            ?? auth()->user()->ledTeams()->whereNotNull('project_id')->first();
+
         if ($first) {
             $this->selectedTeamId = $first->id;
         }
@@ -495,3 +505,4 @@ class TeamLeadAnalytics extends Component
         ];
     }
 }
+

@@ -56,7 +56,9 @@
             @forelse($notifications as $notification)
                 <div class="border-b border-gray-100 px-4 py-3 {{ $notification->read_at ? 'bg-white' : 'bg-indigo-50' }}">
                     <div class="flex items-start justify-between gap-3">
-                        <a href="{{ $notification->url ?: '#' }}" class="min-w-0 flex-1">
+                        <a href="{{ $notification->url ?: '#' }}"
+                           wire:click.prevent="openNotification({{ $notification->id }})"
+                           class="min-w-0 flex-1">
                             <p class="text-sm font-semibold text-gray-900">{{ $notification->title }}</p>
                             @if($notification->body)
                                 <p class="mt-0.5 text-sm text-gray-600">{{ $notification->body }}</p>

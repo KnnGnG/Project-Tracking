@@ -605,9 +605,8 @@ class TeamLeadDashboard extends Component
                         ->where('user_id', $progress->user->id)
                         ->sortBy('log_date');
                     $startCandidates = collect([
-                        $progress->started_at,
                         optional($userLogs->first())->log_date,
-                        ($progress->hasProgressRecord ?? false) && $progress->status !== 'pending' ? $progress->updated_at : null,
+                        $progress->started_at,
                     ])->filter()->map(fn ($date) => Carbon::parse($date));
 
                     if ($startCandidates->isEmpty()) {
@@ -624,13 +623,19 @@ class TeamLeadDashboard extends Component
                     $dueLabel = $task->due_date ? $task->due_date->format('M d') : 'No due date';
                     $startedLabel = $memberStart->format('M d');
                     $endLabel = $memberEnd->format('M d');
+                    $scheduledStartLabel = $task->start_date
+                        ? $task->start_date->format('M d, Y').($task->start_time ? ' '.Carbon::parse($task->start_time)->format('h:i A') : '')
+                        : 'Not scheduled';
+                    $actualStartedLabel = $memberStart->format('M d, Y')
+                        .($progress->started_at ? ' '.$progress->started_at->format('h:i A') : '');
                     $loggedMinutes = $userLogs->sum('minutes');
                     $timing = match (true) {
+                        $task->start_date && $memberStart->lt($task->start_date->copy()->startOfDay()) => 'Started ahead of schedule',
                         $task->due_date && $progress->completed_at && $progress->completed_at->gt($task->due_date->copy()->endOfDay()) => 'Completed late',
                         $task->due_date && $progress->completed_at && $progress->completed_at->lte($task->due_date->copy()->endOfDay()) => 'Completed on time',
                         $progress->status === 'done' => 'Done',
                         $task->due_date && ! $progress->completed_at && now()->startOfDay()->gt($task->due_date) => 'Overdue',
-                        $task->due_date && $memberStart->lt($task->due_date) => 'Started early',
+                        $task->due_date && $memberStart->lt($task->due_date) => 'Started before due date',
                         $task->due_date && $memberStart->isSameDay($task->due_date) => 'Started on due date',
                         $task->due_date && $memberStart->gt($task->due_date) => 'Started late',
                         default => 'Started',
@@ -652,7 +657,8 @@ class TeamLeadDashboard extends Component
                         $actualStartRow['tooltipLines'] = [
                             $progress->user->name,
                             'Task: '.$task->title,
-                            'Start: '.$memberStart->format('M d, Y'),
+                            'Scheduled start: '.$scheduledStartLabel,
+                            'Actual started: '.$actualStartedLabel,
                             'End: '.$memberEnd->format('M d, Y'),
                             'Logged: '.intdiv($loggedMinutes, 60).'h '.($loggedMinutes % 60).'m',
                             'Due: '.($task->due_date ? $task->due_date->format('M d, Y') : 'No due date'),
@@ -693,7 +699,8 @@ class TeamLeadDashboard extends Component
                                 'Start to End',
                                 'Task: '.$task->title,
                                 'Members: '.$memberNames->join(', '),
-                                'Start: '.$combinedStart->format('M d, Y'),
+                                'Scheduled start: '.($task->start_date ? $task->start_date->format('M d, Y').($task->start_time ? ' '.Carbon::parse($task->start_time)->format('h:i A') : '') : 'Not scheduled'),
+                                'Actual started: '.$combinedStart->format('M d, Y'),
                                 'End: '.$combinedEnd->format('M d, Y'),
                                 'Logged: '.intdiv($totalLoggedMinutes, 60).'h '.($totalLoggedMinutes % 60).'m',
                                 'Due: '.($task->due_date ? $task->due_date->format('M d, Y') : 'No due date'),
@@ -947,3 +954,5 @@ class TeamLeadDashboard extends Component
         ));
     }
 }
+
+

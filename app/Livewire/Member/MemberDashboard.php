@@ -40,6 +40,10 @@ class MemberDashboard extends Component
     /** Currently expanded task ID (null = none) */
     public ?int $expandedTaskId = null;
 
+    /** Task opened from a notification link. */
+    #[Url(as: 'task')]
+    public ?int $focusTaskId = null;
+
     /** Flash message */
     public ?string $flash = null;
 
@@ -51,6 +55,10 @@ class MemberDashboard extends Component
         $this->filterProject = request()->has('project')
             ? request()->integer('project')
             : (int) session('active_project_id', 0);
+
+        if ($this->focusTaskId) {
+            $this->openFocusTask($this->focusTaskId);
+        }
     }
 
     public function setTab(string $tab): void
@@ -178,8 +186,10 @@ class MemberDashboard extends Component
                     'type' => 'task_completed',
                     'title' => 'Task completed',
                     'body' => $task->title . ' was marked done.',
-                    'url' => route('dashboard'),
-                    'data' => ['task_id' => $task->id],
+                    'url' => route('lead.tasks', array_filter([
+                        'team' => $task->team_id,
+                    ])),
+                    'data' => ['task_id' => $task->id, 'team_id' => $task->team_id],
                 ]);
             });
     }

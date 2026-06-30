@@ -187,17 +187,17 @@ class LeadTaskManager extends Component
 
             DB::transaction(function () use ($payload, $assigneeIds, $oldDueDate, $oldStatus, $previousAssigneeIds) {
                 $task = $this->ownedTask($this->editingId);
-                $statusChanged = $task->status !== $payload['status'];
                 $task->update($payload);
                 $task->assignees()->sync($assigneeIds->all());
-                $this->syncMemberProgressRows($task, $assigneeIds, $statusChanged ? $payload['status'] : null);
+                $this->syncMemberProgressRows($task, $assigneeIds);
+                $derivedStatus = $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
 
                 if ($oldDueDate !== $payload['due_date']) {
                     $this->recordActivity($task, 'due_date_changed', auth()->user()->name . ' changed due date from ' . ($oldDueDate ?: 'none') . ' to ' . $payload['due_date'] . '.');
                 }
 
-                if ($statusChanged) {
-                    $this->recordActivity($task, 'status_changed', auth()->user()->name . ' changed status from ' . str_replace('_', ' ', $oldStatus) . ' to ' . str_replace('_', ' ', $payload['status']) . '.');
+                if ($oldStatus !== $derivedStatus) {
+                    $this->recordActivity($task, 'status_changed', 'Task status updated from ' . str_replace('_', ' ', $oldStatus) . ' to ' . str_replace('_', ' ', $derivedStatus) . ' based on member progress.');
                 }
 
                 $this->notifyAssignedMembers($task, $assigneeIds->diff($previousAssigneeIds));
@@ -208,6 +208,7 @@ class LeadTaskManager extends Component
                 $task = Task::create(array_merge($payload, ['created_by' => auth()->id()]));
                 $task->assignees()->sync($assigneeIds->all());
                 $this->syncMemberProgressRows($task, $assigneeIds, $payload['status']);
+                $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
                 $this->recordActivity($task, 'created', auth()->user()->name . ' assigned this task.');
                 $this->notifyAssignedMembers($task, $assigneeIds);
             });
@@ -255,7 +256,26 @@ class LeadTaskManager extends Component
             return;
         }
 
-        $this->ownedTask($id)->update(['status' => $status]);
+        $task = $this->ownedTask($id);
+        $oldStatus = $task->status;
+
+        DB::transaction(function () use ($task, $oldStatus): void {
+            $assigneeIds = $task->assignees()
+                ->pluck('users.id')
+                ->push($task->assigned_to)
+                ->filter()
+                ->unique()
+                ->values();
+
+            $this->syncMemberProgressRows($task, $assigneeIds);
+            $derivedStatus = $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
+
+            if ($oldStatus !== $derivedStatus) {
+                $this->recordActivity($task, 'status_changed', 'Task status refreshed from ' . str_replace('_', ' ', $oldStatus) . ' to ' . str_replace('_', ' ', $derivedStatus) . ' based on member progress.');
+            }
+        });
+
+        $this->refreshActiveSelfAssignedTaskContext();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -325,8 +345,12 @@ class LeadTaskManager extends Component
                     'type' => 'task_assigned',
                     'title' => 'New task assigned',
                     'body' => $task->title,
-                    'url' => route('member.dashboard'),
-                    'data' => ['task_id' => $task->id],
+                    'url' => route('member.dashboard', array_filter([
+                        'team' => $task->team_id,
+                        'project' => $task->project_id,
+                        'task' => $task->id,
+                    ])),
+                    'data' => ['task_id' => $task->id, 'team_id' => $task->team_id, 'project_id' => $task->project_id],
                 ]);
             });
     }
@@ -343,10 +367,10 @@ class LeadTaskManager extends Component
                 ['status' => 'pending', 'progress' => 0]
             );
 
-            if ($status) {
+            if ($status && $progress->wasRecentlyCreated) {
                 $progress->status = $status;
                 $progress->progress = $this->progressValueForStatus($status);
-                if (in_array($status, ['in_progress', 'review', 'done'], true) && ! $progress->started_at) {
+                if (in_array($status, ['in_progress', 'review', 'done'], true)) {
                     $progress->started_at = now();
                 }
                 $progress->completed_at = $status === 'done' ? now() : null;
@@ -361,6 +385,34 @@ class LeadTaskManager extends Component
             'done' => 100,
             'in_progress' => 50,
             default => 0,
+        };
+    }
+
+    private function syncOverallTaskStatus(Task $task): string
+    {
+        $status = $this->derivedStatusFor($task);
+
+        if ($task->status !== $status) {
+            $task->update(['status' => $status]);
+        }
+
+        return $status;
+    }
+
+    private function derivedStatusFor(Task $task): string
+    {
+        $progress = $task->memberProgress;
+
+        if ($progress->isEmpty()) {
+            return $task->status;
+        }
+
+        return match (true) {
+            $progress->every(fn ($item) => $item->status === 'done') => 'done',
+            $progress->contains(fn ($item) => $item->status === 'review') => 'review',
+            $progress->contains(fn ($item) => in_array($item->status, ['in_progress', 'done'], true)) => 'in_progress',
+            $progress->every(fn ($item) => $item->status === 'pending') => 'pending',
+            default => 'pending',
         };
     }
 
@@ -401,14 +453,20 @@ class LeadTaskManager extends Component
     {
         $leadTeams = auth()->user()->ledTeams()->whereNotNull('project_id')->with('project')->get();
 
-        // Tasks visible to this lead — filtered
+        // Tasks visible to this lead are synced from member progress before filtering.
         $tasks = Task::with(['assignee', 'assignees', 'team', 'project', 'memberProgress.user'])
             ->whereIn('team_id', $leadTeams->pluck('id'))
             ->when($this->filterTeamId, fn ($q) => $q->where('team_id', $this->filterTeamId))
-            ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))
-            ->orderByRaw("CASE WHEN status = 'in_progress' THEN 0 WHEN status = 'review' THEN 1 WHEN status = 'pending' THEN 2 WHEN status = 'done' THEN 3 ELSE 4 END")
-            ->orderBy('due_date')
-            ->get();
+            ->get()
+            ->each(fn (Task $task) => $this->syncOverallTaskStatus($task))
+            ->when($this->filterStatus, fn ($rows) => $rows->where('status', $this->filterStatus))
+            ->sortBy(function (Task $task): string {
+                $statusOrder = ['in_progress' => 0, 'review' => 1, 'pending' => 2, 'done' => 3][$task->status] ?? 4;
+                $dueOrder = $task->due_date?->timestamp ?? PHP_INT_MAX;
+
+                return sprintf('%02d-%012d-%010d', $statusOrder, $dueOrder, $task->id);
+            })
+            ->values();
 
         // Members for the team selected in the form
         $membersForForm = $this->membersForSelectedTeam();
@@ -430,3 +488,4 @@ class LeadTaskManager extends Component
             ->get();
     }
 }
+

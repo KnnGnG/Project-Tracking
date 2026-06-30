@@ -44,13 +44,16 @@
                         <select id="selectedTaskId"
                                 wire:model="selectedTaskId"
                                 class="mt-1 w-full border border-gray-300 rounded-lg text-sm px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500">
-                            <option value="">{{ $filterTeam > 0 ? 'General work for selected team' : 'General work / no task' }}</option>
+                            <option value="">{{ $filterTeam > 0 ? 'General work for selected team' : 'Select a team for general work' }}</option>
                             @foreach($tasks as $task)
                                 <option value="{{ $task->id }}">
                                     {{ $task->title }}@if($task->team) - {{ $task->team->name }}@endif @if($task->project) / {{ $task->project->name }}@endif
                                 </option>
                             @endforeach
                         </select>
+                        @if($filterTeam === 0)
+                            <p class="mt-1 text-xs text-gray-500">General work needs a selected team so analytics and journal review can place it correctly.</p>
+                        @endif
                         @error('selectedTaskId') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
 

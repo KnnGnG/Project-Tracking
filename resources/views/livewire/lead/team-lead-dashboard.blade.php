@@ -754,6 +754,17 @@
                                         'done'        => 'bg-green-100 text-green-700',
                                         default       => 'bg-gray-100 text-gray-500',
                                     };
+                                    $memberProgress = $task->memberProgress->firstWhere('user_id', $modalMember->id);
+                                    $memberLogs = $task->journalLogs->where('user_id', $modalMember->id)->sortBy('log_date');
+                                    $actualStart = collect([
+                                        optional($memberLogs->first())->log_date,
+                                        $memberProgress?->started_at,
+                                    ])
+                                        ->filter()
+                                        ->map(fn ($date) => \Carbon\Carbon::parse($date))
+                                        ->sortBy(fn ($date) => $date->timestamp)
+                                        ->first();
+                                    $startedEarly = $actualStart && $task->start_date && $actualStart->lt($task->start_date->copy()->startOfDay());
                                 @endphp
                                 <li class="rounded-lg border border-gray-100 bg-gray-50 p-3">
                                     <div class="flex items-start justify-between gap-2">
@@ -765,10 +776,30 @@
                                     @if($task->description)
                                         <p class="text-xs text-gray-500 mt-1.5 line-clamp-2">{{ $task->description }}</p>
                                     @endif
-                                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
-                                        <span>Start {{ $task->start_date?->format('M d, Y') ?? '—' }}</span>
-                                        <span>Due {{ $task->due_date?->format('M d, Y') ?? '—' }}</span>
-                                        <span class="text-gray-400">{{ ucfirst($task->priority) }} priority</span>
+                                    <div class="mt-3 grid grid-cols-1 gap-2 text-xs text-gray-500 sm:grid-cols-2">
+                                        <div class="rounded-lg bg-white px-3 py-2 ring-1 ring-gray-100">
+                                            <p class="font-semibold text-gray-400">Scheduled start</p>
+                                            <p class="mt-0.5 text-gray-700">{{ $task->start_date?->format('M d, Y') ?? 'Not set' }}</p>
+                                        </div>
+                                        <div class="rounded-lg px-3 py-2 ring-1 {{ $startedEarly ? 'bg-emerald-50/60 ring-emerald-200' : 'bg-white ring-gray-100' }}">
+                                            <p class="font-semibold {{ $startedEarly ? 'text-emerald-600' : 'text-gray-400' }}">Actual start</p>
+                                            <p class="mt-0.5 {{ $startedEarly ? 'font-semibold text-emerald-700' : 'text-gray-700' }}">
+                                                {{ $actualStart ? $actualStart->format('M d, Y') : 'Not started' }}
+                                            </p>
+                                            @if($startedEarly)
+                                                <p class="mt-0.5 text-[11px] font-medium text-emerald-600">Started early</p>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 grid grid-cols-1 gap-2 text-xs text-gray-500 sm:grid-cols-2">
+                                        <div class="rounded-lg bg-white px-3 py-2 ring-1 ring-gray-100">
+                                            <p class="font-semibold text-gray-400">Due date</p>
+                                            <p class="mt-0.5 text-gray-700">{{ $task->due_date?->format('M d, Y') ?? 'Not set' }}</p>
+                                        </div>
+                                        <div class="rounded-lg bg-white px-3 py-2 ring-1 ring-gray-100">
+                                            <p class="font-semibold text-gray-400">Priority</p>
+                                            <p class="mt-0.5 text-gray-700">{{ ucfirst($task->priority) }}</p>
+                                        </div>
                                     </div>
                                 </li>
                             @endforeach
@@ -801,3 +832,6 @@
 
     @endif
 </div>
+
+
+

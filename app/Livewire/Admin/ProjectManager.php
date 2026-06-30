@@ -7,6 +7,7 @@ use App\Models\Team;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -43,7 +44,7 @@ class ProjectManager extends Component
             'startDate'   => 'required|date',
             'endDate'     => 'required|date|after_or_equal:startDate',
             'status'      => 'required|in:active,on_hold,completed',
-            'clientId'    => 'nullable|exists:users,id',
+            'clientId'    => ['nullable', Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'client'))],
             'projectTeamIds' => 'nullable|array',
             'projectTeamIds.*' => 'integer|exists:teams,id',
         ];
@@ -230,3 +231,4 @@ class ProjectManager extends Component
         return view('livewire.admin.project-manager', compact('projects', 'clients', 'detailsProject', 'detailsProjectTasks', 'projectTeamOptions', 'selectedProjectTeams'));
     }
 }
+
