@@ -1,58 +1,114 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 🚀 Project Tracker
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Project Tracker is a role-aware project workspace for teams that need one clean place to plan work, assign people, review progress, log effort, and keep everyone aligned without drowning in spreadsheets.
 
-## About Laravel
+It is built with Laravel, Livewire, Tailwind CSS, and Chart.js, and it is designed around a simple idea: every user should land exactly where their work makes sense. A team lead sees leadership tools. A member sees their assigned work. An admin sees the system controls. A client sees the project view that matters to them.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## ✨ What Makes It Shine
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Project Tracker is not just a task list. It is a project command center with structure, accountability, and just enough polish to make daily tracking feel less like paperwork.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **🧭 Role-based project entry**: users see the projects they are involved in, then open the right dashboard based on their role in that project.
+- **🔁 Flexible team roles**: a person can lead one team and still be a member of another, without the system getting confused.
+- **📅 Project timelines**: scheduled work and actual start-to-end activity are shown together, including early starts, late work, and member-specific progress.
+- **✅ Task assignment workflow**: team leads can assign tasks, set dates, priorities, members, and track status as work moves forward.
+- **📝 Journal and time logs**: members can record work logs, including general work, so analytics reflect real effort instead of only task status.
+- **📊 Analytics for team leads**: velocity, completed work, workload, progress, and timeline data help leads understand what is moving and what needs attention.
+- **🔍 Journal review**: team leads can review submitted work logs and keep accountability visible.
+- **⭐ Member evaluations**: team leads can evaluate members, while members can view their own evaluation history.
+- **🔔 Notifications**: important updates surface through the notification system so users do not have to hunt for changes.
+- **🛠️ Admin controls**: admins can manage users, projects, teams, premade teams, assignments, and overall workspace structure.
 
-## Learning Laravel
+## 🧩 Main Areas
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### 🛠️ Admin
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+The admin side is where the workspace is shaped. Admins can create and manage projects, users, teams, premade teams, and task assignments. This is the control room for keeping the system organized.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+### 🧑‍💼 Team Lead
 
-## Agentic Development
+The team lead side focuses on execution. Leads can monitor dashboards, manage tasks, review journals, inspect analytics, view project timelines, and evaluate members.
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+### 🙋 Member
+
+The member side keeps the experience focused. Members can view assigned work, filter by team or project, log time, write journal entries, and check evaluations they have received.
+
+### 🤝 Client
+
+The client side gives project stakeholders a cleaner project-facing view without exposing internal management clutter.
+
+## 🏗️ Tech Stack
+
+- **⚙️ Backend**: Laravel 13
+- **🎨 Frontend**: Livewire 3, Blade, Tailwind CSS
+- **📈 Charts and calendars**: Chart.js, FullCalendar
+- **🔐 Authentication**: Laravel Jetstream and Sanctum
+- **⚡ Build tooling**: Vite
+- **🗄️ Database**: MySQL by default, with Laravel migrations for schema management
+
+## 🚦 Getting Started
+
+Clone the project, install dependencies, configure your environment, and run the app locally.
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+npm install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+npm run build
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+For active development, you can run the Laravel server and Vite separately:
 
-## Contributing
+```bash
+php artisan serve
+npm run dev
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Or use the project development script if your environment supports it:
 
-## Code of Conduct
+```bash
+composer run dev
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## 🌱 Environment Notes
 
-## Security Vulnerabilities
+Update `.env` with your local database credentials before running migrations.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=your_database_name
+DB_USERNAME=your_database_user
+DB_PASSWORD=your_database_password
+```
 
-## License
+If the app reports a missing Vite manifest in production-style mode, build the frontend assets:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+npm run build
+```
+
+## 🧪 Validation
+
+Run the test suite with:
+
+```bash
+php artisan test
+```
+
+You can also clear and rebuild compiled views when working on Blade-heavy changes:
+
+```bash
+php artisan view:clear
+php artisan view:cache
+```
+
+## 🌟 The Vibe
+
+Project Tracker is built for teams that want clarity without chaos: project cards that open the right workspace, timelines that show what actually happened, analytics that tell a useful story, and role-based dashboards that feel intentional instead of stitched together.
+
+In short: less guessing, more momentum.
