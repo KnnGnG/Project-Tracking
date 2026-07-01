@@ -689,7 +689,12 @@ class TeamLeadDashboard extends Component
                 });
 
                 if ($taskRow) {
-                    $actualSegments = $actualSegments->values();
+                    $actualSegments = $actualSegments
+                        ->sortBy(fn (array $segment) => [
+                            $segment['rawStart']?->timestamp ?? PHP_INT_MAX,
+                            $segment['memberName'] ?? $segment['title'] ?? '',
+                        ])
+                        ->values();
                     $taskRow['segments'] = $actualSegments->take(3);
                     $taskRow['segmentOverflowCount'] = max(0, $actualSegments->count() - 3);
 
