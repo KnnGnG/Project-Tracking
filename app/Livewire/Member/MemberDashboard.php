@@ -97,6 +97,10 @@ class MemberDashboard extends Component
             return;
         }
 
+        $this->filterTeam = (int) ($task->team_id ?? 0);
+        $this->filterProject = (int) ($task->project_id ?? 0);
+        $this->normalizeAccessibleFilters();
+
         $today = now()->toDateString();
         $personalStatus = $this->personalStatusFor($task);
 

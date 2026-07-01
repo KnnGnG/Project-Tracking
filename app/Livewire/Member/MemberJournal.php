@@ -104,7 +104,7 @@ class MemberJournal extends Component
                 'notes' => $validated['notes'] ?: null,
             ]);
 
-            $this->syncActualStartFromLog($taskId, $validated['logDate']);
+            $this->recomputeActualStartFromLogs($taskId);
         });
 
         $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
@@ -154,7 +154,7 @@ class MemberJournal extends Component
                 'notes' => $validated['notes'] ?: null,
             ]);
 
-            $this->syncActualStartFromLog($taskId, $validated['logDate']);
+            $this->recomputeActualStartFromLogs($taskId);
         });
 
         $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
@@ -163,9 +163,20 @@ class MemberJournal extends Component
 
     public function deleteLog(int $id): void
     {
-        JournalLog::where('id', $id)
-            ->where('user_id', auth()->id())
-            ->delete();
+        DB::transaction(function () use ($id): void {
+            $log = JournalLog::where('id', $id)
+                ->where('user_id', auth()->id())
+                ->first();
+
+            if (! $log) {
+                return;
+            }
+
+            $taskId = $log->task_id;
+            $log->delete();
+
+            $this->recomputeActualStartFromLogs($taskId);
+        });
 
         $this->flash = 'Journal log deleted.';
     }
@@ -261,26 +272,34 @@ class MemberJournal extends Component
             ->exists();
     }
 
-    private function syncActualStartFromLog(?int $taskId, string $logDate): void
+    private function recomputeActualStartFromLogs(?int $taskId): void
     {
         if (! $taskId) {
             return;
         }
 
+        $earliestLog = JournalLog::query()
+            ->where('task_id', $taskId)
+            ->where('user_id', auth()->id())
+            ->orderBy('log_date')
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->first();
+
         $progress = TaskMemberProgress::firstOrCreate(
             ['task_id' => $taskId, 'user_id' => auth()->id()],
-            ['status' => 'in_progress', 'progress' => 50]
+            ['status' => 'pending', 'progress' => 0]
         );
 
-        $loggedAt = Carbon::parse($logDate)->startOfDay();
+        if ($earliestLog) {
+            $progress->started_at = Carbon::parse($earliestLog->log_date)->startOfDay();
 
-        if (! $progress->started_at || $loggedAt->lt($progress->started_at)) {
-            $progress->started_at = $loggedAt;
-        }
-
-        if ($progress->status === 'pending') {
-            $progress->status = 'in_progress';
-            $progress->progress = max((int) $progress->progress, 50);
+            if ($progress->status === 'pending') {
+                $progress->status = 'in_progress';
+                $progress->progress = max((int) $progress->progress, 50);
+            }
+        } else {
+            $progress->started_at = null;
         }
 
         $progress->save();

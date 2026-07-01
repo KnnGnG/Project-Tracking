@@ -59,6 +59,19 @@ class ProjectManager extends Component
         $this->resetPage();
     }
 
+    public function updatedPerPage(): void
+    {
+        $this->perPage = $this->normalizedPerPage();
+        $this->resetPage();
+    }
+
+    private function normalizedPerPage(): int
+    {
+        return in_array((int) $this->perPage, [10, 15, 25, 50], true)
+            ? (int) $this->perPage
+            : 10;
+    }
+
     public function openCreate(): void
     {
         $this->resetForm();
@@ -201,6 +214,8 @@ class ProjectManager extends Component
 
     public function render()
     {
+        $this->perPage = $this->normalizedPerPage();
+
         $projects = Project::with([
             'client',
             'teams.lead',

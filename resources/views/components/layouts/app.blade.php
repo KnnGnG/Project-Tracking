@@ -78,7 +78,6 @@
         .ui-loading-bar::before { content: ''; display: block; height: 100%; width: 40%; background: linear-gradient(90deg, #6366f1, #22c55e); animation: ui-loading-slide 1s ease-in-out infinite; }
         @keyframes ui-loading-slide { 0% { transform: translateX(-110%); } 100% { transform: translateX(260%); } }
         @media (max-width: 1023px) {
-            body { overflow: hidden; }
             main table { min-width: 760px; }
             .ui-page-heading h2 { font-size: 1.125rem; line-height: 1.5rem; }
         }
@@ -123,11 +122,12 @@
                     };
                     $hasSelfAssignedTask = (bool) session('active_has_self_assigned_task', false);
 
-                    $showTeamLeadNav = $activeProjectRole === 'lead'
-                        || (! $activeProjectRole && $authUser->isTeamLead());
-                    $showMemberNav = $activeProjectRole === 'member'
-                        || (! $activeProjectRole && $authUser->isMember())
-                        || ($hasSelfAssignedTask && $showTeamLeadNav);
+                    $canLead = $authUser->isTeamLead();
+                    $canMember = $authUser->isMember();
+                    $showTeamLeadNav = $canLead
+                        && ($activeProjectRole === 'lead' || ! $activeProjectRole);
+                    $showMemberNav = ($canMember && ($activeProjectRole === 'member' || ! $activeProjectRole))
+                        || ($canMember && $hasSelfAssignedTask && $showTeamLeadNav);
                     $activeMemberRouteParams = array_filter([
                         'team' => $activeTeamId ?: null,
                         'project' => $activeProjectId ?: null,

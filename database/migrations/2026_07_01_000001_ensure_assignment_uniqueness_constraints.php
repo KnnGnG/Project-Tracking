@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         $this->dedupeByLowestId('task_assignees', ['task_id', 'user_id']);
-        $this->dedupeByLowestId('task_member_progress', ['task_id', 'user_id']);
+        $this->mergeDuplicateTaskMemberProgress();
 
         if (! $this->indexExists('task_assignees', 'task_assignees_task_id_user_id_unique')
             && ! $this->indexExists('task_assignees', 'task_assignees_unique_task_user_guard')) {
@@ -62,6 +62,61 @@ return new class extends Migration
             }
 
             $query->delete();
+        }
+    }
+
+    private function mergeDuplicateTaskMemberProgress(): void
+    {
+        if (! Schema::hasTable('task_member_progress')) {
+            return;
+        }
+
+        $duplicates = DB::table('task_member_progress')
+            ->selectRaw('task_id, user_id, COUNT(*) as duplicate_count')
+            ->groupBy('task_id', 'user_id')
+            ->having('duplicate_count', '>', 1)
+            ->get();
+
+        $statusRank = [
+            'pending' => 0,
+            'in_progress' => 1,
+            'review' => 2,
+            'done' => 3,
+        ];
+
+        foreach ($duplicates as $duplicate) {
+            $rows = DB::table('task_member_progress')
+                ->where('task_id', $duplicate->task_id)
+                ->where('user_id', $duplicate->user_id)
+                ->orderBy('id')
+                ->get();
+
+            $survivor = $rows->first();
+            $bestStatus = $rows
+                ->pluck('status')
+                ->filter()
+                ->sortByDesc(fn ($status) => $statusRank[$status] ?? -1)
+                ->first() ?: 'pending';
+
+            $startedAt = $rows->pluck('started_at')->filter()->sort()->first();
+            $completedAt = $rows->pluck('completed_at')->filter()->sortDesc()->first();
+            $createdAt = $rows->pluck('created_at')->filter()->sort()->first();
+            $updatedAt = $rows->pluck('updated_at')->filter()->sortDesc()->first();
+
+            DB::table('task_member_progress')
+                ->where('id', $survivor->id)
+                ->update([
+                    'status' => $bestStatus,
+                    'progress' => $rows->max('progress') ?? 0,
+                    'started_at' => $startedAt,
+                    'completed_at' => $completedAt,
+                    'created_at' => $createdAt ?? $survivor->created_at,
+                    'updated_at' => $updatedAt ?? $survivor->updated_at,
+                ]);
+
+            DB::table('task_member_progress')
+                ->whereIn('id', $rows->pluck('id')->skip(1)->all())
+                ->delete();
         }
     }
 

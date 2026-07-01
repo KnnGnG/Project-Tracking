@@ -257,7 +257,7 @@ class LeadTaskManager extends Component
         $task = $this->ownedTask($id);
         $oldStatus = $task->status;
 
-        DB::transaction(function () use ($task, $oldStatus): void {
+        DB::transaction(function () use ($task, $oldStatus, $status): void {
             $assigneeIds = $task->assignees()
                 ->pluck('users.id')
                 ->push($task->assigned_to)
@@ -265,7 +265,7 @@ class LeadTaskManager extends Component
                 ->unique()
                 ->values();
 
-            $this->syncMemberProgressRows($task, $assigneeIds);
+            $this->syncMemberProgressRows($task, $assigneeIds, $status);
             $derivedStatus = $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
 
             if ($oldStatus !== $derivedStatus) {
@@ -365,10 +365,10 @@ class LeadTaskManager extends Component
                 ['status' => 'pending', 'progress' => 0]
             );
 
-            if ($status && $progress->wasRecentlyCreated) {
+            if ($status) {
                 $progress->status = $status;
                 $progress->progress = $this->progressValueForStatus($status);
-                if (in_array($status, ['in_progress', 'review', 'done'], true)) {
+                if (in_array($status, ['in_progress', 'review', 'done'], true) && ! $progress->started_at) {
                     $progress->started_at = now();
                 }
                 $progress->completed_at = $status === 'done' ? now() : null;
@@ -382,6 +382,7 @@ class LeadTaskManager extends Component
         return match ($status) {
             'done' => 100,
             'in_progress' => 50,
+            'review' => 75,
             default => 0,
         };
     }

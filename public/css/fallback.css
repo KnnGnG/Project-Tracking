@@ -237,7 +237,6 @@ span.rounded-full { display: inline-flex; align-items: center; gap: 0.25rem; whi
 .ui-loading-bar::before { content: ''; display: block; height: 100%; width: 40%; background: linear-gradient(90deg, #6366f1, #22c55e); animation: ui-loading-slide 1s ease-in-out infinite; }
 @keyframes ui-loading-slide { 0% { transform: translateX(-110%); } 100% { transform: translateX(260%); } }
 @media (max-width: 1023px) {
-    body { overflow: hidden; }
     table { min-width: 760px; }
     .ui-page-heading h1, .ui-page-heading h2 { font-size: 1.125rem; line-height: 1.5rem; }
 }
