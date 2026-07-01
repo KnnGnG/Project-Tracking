@@ -3,15 +3,8 @@
         <x-floating-notification :message="session('success')" />
     @endif
 
-    <div class="ui-page-heading">
-        <div>
-            <h2 class="text-lg font-semibold text-gray-900">Assign Teams</h2>
-            <p class="mt-1 text-sm text-gray-500">
-                Create reusable teams without a project, then attach them to projects later.
-            </p>
-        </div>
-
-        @if(!$showForm)
+    @if(!$showForm)
+        <div class="flex justify-end">
             <button wire:click="openCreate"
                     wire:loading.attr="disabled"
                     wire:target="openCreate"
@@ -21,8 +14,8 @@
                 </svg>
                 New Premade Team
             </button>
-        @endif
-    </div>
+        </div>
+    @endif
 
     @if($showForm)
         <div class="ui-soft-panel p-5">

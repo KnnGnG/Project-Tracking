@@ -4,13 +4,8 @@
         <x-floating-notification :message="session('success')" />
     @endif
 
-    {{-- Header row --}}
-    <div class="ui-page-heading">
-        <div>
-            <h2>Teams</h2>
-            <p>Create teams, assign leads, and keep member responsibilities clear.</p>
-        </div>
-        @if(!$showForm)
+    @if(!$showForm)
+        <div class="flex justify-end">
             <button wire:click="openCreate"
                     wire:loading.attr="disabled"
                     wire:target="openCreate"
@@ -20,8 +15,8 @@
                 </svg>
                 New Team
             </button>
-        @endif
-    </div>
+        </div>
+    @endif
 
     {{-- Create / Edit form --}}
     @if($showForm)

@@ -38,6 +38,15 @@
             color: #0f172a;
             box-shadow: 0 1px 1px rgb(15 23 42 / 0.02);
         }
+        main select:not([multiple]) {
+            appearance: none;
+            background-color: #ffffff;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+            background-position: right 0.85rem center;
+            background-repeat: no-repeat;
+            background-size: 1rem 1rem;
+            padding-right: 2.75rem !important;
+        }
         main input:not([type='checkbox']):not([type='radio']):focus,
         main select:focus,
         main textarea:focus {
@@ -295,11 +304,12 @@
                     <button type="button" @click="openSidebar()" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 lg:hidden" aria-label="Open navigation">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                     </button>
+                    @php($pageDescription = \App\Support\PageDescriptions::forCurrentRoute())
                     <div class="min-w-0">
-                    <h1 class="truncate text-xl font-bold tracking-tight text-slate-950">{{ $title ?? 'Dashboard' }}</h1>
-                    <p class="mt-0.5 hidden text-sm text-slate-500 sm:block">
-                        Keep project work, teams, and progress in one clear workspace.
-                    </p>
+                        <h1 class="truncate text-xl font-bold tracking-tight text-slate-950">{{ $title ?? 'Dashboard' }}</h1>
+                        <p class="mt-0.5 hidden text-sm text-slate-500 sm:block">
+                            {{ $pageDescription }}
+                        </p>
                     </div>
                 </div>
                 @auth

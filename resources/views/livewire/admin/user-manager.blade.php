@@ -6,14 +6,7 @@
     @endif
 
     {{-- ── Role filter tabs + search + new user ─────────────────────────────── --}}
-    <div class="ui-page-heading">
-        <div>
-            <h2>Users</h2>
-            <p>Manage accounts, roles, and team access from one place.</p>
-        </div>
-    </div>
-
-    <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+<div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
         {{-- Role tabs --}}
         <div class="flex border-b border-gray-200">
             @php

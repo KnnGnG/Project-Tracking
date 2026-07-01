@@ -1,14 +1,4 @@
 <div wire:poll.visible.60s>
-    <div class="ui-page-heading">
-        <div>
-            <h2>Task Oversight</h2>
-            <p>
-            View all tasks across projects. Assignments are managed by team leads from
-            <span class="font-medium text-gray-600">Lead → Manage Tasks</span>.
-        </p>
-        </div>
-    </div>
-
     {{-- Filters --}}
     <div class="flex flex-wrap items-end gap-4 mb-6" role="group" aria-label="Filter tasks">
         <div class="flex flex-col gap-1 min-w-[10rem]">

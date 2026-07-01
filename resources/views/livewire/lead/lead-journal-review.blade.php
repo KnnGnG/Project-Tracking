@@ -1,11 +1,4 @@
 <div class="space-y-6" wire:poll.visible.60s>
-    <div class="ui-page-heading">
-        <div>
-            <h2>Journal Review</h2>
-            <p>Review team logs, general work, and task-specific time entries.</p>
-        </div>
-    </div>
-
     <div class="grid grid-cols-1 gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:grid-cols-5">
         <div>
             <label for="logDate" class="sr-only">Log date</label>
