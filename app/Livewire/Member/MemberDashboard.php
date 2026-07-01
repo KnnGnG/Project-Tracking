@@ -40,6 +40,10 @@ class MemberDashboard extends Component
     /** Currently expanded task ID (null = none) */
     public ?int $expandedTaskId = null;
 
+    /** Task opened from a notification link. */
+    #[Url(as: 'task')]
+    public ?int $focusTaskId = null;
+
     /** Flash message */
     public ?string $flash = null;
 
@@ -51,6 +55,12 @@ class MemberDashboard extends Component
         $this->filterProject = request()->has('project')
             ? request()->integer('project')
             : (int) session('active_project_id', 0);
+
+        $this->normalizeAccessibleFilters();
+
+        if ($this->focusTaskId) {
+            $this->openFocusTask($this->focusTaskId);
+        }
     }
 
     public function setTab(string $tab): void
@@ -63,6 +73,14 @@ class MemberDashboard extends Component
     {
         $this->filterTeam = max(0, (int) $this->filterTeam);
         $this->filterProject = 0;
+        $this->normalizeAccessibleFilters();
+        $this->expandedTaskId = null;
+    }
+
+    public function updatedFilterProject(): void
+    {
+        $this->filterProject = max(0, (int) $this->filterProject);
+        $this->normalizeAccessibleFilters();
         $this->expandedTaskId = null;
     }
 
@@ -78,6 +96,10 @@ class MemberDashboard extends Component
         if (! $task) {
             return;
         }
+
+        $this->filterTeam = (int) ($task->team_id ?? 0);
+        $this->filterProject = (int) ($task->project_id ?? 0);
+        $this->normalizeAccessibleFilters();
 
         $today = now()->toDateString();
         $personalStatus = $this->personalStatusFor($task);
@@ -148,6 +170,33 @@ class MemberDashboard extends Component
         $this->expandedTaskId = null;
     }
 
+    private function normalizeAccessibleFilters(): void
+    {
+        $userId = auth()->id();
+
+        if ($this->filterTeam > 0 && ! Team::query()
+            ->whereKey($this->filterTeam)
+            ->where(fn ($query) => $query
+                ->whereHas('members', fn ($members) => $members->whereKey($userId))
+                ->orWhereHas('tasks', fn ($tasks) => $tasks
+                    ->where('assigned_to', $userId)
+                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId))))
+            ->exists()) {
+            $this->filterTeam = 0;
+        }
+
+        if ($this->filterProject > 0 && ! Project::query()
+            ->whereKey($this->filterProject)
+            ->whereHas('tasks', fn ($tasks) => $tasks
+                ->where(fn ($query) => $query
+                    ->where('assigned_to', $userId)
+                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+                ->when($this->filterTeam > 0, fn ($query) => $query->where('team_id', $this->filterTeam)))
+            ->exists()) {
+            $this->filterProject = 0;
+        }
+    }
+
     private function ownedTask(int $id): ?Task
     {
         return Task::where('id', $id)
@@ -178,10 +227,21 @@ class MemberDashboard extends Component
                     'type' => 'task_completed',
                     'title' => 'Task completed',
                     'body' => $task->title . ' was marked done.',
-                    'url' => route('dashboard'),
-                    'data' => ['task_id' => $task->id],
+                    'url' => $this->taskCompletionNotificationUrl($task, $userId),
+                    'data' => ['task_id' => $task->id, 'team_id' => $task->team_id],
                 ]);
             });
+    }
+
+    private function taskCompletionNotificationUrl(Task $task, int $userId): string
+    {
+        $recipient = \App\Models\User::find($userId);
+
+        if ($recipient && $task->team_id && $recipient->ledTeams()->whereKey($task->team_id)->exists()) {
+            return route('lead.tasks', ['team' => $task->team_id]);
+        }
+
+        return route('dashboard');
     }
 
     private function updateMemberProgress(Task $task, string $status): void
@@ -278,6 +338,8 @@ class MemberDashboard extends Component
 
     public function render()
     {
+        $this->normalizeAccessibleFilters();
+
         $userId = auth()->id();
         $today = now()->toDateString();
 

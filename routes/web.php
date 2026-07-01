@@ -10,10 +10,12 @@ use App\Livewire\Admin\TeamManager;
 use App\Livewire\Admin\UserManager;
 use App\Livewire\Client\ClientDashboard;
 use App\Livewire\Lead\LeadJournalReview;
+use App\Livewire\Lead\LeadMemberEvaluation;
 use App\Livewire\Lead\LeadTaskManager;
 use App\Livewire\Lead\TeamLeadAnalytics;
 use App\Livewire\Lead\TeamLeadDashboard;
 use App\Livewire\Member\MemberDashboard;
+use App\Livewire\Member\MemberEvaluations;
 use App\Livewire\Member\MemberJournal;
 use Illuminate\Support\Facades\Route;
 
@@ -86,6 +88,7 @@ Route::middleware(['auth', 'throttle:300,1'])->group(function () {
             Route::get('/analytics', TeamLeadAnalytics::class)->name('analytics');
             Route::get('/tasks', LeadTaskManager::class)->name('tasks');
             Route::get('/journals', LeadJournalReview::class)->name('journals');
+            Route::get('/evaluations', LeadMemberEvaluation::class)->name('evaluations');
         });
 
     /*
@@ -99,5 +102,8 @@ Route::middleware(['auth', 'throttle:300,1'])->group(function () {
         ->group(function () {
             Route::get('/dashboard', MemberDashboard::class)->name('dashboard');
             Route::get('/logs', MemberJournal::class)->name('logs');
+            Route::get('/evaluations', MemberEvaluations::class)->name('evaluations');
         });
 });
+
+

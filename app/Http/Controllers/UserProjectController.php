@@ -47,7 +47,13 @@ class UserProjectController extends Controller
             ->when($requestedTeamId, fn ($query) => $query->whereKey($requestedTeamId))
             ->orderByRaw("CASE WHEN team_members.role = 'lead' THEN 0 ELSE 1 END")
             ->orderBy('teams.name')
-            ->firstOrFail();
+            ->first();
+
+        if (! $team) {
+            return redirect()
+                ->route('projects.index')
+                ->with('error', 'That project is not available for your account. Choose one of your assigned projects.');
+        }
 
         $role = $team->pivot->role ?? 'member';
 

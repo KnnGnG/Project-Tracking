@@ -25,6 +25,19 @@ class NotificationBell extends Component
             ->update(['read_at' => now()]);
     }
 
+    public function openNotification(int $id)
+    {
+        $notification = InAppNotification::where('id', $id)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        if (! $notification->read_at) {
+            $notification->markAsRead();
+        }
+
+        return redirect()->to($notification->url ?: route('dashboard'));
+    }
+
     public function render()
     {
         $user = auth()->user();

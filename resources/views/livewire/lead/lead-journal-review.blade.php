@@ -1,5 +1,12 @@
 <div class="space-y-6" wire:poll.visible.60s>
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
+    <div class="ui-page-heading">
+        <div>
+            <h2>Journal Review</h2>
+            <p>Review team logs, general work, and task-specific time entries.</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:grid-cols-5">
         <div>
             <label for="logDate" class="sr-only">Log date</label>
             <input id="logDate" type="date" wire:model.live="logDate" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
@@ -36,12 +43,12 @@
         </div>
     </div>
 
-    <div class="rounded-lg border border-gray-200 bg-white px-5 py-4">
+    <div class="ui-soft-panel px-5 py-4">
         <p class="text-sm text-gray-500">Logged time</p>
         <p class="mt-1 text-3xl font-extrabold text-gray-900">{{ intdiv($totalMinutes, 60) }}h {{ $totalMinutes % 60 }}m</p>
     </div>
 
-    <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div class="ui-soft-panel overflow-hidden">
         @forelse($logs as $log)
             <article class="border-b border-gray-100 px-5 py-4 last:border-b-0">
                 <div class="flex flex-wrap items-start justify-between gap-3">

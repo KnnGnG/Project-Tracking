@@ -1,23 +1,33 @@
 <div class="space-y-6">
 
-    {{-- Flash --}}
-    @if(session('success'))
-        <x-floating-notification :message="session('success')" />
-    @endif
+    <div class="ui-page-heading">
+        <div>
+            <h2>Manage Tasks</h2>
+            <p>Assign work, review member progress, and keep task ownership clear.</p>
+        </div>
+        @if(!$showForm)
+            <button wire:click="openCreate"
+                    wire:loading.attr="disabled"
+                    wire:target="openCreate"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Assign Task
+            </button>
+        @endif
+    </div>
 
-    {{-- ── Filters + New Task button ────────────────────────────────────────── --}}
-    <div class="flex flex-wrap items-center gap-3 justify-between">
-        <div class="flex items-center gap-3">
-            {{-- Team filter --}}
+    <div class="flex flex-wrap items-center gap-3 justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <div class="flex flex-wrap items-center gap-3">
             <select wire:model.live="filterTeamId"
                     class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="">All My Teams</option>
                 @foreach($leadTeams as $team)
-                    <option value="{{ $team->id }}">{{ $team->name }} — {{ $team->project->name }}</option>
+                    <option value="{{ $team->id }}">{{ $team->name }} - {{ $team->project->name }}</option>
                 @endforeach
             </select>
 
-            {{-- Status filter --}}
             <select wire:model.live="filterStatus"
                     class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="">All Statuses</option>
@@ -27,21 +37,11 @@
                 <option value="done">Done</option>
             </select>
         </div>
-
-        @if(!$showForm)
-            <button wire:click="openCreate"
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                </svg>
-                Assign Task
-            </button>
-        @endif
     </div>
 
     {{-- ── Task form ─────────────────────────────────────────────────────────── --}}
     @if($showForm)
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <div class="ui-soft-panel p-6">
             <h2 class="text-base font-semibold text-gray-800 mb-5">
                 {{ $editingId ? 'Edit Task' : 'Assign New Task' }}
             </h2>
@@ -191,11 +191,16 @@
 
             <div class="flex items-center gap-3 mt-6">
                 <button wire:click="save"
-                        class="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
-                    {{ $editingId ? 'Update Task' : 'Assign Task' }}
+                        wire:loading.attr="disabled"
+                        wire:target="save"
+                        class="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                    <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Task' : 'Assign Task' }}</span>
+                    <span wire:loading wire:target="save">Saving...</span>
                 </button>
                 <button wire:click="cancelForm"
-                        class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        wire:loading.attr="disabled"
+                        wire:target="cancelForm,save"
+                        class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-60 disabled:cursor-not-allowed">
                     Cancel
                 </button>
             </div>
@@ -203,9 +208,9 @@
     @endif
 
     {{-- ── Task list ─────────────────────────────────────────────────────────── --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" @if(!$showForm) wire:poll.visible.30s @endif>
+    <div class="ui-soft-panel overflow-hidden" @if(!$showForm) wire:poll.visible.30s @endif>
         @if($tasks->isEmpty())
-            <div class="py-16 text-center text-gray-400">
+            <div class="ui-empty-state">
                 <svg class="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                           d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/>
@@ -291,35 +296,30 @@
                                 </span>
                             </td>
                             <td class="px-6 py-4">
-                                {{-- Inline status switcher --}}
-                                <select wire:change="updateStatus({{ $task->id }}, $event.target.value)"
-                                        class="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 {{ $statusColor }}">
-                                    @foreach($statusOptions as $val => $label)
-                                        <option value="{{ $val }}" {{ $task->status === $val ? 'selected' : '' }}>
-                                            {{ $label }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $statusColor }}">
+                                    {{ $statusOptions[$task->status] ?? ucfirst(str_replace('_', ' ', $task->status)) }}
+                                </span>
+                                <span class="mt-1 block text-[11px] text-gray-400">From members</span>
                             </td>
                             <td class="px-4 py-4 text-right whitespace-nowrap">
                                 @if($expandedTaskId !== $task->id)
                                     <button wire:click="toggleTaskDetails({{ $task->id }})"
-                                            class="text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-3 transition">
+                                            class="ui-action-button ui-action-primary mr-2">
                                         Details
                                     </button>
                                 @else
                                     <button wire:click="toggleTaskDetails({{ $task->id }})"
-                                            class="text-gray-600 hover:text-gray-800 text-xs font-medium mr-3 transition">
+                                            class="ui-action-button mr-2">
                                         Hide
                                     </button>
                                 @endif
                                 <button wire:click="openEdit({{ $task->id }})"
-                                        class="text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-3 transition">
+                                        class="ui-action-button ui-action-primary mr-2">
                                     Edit
                                 </button>
-                                
+
                                 <button wire:click="confirmDelete({{ $task->id }})"
-                                        class="text-red-500 hover:text-red-700 text-xs font-medium transition">
+                                        class="ui-action-button ui-action-danger">
                                     Delete
                                 </button>
                             </td>
@@ -460,8 +460,9 @@
                 Cancel
             </x-secondary-button>
 
-            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled">
-                Delete
+            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled" wire:target="deleteConfirmed">
+                <span wire:loading.remove wire:target="deleteConfirmed">Delete</span>
+                <span wire:loading wire:target="deleteConfirmed">Deleting...</span>
             </x-danger-button>
         </x-slot>
     </x-confirmation-modal>

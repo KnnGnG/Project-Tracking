@@ -4,6 +4,13 @@
         <x-floating-notification :message="$flash" dismiss="dismissFlash" />
     @endif
 
+    <div class="ui-page-heading">
+        <div>
+            <h2>Logs and Journal</h2>
+            <p>Record daily work, timer sessions, and general team activity.</p>
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <section class="xl:col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm">
             <div class="px-6 py-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
@@ -44,13 +51,16 @@
                         <select id="selectedTaskId"
                                 wire:model="selectedTaskId"
                                 class="mt-1 w-full border border-gray-300 rounded-lg text-sm px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500">
-                            <option value="">{{ $filterTeam > 0 ? 'General work for selected team' : 'General work / no task' }}</option>
+                            <option value="">{{ $filterTeam > 0 ? 'General work for selected team' : 'Select a team for general work' }}</option>
                             @foreach($tasks as $task)
                                 <option value="{{ $task->id }}">
                                     {{ $task->title }}@if($task->team) - {{ $task->team->name }}@endif @if($task->project) / {{ $task->project->name }}@endif
                                 </option>
                             @endforeach
                         </select>
+                        @if($filterTeam === 0)
+                            <p class="mt-1 text-xs text-gray-500">General work needs a selected team so analytics and journal review can place it correctly.</p>
+                        @endif
                         @error('selectedTaskId') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
 
@@ -161,8 +171,11 @@
 
                 <div class="flex justify-end">
                     <button type="submit"
-                            class="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700">
-                        Save log
+                            wire:loading.attr="disabled"
+                            wire:target="save"
+                            class="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed">
+                        <span wire:loading.remove wire:target="save">Save log</span>
+                        <span wire:loading wire:target="save">Saving...</span>
                     </button>
                 </div>
             </form>
@@ -198,7 +211,7 @@
                             </div>
                             <button type="button"
                                     wire:click="confirmDelete({{ $log->id }})"
-                                    class="text-xs font-medium text-red-500 hover:text-red-700">
+                                    class="ui-action-button ui-action-danger">
                                 Delete
                             </button>
                         </div>
@@ -212,7 +225,7 @@
                         </div>
                     </article>
                 @empty
-                    <div class="rounded-lg border border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+                    <div class="rounded-lg border border-dashed border-gray-200 bg-gray-50 py-10 text-center text-sm text-gray-400">
                         No logs for this day yet.
                     </div>
                 @endforelse
@@ -244,7 +257,7 @@
                     </span>
                 </div>
             @empty
-                <div class="px-6 py-10 text-center text-sm text-gray-400">
+                <div class="ui-empty-state rounded-none border-0 shadow-none">
                     Older logs will show here after you add entries on other days.
                 </div>
             @endforelse
@@ -440,8 +453,9 @@
                 Cancel
             </x-secondary-button>
 
-            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled">
-                Delete
+            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled" wire:target="deleteConfirmed">
+                <span wire:loading.remove wire:target="deleteConfirmed">Delete</span>
+                <span wire:loading wire:target="deleteConfirmed">Deleting...</span>
             </x-danger-button>
         </x-slot>
     </x-confirmation-modal>

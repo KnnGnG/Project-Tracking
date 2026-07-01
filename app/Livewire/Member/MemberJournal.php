@@ -4,8 +4,10 @@ namespace App\Livewire\Member;
 
 use App\Models\JournalLog;
 use App\Models\Task;
+use App\Models\TaskMemberProgress;
 use App\Models\Team;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -45,6 +47,7 @@ class MemberJournal extends Component
             ? request()->integer('team')
             : (int) session('active_team_id', 0);
         $this->normalizeLogDate();
+        $this->normalizeAccessibleTeamFilter();
     }
 
     public function updatedLogDate(): void
@@ -55,6 +58,7 @@ class MemberJournal extends Component
     public function updatedFilterTeam(): void
     {
         $this->filterTeam = max(0, (int) $this->filterTeam);
+        $this->normalizeAccessibleTeamFilter();
         $this->selectedTaskId = '';
     }
 
@@ -83,15 +87,25 @@ class MemberJournal extends Component
 
         $totalMinutes = (int) ceil($seconds / 60);
         $taskId = ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null;
+        $teamId = $this->teamIdForLog($taskId);
 
-        JournalLog::create([
-            'user_id' => auth()->id(),
-            'task_id' => $taskId,
-            'team_id' => $this->teamIdForLog($taskId),
-            'log_date' => $validated['logDate'],
-            'minutes' => $totalMinutes,
-            'notes' => $validated['notes'] ?: null,
-        ]);
+        if (! $teamId || ! $this->memberCanLogToTeam($teamId)) {
+            $this->addError('selectedTaskId', 'Choose a team before logging general work.');
+            return;
+        }
+
+        DB::transaction(function () use ($taskId, $teamId, $validated, $totalMinutes): void {
+            JournalLog::create([
+                'user_id' => auth()->id(),
+                'task_id' => $taskId,
+                'team_id' => $teamId,
+                'log_date' => $validated['logDate'],
+                'minutes' => $totalMinutes,
+                'notes' => $validated['notes'] ?: null,
+            ]);
+
+            $this->recomputeActualStartFromLogs($taskId);
+        });
 
         $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
         $this->flash = 'Timer session added to your journal.';
@@ -123,15 +137,25 @@ class MemberJournal extends Component
         }
 
         $taskId = ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null;
+        $teamId = $this->teamIdForLog($taskId);
 
-        JournalLog::create([
-            'user_id' => auth()->id(),
-            'task_id' => $taskId,
-            'team_id' => $this->teamIdForLog($taskId),
-            'log_date' => $validated['logDate'],
-            'minutes' => $totalMinutes,
-            'notes' => $validated['notes'] ?: null,
-        ]);
+        if (! $teamId || ! $this->memberCanLogToTeam($teamId)) {
+            $this->addError('selectedTaskId', 'Choose a team before logging general work.');
+            return;
+        }
+
+        DB::transaction(function () use ($taskId, $teamId, $validated, $totalMinutes): void {
+            JournalLog::create([
+                'user_id' => auth()->id(),
+                'task_id' => $taskId,
+                'team_id' => $teamId,
+                'log_date' => $validated['logDate'],
+                'minutes' => $totalMinutes,
+                'notes' => $validated['notes'] ?: null,
+            ]);
+
+            $this->recomputeActualStartFromLogs($taskId);
+        });
 
         $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
         $this->flash = 'Journal log added.';
@@ -139,11 +163,26 @@ class MemberJournal extends Component
 
     public function deleteLog(int $id): void
     {
-        JournalLog::where('id', $id)
-            ->where('user_id', auth()->id())
-            ->delete();
+        $deleted = DB::transaction(function () use ($id): bool {
+            $log = JournalLog::where('id', $id)
+                ->where('user_id', auth()->id())
+                ->first();
 
-        $this->flash = 'Journal log deleted.';
+            if (! $log) {
+                return false;
+            }
+
+            $taskId = $log->task_id;
+            $log->delete();
+
+            $this->recomputeActualStartFromLogs($taskId);
+
+            return true;
+        });
+
+        if ($deleted) {
+            $this->flash = 'Journal log deleted.';
+        }
     }
 
     public function confirmDelete(int $id): void
@@ -214,6 +253,17 @@ class MemberJournal extends Component
         $this->logDate = $date->toDateString();
     }
 
+    private function normalizeAccessibleTeamFilter(): void
+    {
+        if ($this->filterTeam < 1) {
+            return;
+        }
+
+        if (! $this->memberCanLogToTeam($this->filterTeam)) {
+            $this->filterTeam = 0;
+        }
+    }
+
     private function memberTaskExists(int $taskId): bool
     {
         $userId = auth()->id();
@@ -223,6 +273,76 @@ class MemberJournal extends Component
                 ->where('assigned_to', $userId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
             ->when($this->filterTeam > 0, fn ($q) => $q->where('team_id', $this->filterTeam))
+            ->exists();
+    }
+
+    private function recomputeActualStartFromLogs(?int $taskId): void
+    {
+        if (! $taskId) {
+            return;
+        }
+
+        $earliestLog = JournalLog::query()
+            ->where('task_id', $taskId)
+            ->where('user_id', auth()->id())
+            ->orderBy('log_date')
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->first();
+
+        $progress = TaskMemberProgress::firstOrCreate(
+            ['task_id' => $taskId, 'user_id' => auth()->id()],
+            ['status' => 'pending', 'progress' => 0]
+        );
+
+        if ($earliestLog) {
+            $progress->started_at = Carbon::parse($earliestLog->log_date)->startOfDay();
+
+            if ($progress->status === 'pending') {
+                $progress->status = 'in_progress';
+                $progress->progress = max((int) $progress->progress, 50);
+            }
+        } else {
+            $progress->started_at = null;
+        }
+
+        $progress->save();
+
+        $this->syncParentTaskStatus($taskId);
+    }
+
+    private function syncParentTaskStatus(int $taskId): void
+    {
+        $task = Task::with('memberProgress')->find($taskId);
+
+        if (! $task || $task->memberProgress->isEmpty()) {
+            return;
+        }
+
+        $status = match (true) {
+            $task->memberProgress->every(fn ($item) => $item->status === 'done') => 'done',
+            $task->memberProgress->contains(fn ($item) => $item->status === 'review') => 'review',
+            $task->memberProgress->contains(fn ($item) => in_array($item->status, ['in_progress', 'done'], true)) => 'in_progress',
+            $task->memberProgress->every(fn ($item) => $item->status === 'pending') => 'pending',
+            default => 'pending',
+        };
+
+        if ($task->status !== $status) {
+            $task->update(['status' => $status]);
+        }
+    }
+
+    private function memberCanLogToTeam(int $teamId): bool
+    {
+        $userId = auth()->id();
+
+        return Team::query()
+            ->whereKey($teamId)
+            ->where(fn ($query) => $query
+                ->whereHas('members', fn ($members) => $members->whereKey($userId))
+                ->orWhereHas('tasks', fn ($tasks) => $tasks
+                    ->where('assigned_to', $userId)
+                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId))))
             ->exists();
     }
 
@@ -238,6 +358,7 @@ class MemberJournal extends Component
     public function render()
     {
         $this->normalizeLogDate();
+        $this->normalizeAccessibleTeamFilter();
 
         $userId = auth()->id();
 

@@ -12,11 +12,14 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 #[Layout('components.layouts.app')]
 #[Title('Teams')]
 class TeamManager extends Component
 {
+    use WithPagination;
+
     private const ALLOWED_TEAM_ROLES = ['team_lead', 'member'];
 
     // Team form fields
@@ -35,6 +38,8 @@ class TeamManager extends Component
     public bool $confirmingDelete = false;
     public ?int $deleteId = null;
     public ?int $detailsTeamId = null;
+
+    public int $perPage = 10;
 
     protected function rules(): array
     {
@@ -78,6 +83,11 @@ class TeamManager extends Component
     public function updatedProjectId(): void
     {
         $this->loadProjectTeamSelection();
+    }
+
+    public function updatedTeamSearch(): void
+    {
+        $this->resetPage();
     }
 
     public function updatedProjectTeamIds(): void
@@ -293,7 +303,7 @@ class TeamManager extends Component
 
     public function render()
     {
-        $teams    = Team::with(['project', 'lead', 'members'])->withCount('tasks')->latest()->get();
+        $teams    = Team::with(['project', 'lead', 'members'])->withCount('tasks')->latest()->paginate($this->perPage);
         $projects = Project::orderBy('name')->get();
         $people   = User::whereIn('role', ['team_lead', 'member'])->orderBy('name')->get();
         $leads    = $people;

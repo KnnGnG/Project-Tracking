@@ -9,16 +9,21 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 #[Layout('components.layouts.app')]
 #[Title('User Management')]
 class UserManager extends Component
 {
+    use WithPagination;
+
     // ── Filters ───────────────────────────────────────────────────────────────
     #[Url(as: 'role')]
     public string $filterRole = '';
 
     public string $search = '';
+
+    public int $perPage = 15;
 
     // ── Create / Edit form ────────────────────────────────────────────────────
     public bool $showForm = false;
@@ -40,6 +45,16 @@ class UserManager extends Component
     public string $deleteName = '';
 
     // ── Role change confirmation ───────────────────────────────────────────────
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterRole(): void
+    {
+        $this->resetPage();
+    }
+
     public function openCreate(): void
     {
         $this->resetForm();
@@ -108,6 +123,7 @@ class UserManager extends Component
     {
         abort_unless(in_array($role, ['admin', 'client', 'team_lead', 'member'], true), 422);
         User::findOrFail($id)->update(['role' => $role]);
+        $this->clampPageAfterMutation();
         session()->flash('success', 'Role updated.');
     }
 
@@ -135,6 +151,7 @@ class UserManager extends Component
         }
 
         $this->cancelDelete();
+        $this->clampPageAfterMutation();
     }
 
     public function cancelDelete(): void
@@ -154,17 +171,31 @@ class UserManager extends Component
         $this->resetValidation();
     }
 
-    public function render()
+    private function usersQuery()
     {
-        $users = User::withCount(['ledTeams', 'teams'])
+        return User::withCount(['ledTeams', 'teams'])
             ->when($this->filterRole, fn ($q) => $q->where('role', $this->filterRole))
             ->when($this->search, fn ($q) => $q->where(function ($q) {
                 $q->where('name', 'like', "%{$this->search}%")
                     ->orWhere('email', 'like', "%{$this->search}%");
             }))
             ->orderByRaw("CASE WHEN role = 'admin' THEN 0 WHEN role = 'team_lead' THEN 1 WHEN role = 'member' THEN 2 WHEN role = 'client' THEN 3 ELSE 4 END")
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+    }
+
+    private function clampPageAfterMutation(): void
+    {
+        $lastPage = max(1, (int) ceil($this->usersQuery()->toBase()->getCountForPagination() / $this->perPage));
+
+        if ($this->getPage() > $lastPage) {
+            $this->setPage($lastPage);
+        }
+    }
+
+    public function render()
+    {
+        $users = $this->usersQuery()
+            ->paginate($this->perPage);
 
         $roleCounts = [
             'all' => User::count(),

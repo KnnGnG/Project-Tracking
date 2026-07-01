@@ -114,7 +114,8 @@ class Task extends Model
     public function isExceededDeadline(): bool
     {
         return in_array($this->status, ['pending', 'in_progress', 'review'], true)
-            && $this->due_date->isPast();
+            && $this->due_date
+            && $this->due_date->toDateString() < now()->toDateString();
     }
 
     /**

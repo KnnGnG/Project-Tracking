@@ -24,7 +24,15 @@ return new class extends Migration
         DB::table('journal_logs')
             ->join('tasks', 'journal_logs.task_id', '=', 'tasks.id')
             ->whereNull('journal_logs.team_id')
-            ->update(['journal_logs.team_id' => DB::raw('tasks.team_id')]);
+            ->select('journal_logs.id', 'tasks.team_id')
+            ->orderBy('journal_logs.id')
+            ->chunkById(500, function ($logs): void {
+                foreach ($logs as $log) {
+                    DB::table('journal_logs')
+                        ->where('id', $log->id)
+                        ->update(['team_id' => $log->team_id]);
+                }
+            }, 'journal_logs.id', 'id');
     }
 
     public function down(): void
@@ -36,3 +44,4 @@ return new class extends Migration
         }
     }
 };
+

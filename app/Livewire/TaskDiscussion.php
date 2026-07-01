@@ -6,6 +6,7 @@ use App\Models\InAppNotification;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskComment;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
@@ -82,6 +83,28 @@ class TaskDiscussion extends Component
             ->firstOrFail();
     }
 
+    private function taskNotificationUrl(Task $task, int $userId): string
+    {
+        $user = User::find($userId);
+
+        if ($user && $task->team_id && $user->ledTeams()->whereKey($task->team_id)->exists()) {
+            return route('lead.tasks', ['team' => $task->team_id]);
+        }
+
+        if ($user && (
+            $task->assigned_to === $user->id
+            || $task->assignees()->whereKey($user->id)->exists()
+        )) {
+            return route('member.dashboard', array_filter([
+                'team' => $task->team_id,
+                'project' => $task->project_id,
+                'task' => $task->id,
+            ]));
+        }
+
+        return route('dashboard');
+    }
+
     private function notifyComment(Task $task): void
     {
         $leadIds = $task->team
@@ -101,8 +124,8 @@ class TaskDiscussion extends Component
                 'type' => 'task_comment',
                 'title' => 'New task comment',
                 'body' => $task->title,
-                'url' => route('dashboard'),
-                'data' => ['task_id' => $task->id],
+                'url' => $this->taskNotificationUrl($task, $userId),
+                'data' => ['task_id' => $task->id, 'team_id' => $task->team_id, 'project_id' => $task->project_id],
             ]);
         }
     }

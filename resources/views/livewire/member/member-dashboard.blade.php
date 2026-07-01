@@ -6,7 +6,7 @@
     @endif
 
     {{-- ── Summary stat cards ─────────────────────────────────────────────────── --}}
-    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div class="ui-soft-panel overflow-hidden">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
             <div>
                 <h2 class="text-sm font-semibold text-gray-900">Today Focus</h2>
@@ -19,7 +19,7 @@
 
         @if($focusTasks->isEmpty())
             <div class="px-5 py-8 text-center text-sm text-gray-400">
-                Nothing urgent right now. Nice, steady day.
+                Nothing urgent right now. Your active work is under control.
             </div>
         @else
             <div class="grid grid-cols-1 divide-y divide-gray-100 lg:grid-cols-3 lg:divide-x lg:divide-y-0">

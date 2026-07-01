@@ -7,14 +7,18 @@ use App\Models\Team;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 #[Layout('components.layouts.app')]
 #[Title('Projects')]
 class ProjectManager extends Component
 {
+    use WithPagination;
+
     public string $name        = '';
     public string $description = '';
     public string $startDate   = '';
@@ -27,6 +31,7 @@ class ProjectManager extends Component
     public bool $showForm    = false;
     public ?int $editingId   = null;
     public string $search    = '';
+    public int $perPage = 10;
 
     public bool $confirmingDelete = false;
     public ?int $deleteId = null;
@@ -43,10 +48,28 @@ class ProjectManager extends Component
             'startDate'   => 'required|date',
             'endDate'     => 'required|date|after_or_equal:startDate',
             'status'      => 'required|in:active,on_hold,completed',
-            'clientId'    => 'nullable|exists:users,id',
+            'clientId'    => ['nullable', Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'client'))],
             'projectTeamIds' => 'nullable|array',
             'projectTeamIds.*' => 'integer|exists:teams,id',
         ];
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = $this->normalizedPerPage();
+        $this->resetPage();
+    }
+
+    private function normalizedPerPage(): int
+    {
+        return in_array((int) $this->perPage, [10, 15, 25, 50], true)
+            ? (int) $this->perPage
+            : 10;
     }
 
     public function openCreate(): void
@@ -191,6 +214,8 @@ class ProjectManager extends Component
 
     public function render()
     {
+        $this->perPage = $this->normalizedPerPage();
+
         $projects = Project::with([
             'client',
             'teams.lead',
@@ -198,7 +223,7 @@ class ProjectManager extends Component
         ])
             ->when($this->search, fn ($q) => $q->where('name', 'like', "%{$this->search}%"))
             ->latest()
-            ->get();
+            ->paginate($this->perPage);
 
         $clients = User::where('role', 'client')->orderBy('name')->get();
         $projectTeamOptions = $this->projectTeamOptions();
@@ -230,3 +255,4 @@ class ProjectManager extends Component
         return view('livewire.admin.project-manager', compact('projects', 'clients', 'detailsProject', 'detailsProjectTasks', 'projectTeamOptions', 'selectedProjectTeams'));
     }
 }
+

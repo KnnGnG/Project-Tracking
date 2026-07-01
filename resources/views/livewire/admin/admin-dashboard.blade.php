@@ -204,7 +204,7 @@
                     <p class="text-xs text-gray-400 mt-0.5">Review and assign the correct role for each user.</p>
                 </div>
                 <a href="{{ route('admin.users') }}"
-                   class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition">
+                   class="ui-action-button ui-action-primary">
                     Manage all users →
                 </a>
             </div>
@@ -272,7 +272,7 @@
             <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h3 class="text-sm font-semibold text-gray-700">Active Projects</h3>
                 <a href="{{ route('admin.projects') }}"
-                   class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition">View all →</a>
+                   class="ui-action-button ui-action-primary">View all →</a>
             </div>
 
             @if($activeProjects->isEmpty())
