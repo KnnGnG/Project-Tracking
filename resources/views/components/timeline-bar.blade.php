@@ -123,5 +123,11 @@
                 </template>
             </div>
         @endforeach
+        @if(($row['segmentOverflowCount'] ?? 0) > 0)
+            <div class="relative z-30 self-end justify-self-end rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 shadow-sm"
+                 style="grid-column: {{ max(1, $totalDays - 5) }} / span 6; grid-row: 1; margin-bottom: 0.25rem;">
+                +{{ $row['segmentOverflowCount'] }} more
+            </div>
+        @endif
     </div>
 </div>

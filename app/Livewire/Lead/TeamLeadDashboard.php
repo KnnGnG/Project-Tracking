@@ -689,7 +689,9 @@ class TeamLeadDashboard extends Component
                 });
 
                 if ($taskRow) {
-                    $taskRow['segments'] = $actualSegments->values();
+                    $actualSegments = $actualSegments->values();
+                    $taskRow['segments'] = $actualSegments->take(3);
+                    $taskRow['segmentOverflowCount'] = max(0, $actualSegments->count() - 3);
 
                     $rows->push($taskRow);
                 }

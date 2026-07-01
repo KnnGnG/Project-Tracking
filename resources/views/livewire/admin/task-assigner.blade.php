@@ -1,4 +1,4 @@
-<div wire:poll.visible="60s">
+<div wire:poll.visible.60s>
     {{-- Filters --}}
     <div class="flex flex-wrap items-end gap-4 mb-6" role="group" aria-label="Filter tasks">
         <div class="flex flex-col gap-1 min-w-[10rem]">
