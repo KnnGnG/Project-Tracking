@@ -1,10 +1,12 @@
 <div wire:poll.visible.60s>
-    <div class="mb-6">
-        <h1 class="text-lg font-semibold text-gray-900">Task oversight</h1>
-        <p class="text-sm text-gray-500 mt-1">
+    <div class="ui-page-heading">
+        <div>
+            <h2>Task Oversight</h2>
+            <p>
             View all tasks across projects. Assignments are managed by team leads from
             <span class="font-medium text-gray-600">Lead → Manage Tasks</span>.
         </p>
+        </div>
     </div>
 
     {{-- Filters --}}
@@ -54,10 +56,11 @@
     </div>
 
     {{-- Tasks table (read-only) --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="ui-soft-panel overflow-hidden">
         @if($tasks->isEmpty())
-            <div class="py-16 text-center text-gray-400">
-                <p class="text-sm">No tasks match your filters.</p>
+            <div class="ui-empty-state">
+                <p class="text-sm font-semibold text-gray-700">No tasks match your filters.</p>
+                <p class="mt-1 text-sm text-gray-500">Try changing the status or project filter.</p>
             </div>
         @else
             <p class="px-6 py-3 text-xs text-gray-500 border-b border-gray-100 bg-gray-50/80">

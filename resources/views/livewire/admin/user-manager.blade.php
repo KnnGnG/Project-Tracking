@@ -6,7 +6,14 @@
     @endif
 
     {{-- ── Role filter tabs + search + new user ─────────────────────────────── --}}
-    <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="ui-page-heading">
+        <div>
+            <h2>Users</h2>
+            <p>Manage accounts, roles, and team access from one place.</p>
+        </div>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
         {{-- Role tabs --}}
         <div class="flex border-b border-gray-200">
             @php
@@ -41,7 +48,9 @@
 
             @if(!$showForm)
                 <button wire:click="openCreate"
-                        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
+                        wire:loading.attr="disabled"
+                        wire:target="openCreate"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
@@ -53,7 +62,7 @@
 
     {{-- ── Create / Edit form ───────────────────────────────────────────────── --}}
     @if($showForm)
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <div class="ui-soft-panel p-6">
             <h2 class="text-base font-semibold text-gray-800 mb-5">
                 {{ $editingId ? 'Edit User' : 'Create New User' }}
             </h2>
@@ -108,11 +117,16 @@
 
             <div class="flex items-center gap-3 mt-6">
                 <button wire:click="save"
-                        class="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
-                    {{ $editingId ? 'Update User' : 'Create User' }}
+                        wire:loading.attr="disabled"
+                        wire:target="save"
+                        class="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                    <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update User' : 'Create User' }}</span>
+                    <span wire:loading wire:target="save">Saving...</span>
                 </button>
                 <button wire:click="cancelForm"
-                        class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        wire:loading.attr="disabled"
+                        wire:target="cancelForm,save"
+                        class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-60 disabled:cursor-not-allowed">
                     Cancel
                 </button>
             </div>
@@ -120,10 +134,11 @@
     @endif
 
     {{-- ── User table ───────────────────────────────────────────────────────── --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" @if(!$showForm) wire:poll.visible.60s @endif>
+    <div class="ui-soft-panel overflow-hidden" @if(!$showForm) wire:poll.visible.60s @endif>
         @if($users->isEmpty())
-            <div class="py-16 text-center text-gray-400">
-                <p class="text-sm">No users found.</p>
+            <div class="ui-empty-state">
+                <p class="text-sm font-semibold text-gray-700">No users found.</p>
+                <p class="mt-1 text-sm text-gray-500">Try a different role filter or search term.</p>
             </div>
         @else
             <table class="w-full text-sm">
@@ -200,12 +215,16 @@
 
                             <td class="px-4 py-4 text-right whitespace-nowrap">
                                 <button wire:click="openEdit({{ $user->id }})"
-                                        class="text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-3 transition">
+                                        wire:loading.attr="disabled"
+                                        wire:target="openEdit"
+                                        class="ui-action-button ui-action-primary mr-2">
                                     Edit
                                 </button>
                                 @if($user->id !== auth()->id())
                                     <button wire:click="confirmDelete({{ $user->id }})"
-                                            class="text-red-500 hover:text-red-700 text-xs font-medium transition">
+                                            wire:loading.attr="disabled"
+                                            wire:target="confirmDelete"
+                                            class="ui-action-button ui-action-danger">
                                         Delete
                                     </button>
                                 @endif
@@ -214,6 +233,9 @@
                     @endforeach
                 </tbody>
             </table>
+            <div class="border-t border-gray-100 bg-gray-50 px-6 py-4">
+                {{ $users->links() }}
+            </div>
         @endif
     </div>
 
@@ -231,8 +253,9 @@
                 Cancel
             </x-secondary-button>
 
-            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled">
-                Delete
+            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled" wire:target="deleteConfirmed">
+                <span wire:loading.remove wire:target="deleteConfirmed">Delete</span>
+                <span wire:loading wire:target="deleteConfirmed">Deleting...</span>
             </x-danger-button>
         </x-slot>
     </x-confirmation-modal>

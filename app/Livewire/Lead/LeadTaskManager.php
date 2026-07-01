@@ -131,7 +131,6 @@ class LeadTaskManager extends Component
             'startDate' => 'nullable|date',
             'startTime' => 'nullable|date_format:H:i',
             'dueDate' => 'required|date',
-            'status' => 'required|in:pending,in_progress,review,done',
             'priority' => 'required|in:low,medium,high',
         ]);
 
@@ -170,7 +169,6 @@ class LeadTaskManager extends Component
             'start_date' => $data['startDate'] ?: null,
             'start_time' => $data['startTime'] ?: null,
             'due_date' => $data['dueDate'],
-            'status' => $data['status'],
             'priority' => $data['priority'],
         ];
 
@@ -205,7 +203,7 @@ class LeadTaskManager extends Component
             session()->flash('success', 'Task updated.');
         } else {
             DB::transaction(function () use ($payload, $assigneeIds) {
-                $task = Task::create(array_merge($payload, ['created_by' => auth()->id()]));
+                $task = Task::create(array_merge($payload, ['created_by' => auth()->id(), 'status' => 'pending']));
                 $task->assignees()->sync($assigneeIds->all());
                 $this->syncMemberProgressRows($task, $assigneeIds);
                 $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
@@ -452,6 +450,10 @@ class LeadTaskManager extends Component
     public function render()
     {
         $leadTeams = auth()->user()->ledTeams()->whereNotNull('project_id')->with('project')->get();
+
+        if ($this->filterTeamId && ! $leadTeams->contains('id', $this->filterTeamId)) {
+            $this->filterTeamId = $leadTeams->first()?->id;
+        }
 
         // Tasks visible to this lead are read-only in render; status is synced when progress changes.
         $tasks = Task::with(['assignee', 'assignees', 'team', 'project', 'memberProgress.user'])

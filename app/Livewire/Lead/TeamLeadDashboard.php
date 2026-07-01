@@ -666,7 +666,7 @@ class TeamLeadDashboard extends Component
 
                     if ($actualStartRow) {
                         // expose the precise started timestamp for the UI hover
-                        $actualStartRow['startedAt'] = $actualStartTimestamp->format('M d, Y h:i A');
+                        $actualStartRow['startedAt'] = $actualStartTimestamp->format($actualStartCandidate['hasTime'] ? 'M d, Y h:i A' : 'M d, Y');
                         $actualStartRow['memberName'] = $progress->user->name;
                         $actualStartRow['loggedMinutes'] = $loggedMinutes;
                         $actualStartRow['tooltipLines'] = [

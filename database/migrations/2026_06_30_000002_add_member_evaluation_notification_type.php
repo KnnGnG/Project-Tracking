@@ -7,11 +7,19 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement("ALTER TABLE in_app_notifications MODIFY type ENUM('task_assigned', 'task_completed', 'task_comment', 'member_evaluation') NOT NULL");
     }
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement("ALTER TABLE in_app_notifications MODIFY type ENUM('task_assigned', 'task_completed', 'task_comment') NOT NULL");
     }
 };

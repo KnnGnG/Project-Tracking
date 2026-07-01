@@ -13,7 +13,6 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @else
         <link rel="stylesheet" href="{{ asset('css/fallback.css') }}">
-        <script src="https://cdn.tailwindcss.com"></script>
     @endif
 
     <style>
@@ -23,16 +22,80 @@
         .app-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .app-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
         .app-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; border: 3px solid transparent; background-clip: content-box; }
+        main .bg-white.border.border-gray-200,
+        main .border.border-gray-200.bg-white {
+            border-color: #e2e8f0 !important;
+            box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 12px 30px -28px rgb(15 23 42 / 0.35);
+        }
+        main table thead { background: #f8fafc !important; }
+        main table th { color: #64748b !important; font-size: 0.72rem; line-height: 1rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        main table tbody tr { transition: background-color 150ms ease; }
+        main table tbody tr:hover { background: #f8fafc !important; }
+        main input:not([type='checkbox']):not([type='radio']),
+        main select,
+        main textarea {
+            border-color: #cbd5e1;
+            color: #0f172a;
+            box-shadow: 0 1px 1px rgb(15 23 42 / 0.02);
+        }
+        main input:not([type='checkbox']):not([type='radio']):focus,
+        main select:focus,
+        main textarea:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgb(99 102 241 / 0.14);
+            outline: none;
+        }
+        main label { color: #334155; }
+        .ui-page-heading { margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; }
+        .ui-page-heading h2 { margin: 0; color: #0f172a; font-size: 1.25rem; line-height: 1.75rem; font-weight: 800; letter-spacing: 0; }
+        .ui-page-heading p { margin-top: 0.35rem; color: #64748b; font-size: 0.875rem; line-height: 1.25rem; }
+        .ui-soft-panel { border-radius: 1rem; border: 1px solid #e2e8f0; background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%); box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 18px 40px -32px rgb(15 23 42 / 0.45); }
+        .ui-empty-state { border-radius: 1rem; border: 1px dashed #cbd5e1; background: #ffffff; padding: 4rem 1.5rem; text-align: center; color: #64748b; }
+        button[disabled], .opacity-disabled { cursor: not-allowed; opacity: 0.65; }
+        .ui-action-row { display: flex; align-items: center; gap: 0.75rem; }
+        @media (max-width: 768px) {
+            main .ui-soft-panel.overflow-hidden,
+            main .bg-white.overflow-hidden,
+            main .rounded-xl.overflow-hidden { overflow-x: auto; }
+            main table { min-width: 720px; }
+            .ui-page-heading { align-items: flex-start; }
+        }
+        .ui-action-button { border-radius: 0.5rem; border: 1px solid #e2e8f0; padding: 0.375rem 0.75rem; font-size: 0.75rem; line-height: 1rem; font-weight: 700; transition: all 150ms ease; }
+        .ui-action-button:hover { background: #f8fafc; }
+        .ui-action-danger { border-color: #fecaca; color: #dc2626; }
+        .ui-action-danger:hover { background: #fef2f2; color: #b91c1c; }
+        .ui-action-primary { border-color: #c7d2fe; color: #4f46e5; }
+        .ui-action-primary:hover { background: #eef2ff; color: #4338ca; }
+
+        .ui-table-scroll { overflow-x: auto; }
+        main .ui-soft-panel table thead th,
+        main .bg-white table thead th { position: sticky; top: 0; z-index: 2; }
+        main td, main th { vertical-align: middle; }
+        main span.rounded-full { display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; line-height: 1rem; }
+        .ui-badge { display: inline-flex; align-items: center; border-radius: 9999px; padding: 0.125rem 0.625rem; font-size: 0.75rem; line-height: 1rem; font-weight: 700; white-space: nowrap; }
+        .ui-form-section { border-radius: 0.875rem; border: 1px solid #e2e8f0; background: #fff; padding: 1rem; }
+        .ui-loading-bar { position: fixed; inset: 0 0 auto 0; z-index: 80; height: 3px; overflow: hidden; background: transparent; }
+        .ui-loading-bar::before { content: ''; display: block; height: 100%; width: 40%; background: linear-gradient(90deg, #6366f1, #22c55e); animation: ui-loading-slide 1s ease-in-out infinite; }
+        @keyframes ui-loading-slide { 0% { transform: translateX(-110%); } 100% { transform: translateX(260%); } }
+        @media (max-width: 1023px) {
+            body { overflow: hidden; }
+            main table { min-width: 760px; }
+            .ui-page-heading h2 { font-size: 1.125rem; line-height: 1.5rem; }
+        }
     </style>
 
     @livewireStyles
 </head>
 <body class="bg-slate-100 font-sans antialiased text-slate-900">
 
-<div class="flex h-screen overflow-hidden bg-slate-100">
+<div wire:loading.delay class="ui-loading-bar" aria-hidden="true"></div>
+
+<div x-data="{ sidebarOpen: false }" class="flex h-screen overflow-hidden bg-slate-100">
+
+    <div x-cloak x-show="sidebarOpen" x-transition.opacity @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm lg:hidden"></div>
 
     {{-- Sidebar --}}
-    <aside class="flex w-72 flex-shrink-0 flex-col border-r border-slate-800/80 bg-slate-950 text-white shadow-xl shadow-slate-950/10">
+    <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-50 flex w-72 flex-shrink-0 flex-col border-r border-slate-800/80 bg-slate-950 text-white shadow-xl shadow-slate-950/10 transition-transform duration-200 ease-out lg:static lg:translate-x-0">
         {{-- Logo --}}
         <div class="border-b border-white/10 px-5 py-5">
             <a href="{{ route('dashboard') }}" class="flex items-center gap-3 rounded-xl px-1 py-1 transition hover:bg-white/5">
@@ -45,7 +108,7 @@
         </div>
 
         {{-- Navigation --}}
-        <nav class="app-scrollbar flex-1 space-y-1 overflow-y-auto px-4 py-5">
+        <nav @click="if ($event.target.closest('a')) sidebarOpen = false" class="app-scrollbar flex-1 space-y-1 overflow-y-auto px-4 py-5">
             @auth
                 @php
                     $authUser = auth()->user();
@@ -201,15 +264,20 @@
     </aside>
 
     {{-- Main content --}}
-    <main class="app-scrollbar min-w-0 flex-1 overflow-y-auto">
+    <main class="app-scrollbar min-w-0 flex-1 overflow-y-auto" @keydown.escape.window="sidebarOpen = false">
         {{-- Top bar --}}
         <header class="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 px-6 py-4 shadow-sm shadow-slate-200/40 backdrop-blur lg:px-8">
             <div class="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
-                <div class="min-w-0">
+                <div class="flex min-w-0 items-center gap-3">
+                    <button type="button" @click="sidebarOpen = true" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 lg:hidden" aria-label="Open navigation">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    </button>
+                    <div class="min-w-0">
                     <h1 class="truncate text-xl font-bold tracking-tight text-slate-950">{{ $title ?? 'Dashboard' }}</h1>
                     <p class="mt-0.5 hidden text-sm text-slate-500 sm:block">
                         Keep project work, teams, and progress in one clear workspace.
                     </p>
+                    </div>
                 </div>
                 @auth
                     <div class="flex items-center gap-3">

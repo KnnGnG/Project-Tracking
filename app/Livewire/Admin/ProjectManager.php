@@ -11,11 +11,14 @@ use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 #[Layout('components.layouts.app')]
 #[Title('Projects')]
 class ProjectManager extends Component
 {
+    use WithPagination;
+
     public string $name        = '';
     public string $description = '';
     public string $startDate   = '';
@@ -28,6 +31,7 @@ class ProjectManager extends Component
     public bool $showForm    = false;
     public ?int $editingId   = null;
     public string $search    = '';
+    public int $perPage = 10;
 
     public bool $confirmingDelete = false;
     public ?int $deleteId = null;
@@ -48,6 +52,11 @@ class ProjectManager extends Component
             'projectTeamIds' => 'nullable|array',
             'projectTeamIds.*' => 'integer|exists:teams,id',
         ];
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
     }
 
     public function openCreate(): void
@@ -199,7 +208,7 @@ class ProjectManager extends Component
         ])
             ->when($this->search, fn ($q) => $q->where('name', 'like', "%{$this->search}%"))
             ->latest()
-            ->get();
+            ->paginate($this->perPage);
 
         $clients = User::where('role', 'client')->orderBy('name')->get();
         $projectTeamOptions = $this->projectTeamOptions();

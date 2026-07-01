@@ -19,8 +19,9 @@
     @endif
 
     @if(!$selectedTeam)
-        <div class="rounded-xl border border-gray-200 bg-white py-20 text-center shadow-sm">
-            <p class="text-sm text-gray-400">You are not leading any project teams yet.</p>
+        <div class="ui-empty-state">
+            <p class="text-sm font-semibold text-gray-700">You are not leading any project teams yet.</p>
+            <p class="mt-1 text-sm text-gray-500">Evaluations will be available once you lead a team.</p>
         </div>
     @else
         <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -113,7 +114,7 @@
                     </div>
 
                     @if(!$selectedMember)
-                        <div class="px-6 py-16 text-center text-sm text-gray-400">
+                        <div class="ui-empty-state rounded-none border-0 shadow-none">
                             Select a team member first.
                         </div>
                     @else
@@ -172,8 +173,12 @@
                             @error('selectedMemberId') <p class="text-sm text-red-500">{{ $message }}</p> @enderror
 
                             <div class="flex justify-end">
-                                <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">
-                                    {{ $editingId ? 'Update Evaluation' : 'Save Evaluation' }}
+                                <button type="submit"
+                                        wire:loading.attr="disabled"
+                                        wire:target="save"
+                                        class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed">
+                                    <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Evaluation' : 'Save Evaluation' }}</span>
+                                    <span wire:loading wire:target="save">Saving...</span>
                                 </button>
                             </div>
                         </form>
@@ -204,13 +209,14 @@
                                     </div>
                                     @if($evaluation->evaluator_id === auth()->id())
                                       <div class="flex gap-2">
-                                        <button wire:click="editEvaluation({{ $evaluation->id }})" class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">
+                                        <button wire:click="editEvaluation({{ $evaluation->id }})" wire:loading.attr="disabled" wire:target="editEvaluation" class="ui-action-button ui-action-primary">
                                             Edit
                                         </button>
-                                        <button wire:click="deleteEvaluation({{ $evaluation->id }})" wire:confirm="Delete this evaluation?" class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">
+                                        <button wire:click="deleteEvaluation({{ $evaluation->id }})" wire:confirm="Delete this evaluation?" wire:loading.attr="disabled" wire:target="deleteEvaluation" class="ui-action-button ui-action-danger">
                                             Delete
                                         </button>
                                     </div>
+                                    @endif
                                 </div>
 
                                 @if($evaluation->summary)
@@ -218,7 +224,7 @@
                                 @endif
                             </article>
                         @empty
-                            <div class="px-6 py-12 text-center text-sm text-gray-400">
+                            <div class="ui-empty-state rounded-none border-0 shadow-none">
                                 No evaluations recorded for this team yet.
                             </div>
                         @endforelse

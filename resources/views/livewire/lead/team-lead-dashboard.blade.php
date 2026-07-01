@@ -5,6 +5,13 @@
         <x-floating-notification :message="session('event_success')" />
     @endif
 
+    <div class="ui-page-heading">
+        <div>
+            <h2>Team Dashboard</h2>
+            <p>Monitor timeline progress, team workload, and urgent project activity.</p>
+        </div>
+    </div>
+
     {{-- ── Team tabs ─────────────────────────────────────────────────────── --}}
     @if($teams->isNotEmpty())
         <div class="flex gap-2 flex-wrap">
@@ -22,8 +29,9 @@
     @endif
 
     @if(!$selectedTeam)
-        <div class="bg-white rounded-xl border border-gray-200 py-20 text-center text-gray-400">
-            <p class="text-sm">You are not leading any teams yet.</p>
+        <div class="ui-empty-state">
+            <p class="text-sm font-semibold text-gray-700">You are not leading any teams yet.</p>
+            <p class="mt-1 text-sm text-gray-500">Team dashboards will appear here once you are assigned as a lead.</p>
         </div>
     @else
 
@@ -363,11 +371,16 @@
                     </div>
                     <div class="flex items-center gap-3 mt-4">
                         <button wire:click="saveEvent"
-                                class="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition">
-                            {{ $editingEventId ? 'Update Event' : 'Add to Timeline' }}
+                                wire:loading.attr="disabled"
+                                wire:target="saveEvent"
+                                class="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                            <span wire:loading.remove wire:target="saveEvent">{{ $editingEventId ? 'Update Event' : 'Add to Timeline' }}</span>
+                            <span wire:loading wire:target="saveEvent">Saving...</span>
                         </button>
                         <button wire:click="cancelEventForm"
-                                class="px-4 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                                wire:loading.attr="disabled"
+                                wire:target="cancelEventForm,saveEvent"
+                                class="px-4 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-60 disabled:cursor-not-allowed">
                             Cancel
                         </button>
                     </div>
@@ -375,14 +388,16 @@
             @endif
 
             @if($events->isEmpty() && $memberStartActivities->isEmpty() && !$showEventForm)
-                <div class="py-16 text-center text-gray-400">
+                <div class="ui-empty-state rounded-none border-0 shadow-none">
                     <svg class="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                               d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
                     <p class="text-sm mb-3">No events on the timeline yet.</p>
                     <button wire:click="openCreateEvent"
-                            class="px-4 py-2 text-xs font-medium text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition">
+                            wire:loading.attr="disabled"
+                            wire:target="openCreateEvent"
+                            class="px-4 py-2 text-xs font-medium text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition disabled:opacity-60 disabled:cursor-not-allowed">
                         Add the first event
                     </button>
                 </div>
@@ -449,13 +464,13 @@
                                                 <p class="text-xs text-gray-500 mt-0.5">{{ $event->description }}</p>
                                             @endif
                                             {{-- Edit / delete --}}
-                                            <div class="flex items-center gap-3 mt-2">
+                                            <div class="mt-2 flex flex-wrap items-center gap-2">
                                                 <button wire:click="openEditEvent({{ $event->id }})"
-                                                        class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition">
+                                                        class="ui-action-button ui-action-primary">
                                                     Edit
                                                 </button>
                                                 <button wire:click="confirmDeleteEvent({{ $event->id }})"
-                                                        class="text-xs text-red-500 hover:text-red-700 font-medium transition">
+                                                        class="ui-action-button ui-action-danger">
                                                     Delete
                                                 </button>
                                             </div>

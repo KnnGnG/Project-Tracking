@@ -7,6 +7,7 @@ use App\Models\Task;
 use App\Models\TaskMemberProgress;
 use App\Models\Team;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -46,6 +47,7 @@ class MemberJournal extends Component
             ? request()->integer('team')
             : (int) session('active_team_id', 0);
         $this->normalizeLogDate();
+        $this->normalizeAccessibleTeamFilter();
     }
 
     public function updatedLogDate(): void
@@ -56,6 +58,7 @@ class MemberJournal extends Component
     public function updatedFilterTeam(): void
     {
         $this->filterTeam = max(0, (int) $this->filterTeam);
+        $this->normalizeAccessibleTeamFilter();
         $this->selectedTaskId = '';
     }
 
@@ -91,16 +94,18 @@ class MemberJournal extends Component
             return;
         }
 
-        JournalLog::create([
-            'user_id' => auth()->id(),
-            'task_id' => $taskId,
-            'team_id' => $teamId,
-            'log_date' => $validated['logDate'],
-            'minutes' => $totalMinutes,
-            'notes' => $validated['notes'] ?: null,
-        ]);
+        DB::transaction(function () use ($taskId, $teamId, $validated, $totalMinutes): void {
+            JournalLog::create([
+                'user_id' => auth()->id(),
+                'task_id' => $taskId,
+                'team_id' => $teamId,
+                'log_date' => $validated['logDate'],
+                'minutes' => $totalMinutes,
+                'notes' => $validated['notes'] ?: null,
+            ]);
 
-        $this->syncActualStartFromLog($taskId, $validated['logDate']);
+            $this->syncActualStartFromLog($taskId, $validated['logDate']);
+        });
 
         $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
         $this->flash = 'Timer session added to your journal.';
@@ -139,16 +144,18 @@ class MemberJournal extends Component
             return;
         }
 
-        JournalLog::create([
-            'user_id' => auth()->id(),
-            'task_id' => $taskId,
-            'team_id' => $teamId,
-            'log_date' => $validated['logDate'],
-            'minutes' => $totalMinutes,
-            'notes' => $validated['notes'] ?: null,
-        ]);
+        DB::transaction(function () use ($taskId, $teamId, $validated, $totalMinutes): void {
+            JournalLog::create([
+                'user_id' => auth()->id(),
+                'task_id' => $taskId,
+                'team_id' => $teamId,
+                'log_date' => $validated['logDate'],
+                'minutes' => $totalMinutes,
+                'notes' => $validated['notes'] ?: null,
+            ]);
 
-        $this->syncActualStartFromLog($taskId, $validated['logDate']);
+            $this->syncActualStartFromLog($taskId, $validated['logDate']);
+        });
 
         $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
         $this->flash = 'Journal log added.';
@@ -229,6 +236,17 @@ class MemberJournal extends Component
         }
 
         $this->logDate = $date->toDateString();
+    }
+
+    private function normalizeAccessibleTeamFilter(): void
+    {
+        if ($this->filterTeam < 1) {
+            return;
+        }
+
+        if (! $this->memberCanLogToTeam($this->filterTeam)) {
+            $this->filterTeam = 0;
+        }
     }
 
     private function memberTaskExists(int $taskId): bool
@@ -317,6 +335,7 @@ class MemberJournal extends Component
     public function render()
     {
         $this->normalizeLogDate();
+        $this->normalizeAccessibleTeamFilter();
 
         $userId = auth()->id();
 

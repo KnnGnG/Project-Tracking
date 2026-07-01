@@ -1,5 +1,12 @@
 <div class="space-y-6" wire:poll.visible.45s>
 
+    <div class="ui-page-heading">
+        <div>
+            <h2>Client Dashboard</h2>
+            <p>View project health, milestones, updates, and upcoming deadlines.</p>
+        </div>
+    </div>
+
     {{-- ── Project tabs ──────────────────────────────────────────────────── --}}
     @if($projects->isNotEmpty())
         <div class="flex gap-2 flex-wrap">
@@ -16,7 +23,7 @@
     @endif
 
     @if(!$selectedProject)
-        <div class="bg-white rounded-xl border border-gray-200 py-20 text-center text-gray-400">
+        <div class="ui-empty-state">
             <svg class="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                       d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>

@@ -56,6 +56,8 @@ class MemberDashboard extends Component
             ? request()->integer('project')
             : (int) session('active_project_id', 0);
 
+        $this->normalizeAccessibleFilters();
+
         if ($this->focusTaskId) {
             $this->openFocusTask($this->focusTaskId);
         }
@@ -71,6 +73,14 @@ class MemberDashboard extends Component
     {
         $this->filterTeam = max(0, (int) $this->filterTeam);
         $this->filterProject = 0;
+        $this->normalizeAccessibleFilters();
+        $this->expandedTaskId = null;
+    }
+
+    public function updatedFilterProject(): void
+    {
+        $this->filterProject = max(0, (int) $this->filterProject);
+        $this->normalizeAccessibleFilters();
         $this->expandedTaskId = null;
     }
 
@@ -154,6 +164,33 @@ class MemberDashboard extends Component
 
         // If the task moved out of the current tab, close the detail panel
         $this->expandedTaskId = null;
+    }
+
+    private function normalizeAccessibleFilters(): void
+    {
+        $userId = auth()->id();
+
+        if ($this->filterTeam > 0 && ! Team::query()
+            ->whereKey($this->filterTeam)
+            ->where(fn ($query) => $query
+                ->whereHas('members', fn ($members) => $members->whereKey($userId))
+                ->orWhereHas('tasks', fn ($tasks) => $tasks
+                    ->where('assigned_to', $userId)
+                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId))))
+            ->exists()) {
+            $this->filterTeam = 0;
+        }
+
+        if ($this->filterProject > 0 && ! Project::query()
+            ->whereKey($this->filterProject)
+            ->whereHas('tasks', fn ($tasks) => $tasks
+                ->where(fn ($query) => $query
+                    ->where('assigned_to', $userId)
+                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+                ->when($this->filterTeam > 0, fn ($query) => $query->where('team_id', $this->filterTeam)))
+            ->exists()) {
+            $this->filterProject = 0;
+        }
     }
 
     private function ownedTask(int $id): ?Task
@@ -297,6 +334,8 @@ class MemberDashboard extends Component
 
     public function render()
     {
+        $this->normalizeAccessibleFilters();
+
         $userId = auth()->id();
         $today = now()->toDateString();
 

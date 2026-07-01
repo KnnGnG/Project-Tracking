@@ -7,7 +7,11 @@
     <title>{{ config('app.name', 'Project Tracker') }}</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet"/>
-    <script src="https://cdn.tailwindcss.com"></script>
+    @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @else
+        <link rel="stylesheet" href="{{ asset('css/fallback.css') }}">
+    @endif
     <style>
         body { font-family: 'Figtree', sans-serif; }
     </style>

@@ -21,11 +21,27 @@ class MemberEvaluations extends Component
         $this->filterTeam = request()->has('team')
             ? request()->integer('team')
             : (int) session('active_team_id', 0);
+        $this->normalizeAccessibleTeamFilter();
     }
 
     public function updatedFilterTeam(): void
     {
         $this->filterTeam = max(0, (int) $this->filterTeam);
+        $this->normalizeAccessibleTeamFilter();
+    }
+
+    private function normalizeAccessibleTeamFilter(): void
+    {
+        if ($this->filterTeam < 1) {
+            return;
+        }
+
+        if (! Team::query()
+            ->whereKey($this->filterTeam)
+            ->whereHas('members', fn ($members) => $members->whereKey(auth()->id()))
+            ->exists()) {
+            $this->filterTeam = 0;
+        }
     }
 
     public function render()

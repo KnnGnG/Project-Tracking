@@ -9,16 +9,21 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 #[Layout('components.layouts.app')]
 #[Title('User Management')]
 class UserManager extends Component
 {
+    use WithPagination;
+
     // ── Filters ───────────────────────────────────────────────────────────────
     #[Url(as: 'role')]
     public string $filterRole = '';
 
     public string $search = '';
+
+    public int $perPage = 15;
 
     // ── Create / Edit form ────────────────────────────────────────────────────
     public bool $showForm = false;
@@ -40,6 +45,16 @@ class UserManager extends Component
     public string $deleteName = '';
 
     // ── Role change confirmation ───────────────────────────────────────────────
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterRole(): void
+    {
+        $this->resetPage();
+    }
+
     public function openCreate(): void
     {
         $this->resetForm();
@@ -164,7 +179,7 @@ class UserManager extends Component
             }))
             ->orderByRaw("CASE WHEN role = 'admin' THEN 0 WHEN role = 'team_lead' THEN 1 WHEN role = 'member' THEN 2 WHEN role = 'client' THEN 3 ELSE 4 END")
             ->orderBy('name')
-            ->get();
+            ->paginate($this->perPage);
 
         $roleCounts = [
             'all' => User::count(),

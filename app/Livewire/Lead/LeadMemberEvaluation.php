@@ -345,16 +345,19 @@ class LeadMemberEvaluation extends Component
                 ->where('assigned_to', $memberId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($memberId)));
 
-        $taskIds = (clone $taskQuery)->pluck('id');
-        $progressQuery = TaskMemberProgress::query()
+        $tasks = (clone $taskQuery)->get(['id', 'status']);
+        $taskIds = $tasks->pluck('id');
+        $progressByTask = TaskMemberProgress::query()
             ->where('user_id', $memberId)
-            ->whereIn('task_id', $taskIds);
+            ->whereIn('task_id', $taskIds)
+            ->pluck('status', 'task_id');
+        $memberStatuses = $tasks->map(fn (Task $task) => $progressByTask->get($task->id, $task->status));
 
         return [
             'tasks' => $taskIds->count(),
-            'done' => (clone $progressQuery)->where('status', 'done')->count(),
-            'review' => (clone $progressQuery)->where('status', 'review')->count(),
-            'active' => (clone $progressQuery)->whereIn('status', ['pending', 'in_progress'])->count(),
+            'done' => $memberStatuses->where(fn ($status) => $status === 'done')->count(),
+            'review' => $memberStatuses->where(fn ($status) => $status === 'review')->count(),
+            'active' => $memberStatuses->filter(fn ($status) => in_array($status, ['pending', 'in_progress'], true))->count(),
             'loggedMinutes' => JournalLog::query()
                 ->where('user_id', $memberId)
                 ->where(function ($query) use ($teamId) {

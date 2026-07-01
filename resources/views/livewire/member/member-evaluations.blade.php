@@ -1,4 +1,11 @@
 <div class="space-y-6" wire:poll.visible.60s>
+    <div class="ui-page-heading">
+        <div>
+            <h2>My Evaluations</h2>
+            <p>Review feedback and coaching notes from your team leads.</p>
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Evaluations</p>
@@ -46,7 +53,7 @@
     </div>
 
     @if($evaluations->isEmpty())
-        <div class="rounded-xl border border-gray-200 bg-white py-20 text-center shadow-sm">
+        <div class="ui-empty-state">
             <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.161c.969 0 1.371 1.24.588 1.81l-3.366 2.445a1 1 0 00-.364 1.118l1.286 3.957c.3.921-.755 1.688-1.539 1.118l-3.366-2.445a1 1 0 00-1.176 0l-3.366 2.445c-.784.57-1.838-.197-1.539-1.118l1.286-3.957a1 1 0 00-.364-1.118L4.062 9.384c-.783-.57-.38-1.81.588-1.81h4.161a1 1 0 00.95-.69l1.288-3.957z" />

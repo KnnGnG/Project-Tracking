@@ -4,17 +4,16 @@
         <x-floating-notification :message="session('success')" />
     @endif
 
-    {{-- Header row --}}
-    <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-3">
-            <input wire:model.live.debounce.300ms="search"
-                   type="text"
-                   placeholder="Search projects…"
-                   class="w-64 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    <div class="ui-page-heading">
+        <div>
+            <h2>Projects</h2>
+            <p>Create projects, connect teams, and keep delivery timelines organized.</p>
         </div>
         @if(!$showForm)
             <button wire:click="openCreate"
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
+                    wire:loading.attr="disabled"
+                    wire:target="openCreate"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
@@ -23,9 +22,16 @@
         @endif
     </div>
 
+    <div class="mb-5 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <input wire:model.live.debounce.300ms="search"
+               type="text"
+               placeholder="Search projects..."
+               class="w-full max-w-md px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </div>
+
     {{-- Create / Edit form --}}
     @if($showForm)
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+        <div class="ui-soft-panel p-6 mb-6">
             <h2 class="text-base font-semibold text-gray-800 mb-5">
                 {{ $editingId ? 'Edit Project' : 'New Project' }}
             </h2>
@@ -130,11 +136,16 @@
             {{-- Actions --}}
             <div class="flex items-center gap-3 mt-6">
                 <button wire:click="save"
-                        class="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
-                    {{ $editingId ? 'Update Project' : 'Create Project' }}
+                        wire:loading.attr="disabled"
+                        wire:target="save"
+                        class="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                    <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Project' : 'Create Project' }}</span>
+                    <span wire:loading wire:target="save">Saving...</span>
                 </button>
                 <button wire:click="cancelForm"
-                        class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        wire:loading.attr="disabled"
+                        wire:target="cancelForm,save"
+                        class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-60 disabled:cursor-not-allowed">
                     Cancel
                 </button>
             </div>
@@ -142,9 +153,9 @@
     @endif
 
     {{-- Projects table --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" @if(!$showForm) wire:poll.visible.60s @endif>
+    <div class="ui-soft-panel overflow-hidden" @if(!$showForm) wire:poll.visible.60s @endif>
         @if($projects->isEmpty())
-            <div class="py-16 text-center text-gray-400">
+            <div class="ui-empty-state">
                 <svg class="w-10 h-10 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                           d="M3 7h18M3 12h18M3 17h18"/>
@@ -209,17 +220,17 @@
                                 {{ $project->teams->count() }}
                             </td>
                             <td class="w-56 px-4 py-4 whitespace-nowrap">
-                                <div class="flex items-center justify-start gap-4">
+                                <div class="flex flex-wrap items-center justify-start gap-2">
                                     <button wire:click="showDetails({{ $project->id }})"
-                                            class="inline-flex w-12 justify-center text-indigo-600 hover:text-indigo-800 text-xs font-medium transition">
+                                            class="ui-action-button ui-action-primary">
                                         Details
                                     </button>
                                     <button wire:click="openEdit({{ $project->id }})"
-                                            class="inline-flex w-9 justify-center text-indigo-600 hover:text-indigo-800 text-xs font-medium transition">
+                                            class="ui-action-button ui-action-primary">
                                         Edit
                                     </button>
                                     <button wire:click="confirmDelete({{ $project->id }})"
-                                            class="inline-flex w-11 justify-center text-red-500 hover:text-red-700 text-xs font-medium transition">
+                                            class="ui-action-button ui-action-danger">
                                         Delete
                                     </button>
                                 </div>
@@ -475,6 +486,9 @@
                     @endforeach
                 </tbody>
             </table>
+            <div class="border-t border-gray-100 bg-gray-50 px-6 py-4">
+                {{ $projects->links() }}
+            </div>
         @endif
     </div>
 
@@ -494,8 +508,9 @@
                 Cancel
             </x-secondary-button>
 
-            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled">
-                Delete
+            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled" wire:target="deleteConfirmed">
+                <span wire:loading.remove wire:target="deleteConfirmed">Delete</span>
+                <span wire:loading wire:target="deleteConfirmed">Deleting...</span>
             </x-danger-button>
         </x-slot>
     </x-confirmation-modal>

@@ -13,7 +13,7 @@
 </head>
 <body class="min-h-screen bg-gray-100 font-sans antialiased text-gray-900">
     <div class="min-h-screen">
-        <header class="border-b border-gray-200 bg-white">
+        <header class="border-b border-gray-200 bg-white/95 shadow-sm">
             <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
                 <div class="flex items-center gap-3">
                     <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-sm font-bold text-white">
@@ -43,10 +43,16 @@
             </div>
         </header>
 
-        <main class="mx-auto max-w-7xl px-6 py-8">
-            <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <main class="mx-auto max-w-7xl px-6 py-8 lg:py-10">
+            @if(session('error'))
+                <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            <div class="ui-page-heading">
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight text-gray-950">My Projects</h1>
+                    <h1>My Projects</h1>
                     <p class="mt-2 text-sm text-gray-500">
                         Choose a project to open the dashboard for your role in that project.
                     </p>
@@ -57,7 +63,7 @@
             </div>
 
             @if($projects->isEmpty())
-                <div class="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
+                <div class="ui-soft-panel px-6 py-16 text-center">
                     <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -82,7 +88,7 @@
                             };
                         @endphp
 
-                        <article class="project-card group flex min-h-[260px] flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md">
+                        <article class="project-card group flex min-h-[260px] flex-col border bg-white p-5 transition hover:-translate-y-0.5 hover:border-indigo-200">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <h3 class="truncate text-base font-semibold text-gray-900 group-hover:text-indigo-700">

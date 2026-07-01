@@ -33,10 +33,32 @@ class LeadJournalReview extends Component
         }
     }
 
+    private function normalizeFilters($teamIds): void
+    {
+        if ($this->teamId !== '' && ! $teamIds->contains((int) $this->teamId)) {
+            $this->teamId = '';
+        }
+
+        if ($this->memberId !== '' && ! User::query()
+            ->whereKey((int) $this->memberId)
+            ->whereHas('teams', fn ($teams) => $teams->whereIn('teams.id', $teamIds))
+            ->exists()) {
+            $this->memberId = '';
+        }
+
+        if ($this->taskId !== '' && ! Task::query()
+            ->whereKey((int) $this->taskId)
+            ->whereIn('team_id', $teamIds)
+            ->exists()) {
+            $this->taskId = '';
+        }
+    }
+
     public function render()
     {
         $leadTeams = auth()->user()->ledTeams()->whereNotNull('project_id')->with('project')->get();
         $teamIds = $leadTeams->pluck('id');
+        $this->normalizeFilters($teamIds);
 
         $members = User::whereHas('teams', fn ($q) => $q->whereIn('teams.id', $teamIds))
             ->orderBy('name')

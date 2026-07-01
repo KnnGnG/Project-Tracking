@@ -5,11 +5,16 @@
     @endif
 
     {{-- Header row --}}
-    <div class="flex items-center justify-between mb-6">
-        <div></div>
+    <div class="ui-page-heading">
+        <div>
+            <h2>Teams</h2>
+            <p>Create teams, assign leads, and keep member responsibilities clear.</p>
+        </div>
         @if(!$showForm)
             <button wire:click="openCreate"
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
+                    wire:loading.attr="disabled"
+                    wire:target="openCreate"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
@@ -20,7 +25,7 @@
 
     {{-- Create / Edit form --}}
     @if($showForm)
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+        <div class="ui-soft-panel p-6 mb-6">
             <h2 class="text-base font-semibold text-gray-800 mb-5">
                 {{ $editingId ? 'Edit Team' : 'New Team' }}
             </h2>
@@ -177,11 +182,16 @@
 
             <div class="flex items-center gap-3 mt-6">
                 <button wire:click="save"
-                        class="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition">
-                    {{ $editingId ? 'Update Team' : 'Create Team' }}
+                        wire:loading.attr="disabled"
+                        wire:target="save"
+                        class="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                    <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Team' : 'Create Team' }}</span>
+                    <span wire:loading wire:target="save">Saving...</span>
                 </button>
                 <button wire:click="cancelForm"
-                        class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        wire:loading.attr="disabled"
+                        wire:target="cancelForm,save"
+                        class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-60 disabled:cursor-not-allowed">
                     Cancel
                 </button>
             </div>
@@ -191,7 +201,7 @@
     {{-- Teams list --}}
     <div class="space-y-3" @if(!$showForm) wire:poll.visible.60s @endif>
         @forelse($teams as $team)
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="ui-soft-panel overflow-hidden">
                 {{-- Team row --}}
                 <div class="flex items-center gap-4 px-6 py-4">
                     <div class="flex-1 min-w-0">
@@ -216,15 +226,15 @@
                     </div>
                     <div class="flex items-center gap-2 text-xs font-medium">
                         <button wire:click="showDetails({{ $team->id }})"
-                                class="text-indigo-600 hover:text-indigo-800 px-3 py-1.5 rounded-lg border border-indigo-200 transition">
+                                class="ui-action-button ui-action-primary">
                             Details
                         </button>
                         <button wire:click="openEdit({{ $team->id }})"
-                                class="text-gray-600 hover:text-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 transition">
+                                class="ui-action-button">
                             Edit
                         </button>
                         <button wire:click="confirmDelete({{ $team->id }})"
-                                class="text-red-500 hover:text-red-700 px-3 py-1.5 rounded-lg border border-red-200 transition">
+                                class="ui-action-button ui-action-danger">
                             Delete
                         </button>
                     </div>
@@ -383,10 +393,17 @@
                 </div>
             @endif
         @empty
-            <div class="bg-white rounded-xl border border-gray-200 py-16 text-center text-gray-400">
-                <p class="text-sm">No teams yet. Create one to get started.</p>
+            <div class="ui-empty-state">
+                <p class="text-sm font-semibold text-gray-700">No teams yet</p>
+                <p class="mt-1 text-sm text-gray-500">Create a team to start assigning members and tasks.</p>
             </div>
         @endforelse
+
+        @if($teams->hasPages())
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                {{ $teams->links() }}
+            </div>
+        @endif
     </div>
 
     
@@ -405,8 +422,9 @@
                 Cancel
             </x-secondary-button>
 
-            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled">
-                Delete
+            <x-danger-button class="ms-3" wire:click="deleteConfirmed" wire:loading.attr="disabled" wire:target="deleteConfirmed">
+                <span wire:loading.remove wire:target="deleteConfirmed">Delete</span>
+                <span wire:loading wire:target="deleteConfirmed">Deleting...</span>
             </x-danger-button>
         </x-slot>
     </x-confirmation-modal>

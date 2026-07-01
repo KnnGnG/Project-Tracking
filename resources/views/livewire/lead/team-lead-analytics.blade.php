@@ -1,7 +1,14 @@
 <div class="space-y-6" wire:key="lead-analytics-{{ $selectedTeamId ?? 'none' }}" wire:poll.visible.60s>
 
+    <div class="ui-page-heading">
+        <div>
+            <h2>Analytics</h2>
+            <p>Track completion, punctuality, and logged hours for the selected team.</p>
+        </div>
+    </div>
+
     @if($teams->isEmpty())
-        <div class="bg-white rounded-xl border border-gray-200 py-20 text-center text-gray-400">
+        <div class="ui-empty-state">
             <p class="text-sm">You are not leading any teams yet.</p>
         </div>
     @else
@@ -22,11 +29,11 @@
         </div>
 
         @if(!$selectedTeam)
-            <div class="bg-white rounded-xl border border-gray-200 py-16 text-center text-gray-400">
+            <div class="ui-empty-state">
                 <p class="text-sm">Choose a team to view charts.</p>
             </div>
         @elseif($selectedTeam->tasks->isEmpty())
-            <div class="bg-white rounded-xl border border-gray-200 py-16 text-center text-gray-400">
+            <div class="ui-empty-state">
                 <p class="text-sm">No tasks yet for this team — analytics will populate once tasks exist.</p>
             </div>
         @else
@@ -141,7 +148,6 @@
 
 @once
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
 <script>
 (function () {
     let charts = [];
@@ -189,7 +195,10 @@
         destroyCharts();
 
         var p = palette();
-        if (!payload || !window.Chart) return;
+        if (!payload || !window.Chart) {
+            console.warn('Chart.js is not available. Run npm install and npm run build.');
+            return;
+        }
 
         /* Completed tasks */
         var completed = payload.completed;
