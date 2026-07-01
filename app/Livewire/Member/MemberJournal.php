@@ -300,6 +300,12 @@ class MemberJournal extends Component
             }
         } else {
             $progress->started_at = null;
+
+            if ($progress->status === 'in_progress') {
+                $progress->status = 'pending';
+                $progress->progress = 0;
+                $progress->completed_at = null;
+            }
         }
 
         $progress->save();

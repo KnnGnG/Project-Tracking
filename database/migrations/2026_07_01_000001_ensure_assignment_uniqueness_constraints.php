@@ -51,7 +51,7 @@ return new class extends Migration
         $duplicates = DB::table($table)
             ->selectRaw('MIN(id) as keep_id, '.implode(', ', $columns).', COUNT(*) as duplicate_count')
             ->groupBy($columns)
-            ->having('duplicate_count', '>', 1)
+            ->havingRaw('COUNT(*) > 1')
             ->get();
 
         foreach ($duplicates as $duplicate) {
@@ -74,7 +74,7 @@ return new class extends Migration
         $duplicates = DB::table('task_member_progress')
             ->selectRaw('task_id, user_id, COUNT(*) as duplicate_count')
             ->groupBy('task_id', 'user_id')
-            ->having('duplicate_count', '>', 1)
+            ->havingRaw('COUNT(*) > 1')
             ->get();
 
         $statusRank = [

@@ -89,12 +89,21 @@
 
 <div wire:loading.delay class="ui-loading-bar" aria-hidden="true"></div>
 
-<div x-data="{ sidebarOpen: false }" class="flex h-screen overflow-hidden bg-slate-100">
+<div
+    x-data="{ sidebarOpen: false, isDesktop: window.matchMedia('(min-width: 1024px)').matches }"
+    x-init="const desktopQuery = window.matchMedia('(min-width: 1024px)'); const syncDesktop = () => isDesktop = desktopQuery.matches; desktopQuery.addEventListener('change', syncDesktop); syncDesktop();"
+    class="flex h-screen overflow-hidden bg-slate-100"
+>
 
     <div x-cloak x-show="sidebarOpen" x-transition.opacity @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm lg:hidden"></div>
 
     {{-- Sidebar --}}
-    <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-50 flex w-72 flex-shrink-0 flex-col border-r border-slate-800/80 bg-slate-950 text-white shadow-xl shadow-slate-950/10 transition-transform duration-200 ease-out lg:static lg:translate-x-0">
+    <aside
+        :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+        :inert="! sidebarOpen && ! isDesktop"
+        :aria-hidden="(! sidebarOpen && ! isDesktop).toString()"
+        class="fixed inset-y-0 left-0 z-50 flex w-72 flex-shrink-0 flex-col border-r border-slate-800/80 bg-slate-950 text-white shadow-xl shadow-slate-950/10 transition-transform duration-200 ease-out lg:static lg:translate-x-0"
+    >
         {{-- Logo --}}
         <div class="border-b border-white/10 px-5 py-5">
             <a href="{{ route('dashboard') }}" class="flex items-center gap-3 rounded-xl px-1 py-1 transition hover:bg-white/5">
