@@ -163,22 +163,26 @@ class MemberJournal extends Component
 
     public function deleteLog(int $id): void
     {
-        DB::transaction(function () use ($id): void {
+        $deleted = DB::transaction(function () use ($id): bool {
             $log = JournalLog::where('id', $id)
                 ->where('user_id', auth()->id())
                 ->first();
 
             if (! $log) {
-                return;
+                return false;
             }
 
             $taskId = $log->task_id;
             $log->delete();
 
             $this->recomputeActualStartFromLogs($taskId);
+
+            return true;
         });
 
-        $this->flash = 'Journal log deleted.';
+        if ($deleted) {
+            $this->flash = 'Journal log deleted.';
+        }
     }
 
     public function confirmDelete(int $id): void
@@ -300,12 +304,6 @@ class MemberJournal extends Component
             }
         } else {
             $progress->started_at = null;
-
-            if ($progress->status === 'in_progress') {
-                $progress->status = 'pending';
-                $progress->progress = 0;
-                $progress->completed_at = null;
-            }
         }
 
         $progress->save();

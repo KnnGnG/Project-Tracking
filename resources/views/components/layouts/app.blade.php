@@ -90,15 +90,29 @@
 <div wire:loading.delay class="ui-loading-bar" aria-hidden="true"></div>
 
 <div
-    x-data="{ sidebarOpen: false, isDesktop: window.matchMedia('(min-width: 1024px)').matches }"
-    x-init="const desktopQuery = window.matchMedia('(min-width: 1024px)'); const syncDesktop = () => isDesktop = desktopQuery.matches; desktopQuery.addEventListener('change', syncDesktop); syncDesktop();"
+    x-data="{
+        sidebarOpen: false,
+        isDesktop: window.matchMedia('(min-width: 1024px)').matches,
+        lastFocused: null,
+        openSidebar() {
+            this.lastFocused = document.activeElement;
+            this.sidebarOpen = true;
+            this.$nextTick(() => this.$refs.sidebar?.querySelector('a, button')?.focus());
+        },
+        closeSidebar() {
+            this.sidebarOpen = false;
+            this.$nextTick(() => this.lastFocused?.focus?.());
+        }
+    }"
+    x-init="const desktopQuery = window.matchMedia('(min-width: 1024px)'); const syncDesktop = () => { isDesktop = desktopQuery.matches; if (isDesktop) sidebarOpen = false; }; desktopQuery.addEventListener('change', syncDesktop); syncDesktop();"
     class="flex h-screen overflow-hidden bg-slate-100"
 >
 
-    <div x-cloak x-show="sidebarOpen" x-transition.opacity @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm lg:hidden"></div>
+    <div x-cloak x-show="sidebarOpen" x-transition.opacity @click="closeSidebar()" class="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm lg:hidden"></div>
 
     {{-- Sidebar --}}
     <aside
+        x-ref="sidebar"
         :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
         :inert="! sidebarOpen && ! isDesktop"
         :aria-hidden="(! sidebarOpen && ! isDesktop).toString()"
@@ -116,7 +130,7 @@
         </div>
 
         {{-- Navigation --}}
-        <nav @click="if ($event.target.closest('a')) sidebarOpen = false" class="app-scrollbar flex-1 space-y-1 overflow-y-auto px-4 py-5">
+        <nav @click="if ($event.target.closest('a')) closeSidebar()" class="app-scrollbar flex-1 space-y-1 overflow-y-auto px-4 py-5">
             @auth
                 @php
                     $authUser = auth()->user();
@@ -273,12 +287,12 @@
     </aside>
 
     {{-- Main content --}}
-    <main class="app-scrollbar min-w-0 flex-1 overflow-y-auto" @keydown.escape.window="sidebarOpen = false">
+    <main class="app-scrollbar min-w-0 flex-1 overflow-y-auto" :inert="sidebarOpen && ! isDesktop" :aria-hidden="(sidebarOpen && ! isDesktop).toString()" @keydown.escape.window="closeSidebar()">
         {{-- Top bar --}}
         <header class="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 px-6 py-4 shadow-sm shadow-slate-200/40 backdrop-blur lg:px-8">
             <div class="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
                 <div class="flex min-w-0 items-center gap-3">
-                    <button type="button" @click="sidebarOpen = true" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 lg:hidden" aria-label="Open navigation">
+                    <button type="button" @click="openSidebar()" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 lg:hidden" aria-label="Open navigation">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                     </button>
                     <div class="min-w-0">
