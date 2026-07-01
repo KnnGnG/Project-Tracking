@@ -1,11 +1,7 @@
 <div class="space-y-6">
 
-    <div class="ui-page-heading">
-        <div>
-            <h2>Manage Tasks</h2>
-            <p>Assign work, review member progress, and keep task ownership clear.</p>
-        </div>
-        @if(!$showForm)
+    @if(!$showForm)
+        <div class="flex justify-end">
             <button wire:click="openCreate"
                     wire:loading.attr="disabled"
                     wire:target="openCreate"
@@ -15,8 +11,8 @@
                 </svg>
                 Assign Task
             </button>
-        @endif
-    </div>
+        </div>
+    @endif
 
     <div class="flex flex-wrap items-center gap-3 justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center gap-3">

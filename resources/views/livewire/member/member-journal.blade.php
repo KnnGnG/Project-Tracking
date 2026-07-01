@@ -4,13 +4,6 @@
         <x-floating-notification :message="$flash" dismiss="dismissFlash" />
     @endif
 
-    <div class="ui-page-heading">
-        <div>
-            <h2>Logs and Journal</h2>
-            <p>Record daily work, timer sessions, and general team activity.</p>
-        </div>
-    </div>
-
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <section class="xl:col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm">
             <div class="px-6 py-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">

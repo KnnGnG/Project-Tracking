@@ -1,12 +1,5 @@
 <div class="space-y-6" wire:key="lead-analytics-{{ $selectedTeamId ?? 'none' }}" wire:poll.visible.60s>
 
-    <div class="ui-page-heading">
-        <div>
-            <h2>Analytics</h2>
-            <p>Track completion, punctuality, and logged hours for the selected team.</p>
-        </div>
-    </div>
-
     @if($teams->isEmpty())
         <div class="ui-empty-state">
             <p class="text-sm">You are not leading any teams yet.</p>

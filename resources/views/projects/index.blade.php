@@ -10,31 +10,145 @@
     @else
         <link rel="stylesheet" href="{{ asset('css/fallback.css') }}">
     @endif
+    <style>
+        .project-picker-shell {
+            background: #f6f7fb;
+        }
+
+        .project-picker-header {
+            border-bottom: 1px solid #e2e8f0;
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+
+        .project-picker-heading {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .project-picker-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+            gap: 1.25rem;
+            align-items: stretch;
+        }
+
+        .project-picker-card {
+            display: flex;
+            min-height: 330px;
+            flex-direction: column;
+            border: 1px solid #e2e8f0;
+            border-radius: 1rem;
+            background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 18px 40px -32px rgba(15, 23, 42, 0.45);
+            overflow: hidden;
+            transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+        }
+
+        .project-picker-card:hover {
+            border-color: #c7d2fe;
+            box-shadow: 0 18px 34px -24px rgba(79, 70, 229, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .project-picker-card-body {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            padding: 1.25rem;
+        }
+
+        .project-team-list {
+            display: grid;
+            gap: 0.625rem;
+            margin-top: 1rem;
+        }
+
+        .project-team-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.75rem;
+            background: #f8fafc;
+            padding: 0.75rem 0.875rem;
+            transition: all 150ms ease;
+        }
+
+        .project-team-link:hover {
+            border-color: #c7d2fe;
+            background: #ffffff;
+            box-shadow: 0 10px 20px -18px rgba(79, 70, 229, 0.45);
+        }
+
+        .project-status-pill,
+        .project-role-pill,
+        .project-count-pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 9999px;
+            white-space: nowrap;
+            font-weight: 700;
+            line-height: 1rem;
+        }
+
+        .project-status-pill {
+            padding: 0.25rem 0.625rem;
+            font-size: 0.75rem;
+        }
+
+        .project-role-pill {
+            margin-top: 0.375rem;
+            border: 1px solid;
+            padding: 0.125rem 0.5rem;
+            font-size: 0.6875rem;
+        }
+
+        .project-count-pill {
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            padding: 0.375rem 0.75rem;
+            color: #64748b;
+            font-size: 0.75rem;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+
+        @media (max-width: 640px) {
+            .project-picker-heading {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+    </style>
 </head>
-<body class="min-h-screen bg-gray-100 font-sans antialiased text-gray-900">
+<body class="project-picker-shell min-h-screen font-sans antialiased text-slate-900">
     <div class="min-h-screen">
-        <header class="border-b border-gray-200 bg-white/95 shadow-sm">
+        <header class="project-picker-header">
             <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
                 <div class="flex items-center gap-3">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-sm font-bold text-white">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-sm font-bold text-white shadow-lg shadow-indigo-950/20">
                         PT
                     </div>
                     <div>
-                        <p class="text-sm font-semibold text-gray-900">Project Tracker</p>
-                        <p class="text-xs text-gray-500">Project workspace</p>
+                        <p class="text-sm font-bold text-slate-900">Project Tracker</p>
+                        <p class="text-xs font-medium text-slate-500">Project workspace</p>
                     </div>
                 </div>
 
                 @auth
                     <div class="flex items-center gap-4">
                         <div class="hidden text-right sm:block">
-                            <p class="text-sm font-semibold text-gray-800">{{ auth()->user()->name }}</p>
-                            <p class="text-xs text-gray-500">{{ auth()->user()->email }}</p>
+                            <p class="text-sm font-semibold text-slate-800">{{ auth()->user()->name }}</p>
+                            <p class="text-xs text-slate-500">{{ auth()->user()->email }}</p>
                         </div>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit"
-                                    class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 hover:text-gray-900">
+                                    class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
                                 Sign out
                             </button>
                         </form>
@@ -50,109 +164,114 @@
                 </div>
             @endif
 
-            <div class="ui-page-heading">
+            <div class="project-picker-heading">
                 <div>
-                    <h1>My Projects</h1>
-                    <p class="mt-2 text-sm text-gray-500">
+                    <h1 class="text-2xl font-extrabold tracking-tight text-slate-950">My Projects</h1>
+                    <p class="mt-2 text-sm text-slate-600">
                         Choose a project to open the dashboard for your role in that project.
                     </p>
                 </div>
-                <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-500 shadow-sm ring-1 ring-gray-200">
+                <span class="project-count-pill">
                     {{ $projects->count() }} project{{ $projects->count() === 1 ? '' : 's' }}
                 </span>
             </div>
 
             @if($projects->isEmpty())
-                <div class="ui-soft-panel px-6 py-16 text-center">
+                <div class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-sm">
                     <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
                         </svg>
                     </div>
-                    <h3 class="mt-4 text-base font-semibold text-gray-900">No assigned projects yet</h3>
-                    <p class="mt-2 text-sm text-gray-500">
+                    <h3 class="mt-4 text-base font-semibold text-slate-900">No assigned projects yet</h3>
+                    <p class="mt-2 text-sm text-slate-500">
                         Projects will appear here once you are added as a team lead or member.
                     </p>
                 </div>
             @else
-                <div class="project-card-grid">
+                <div class="project-picker-grid">
                     @foreach($projects as $item)
                         @php
                             $project = $item['project'];
+                            $visibleTeams = $item['teams']->take(3);
+                            $hiddenTeamCount = max(0, $item['teams']->count() - $visibleTeams->count());
                             $statusClass = match($project->status) {
-                                'active' => 'bg-green-100 text-green-700',
-                                'on_hold' => 'bg-yellow-100 text-yellow-700',
+                                'active' => 'bg-emerald-100 text-emerald-700',
+                                'on_hold' => 'bg-amber-100 text-amber-700',
                                 'completed' => 'bg-blue-100 text-blue-700',
-                                default => 'bg-gray-100 text-gray-600',
+                                default => 'bg-slate-100 text-slate-600',
                             };
                         @endphp
 
-                        <article class="project-card group flex min-h-[260px] flex-col border bg-white p-5 transition hover:-translate-y-0.5 hover:border-indigo-200">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <h3 class="truncate text-base font-semibold text-gray-900 group-hover:text-indigo-700">
-                                        {{ $project->name }}
-                                    </h3>
-                                    <p class="mt-1 text-sm text-gray-500">
-                                        {{ $item['teams']->count() }} team{{ $item['teams']->count() !== 1 ? 's' : '' }}
-                                    </p>
-                                </div>
-                                <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass }}">
-                                    {{ ucfirst(str_replace('_', ' ', $project->status)) }}
-                                </span>
-                            </div>
-
-                            <p class="mt-4 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-gray-600">
-                                {{ $project->description ?: 'No description provided.' }}
-                            </p>
-
-                            <div class="mt-5 max-h-40 space-y-2 overflow-y-auto pr-1">
-                                @foreach($item['teams']->take(4) as $team)
-                                    @php
-                                        $teamRole = $team->pivot->role ?? 'member';
-                                        $roleLabel = $teamRole === 'lead' ? 'Team Lead' : 'Member';
-                                        $roleClass = $teamRole === 'lead'
-                                            ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
-                                            : 'bg-emerald-50 text-emerald-700 border-emerald-100';
-                                    @endphp
-                                    <a href="{{ route('projects.open', ['project' => $project, 'team' => $team->id]) }}"
-                                       class="group flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 transition hover:border-indigo-300 hover:bg-white hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                                        <div class="min-w-0">
-                                            <p class="truncate text-sm font-semibold text-gray-800 group-hover:text-indigo-700">
-                                                {{ $team->name }}
-                                            </p>
-                                            <span class="mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold {{ $roleClass }}">
-                                                Opens as {{ $roleLabel }}
-                                            </span>
-                                        </div>
-                                        <span class="shrink-0 text-sm font-semibold text-indigo-600 group-hover:text-indigo-700">
-                                            Open
-                                        </span>
-                                    </a>
-                                @endforeach
-                                @if($item['teams']->count() > 4)
-                                    <span class="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
-                                        +{{ $item['teams']->count() - 4 }} more
+                        <article class="project-picker-card group">
+                            <div class="project-picker-card-body">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <h3 class="truncate text-base font-bold text-slate-950 group-hover:text-indigo-700">
+                                            {{ $project->name }}
+                                        </h3>
+                                        <p class="mt-1 text-sm text-slate-500">
+                                            {{ $item['teams']->count() }} team{{ $item['teams']->count() !== 1 ? 's' : '' }}
+                                        </p>
+                                    </div>
+                                    <span class="project-status-pill {{ $statusClass }}">
+                                        {{ ucfirst(str_replace('_', ' ', $project->status)) }}
                                     </span>
-                                @endif
-                            </div>
+                                </div>
 
-                            <div class="mt-auto flex items-center justify-between gap-3 border-t border-gray-100 pt-4 text-sm">
-                                <span class="text-gray-500">
-                                    @if($project->start_date || $project->end_date)
-                                        {{ $project->start_date?->format('M d, Y') ?? 'TBD' }}
-                                        @if($project->end_date)
-                                            - {{ $project->end_date->format('M d, Y') }}
-                                        @endif
-                                    @else
-                                        Dates not set
+                                <p class="mt-4 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-slate-600">
+                                    {{ $project->description ?: 'No description provided.' }}
+                                </p>
+
+                                <div class="project-team-list">
+                                    @foreach($visibleTeams as $team)
+                                        @php
+                                            $teamRole = $team->pivot->role ?? 'member';
+                                            $roleLabel = $teamRole === 'lead' ? 'Team Lead' : 'Member';
+                                            $roleClass = $teamRole === 'lead'
+                                                ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                                                : 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                                        @endphp
+                                        <a href="{{ route('projects.open', ['project' => $project, 'team' => $team->id]) }}"
+                                           class="project-team-link focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                            <div class="min-w-0">
+                                                <p class="truncate text-sm font-bold text-slate-800">
+                                                    {{ $team->name }}
+                                                </p>
+                                                <span class="project-role-pill {{ $roleClass }}">
+                                                    Opens as {{ $roleLabel }}
+                                                </span>
+                                            </div>
+                                            <span class="shrink-0 text-sm font-bold text-indigo-600">
+                                                Open
+                                            </span>
+                                        </a>
+                                    @endforeach
+
+                                    @if($hiddenTeamCount > 0)
+                                        <div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+                                            +{{ $hiddenTeamCount }} more team{{ $hiddenTeamCount === 1 ? '' : 's' }} in this project
+                                        </div>
                                     @endif
-                                </span>
-                                <a href="{{ route('projects.open', $project) }}"
-                                   class="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                    Open project
-                                </a>
+                                </div>
+
+                                <div class="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-4 text-sm">
+                                    <span class="text-slate-500">
+                                        @if($project->start_date || $project->end_date)
+                                            {{ $project->start_date?->format('M d, Y') ?? 'TBD' }}
+                                            @if($project->end_date)
+                                                - {{ $project->end_date->format('M d, Y') }}
+                                            @endif
+                                        @else
+                                            Dates not set
+                                        @endif
+                                    </span>
+                                    <a href="{{ route('projects.open', $project) }}"
+                                       class="shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-bold text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        Open project
+                                    </a>
+                                </div>
                             </div>
                         </article>
                     @endforeach
@@ -162,4 +281,3 @@
     </div>
 </body>
 </html>
-

@@ -4,15 +4,7 @@
     @if(session('event_success'))
         <x-floating-notification :message="session('event_success')" />
     @endif
-
-    <div class="ui-page-heading">
-        <div>
-            <h2>Team Dashboard</h2>
-            <p>Monitor timeline progress, team workload, and urgent project activity.</p>
-        </div>
-    </div>
-
-    {{-- ── Team tabs ─────────────────────────────────────────────────────── --}}
+{{-- ── Team tabs ─────────────────────────────────────────────────────── --}}
     @if($teams->isNotEmpty())
         <div class="flex gap-2 flex-wrap">
             @foreach($teams as $team)

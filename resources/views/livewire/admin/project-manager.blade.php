@@ -4,12 +4,8 @@
         <x-floating-notification :message="session('success')" />
     @endif
 
-    <div class="ui-page-heading">
-        <div>
-            <h2>Projects</h2>
-            <p>Create projects, connect teams, and keep delivery timelines organized.</p>
-        </div>
-        @if(!$showForm)
+    @if(!$showForm)
+        <div class="flex justify-end">
             <button wire:click="openCreate"
                     wire:loading.attr="disabled"
                     wire:target="openCreate"
@@ -19,8 +15,8 @@
                 </svg>
                 New Project
             </button>
-        @endif
-    </div>
+        </div>
+    @endif
 
     <div class="mb-5 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <input wire:model.live.debounce.300ms="search"

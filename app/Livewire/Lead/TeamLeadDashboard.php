@@ -510,6 +510,7 @@ class TeamLeadDashboard extends Component
                 'kind' => $kind,
                 'label' => $label,
                 'title' => $title,
+                'displayTitle' => $title,
                 'dateRange' => $start->format('M d').' - '.$end->format('M d'),
                 'startDay' => $visibleStart->day,
                 'span' => max(1, $span),
@@ -544,6 +545,7 @@ class TeamLeadDashboard extends Component
                     $scheduledStart = $task->start_date
                         ? $task->start_date->format('M d, Y').($task->start_time ? ' '.Carbon::parse($task->start_time)->format('h:i A') : '')
                         : 'Not set';
+                    $taskRow['displayTitle'] = $task->title;
                     $taskRow['statusLabel'] = ucwords(str_replace('_', ' ', $task->status));
                     $taskRow['tooltipLines'] = [
                         'Task',
@@ -665,6 +667,7 @@ class TeamLeadDashboard extends Component
                     );
 
                     if ($actualStartRow) {
+                        $actualStartRow['displayTitle'] = $progress->user->name.' - '.$timing;
                         // expose the precise started timestamp for the UI hover
                         $actualStartRow['startedAt'] = $actualStartTimestamp->format($actualStartCandidate['hasTime'] ? 'M d, Y h:i A' : 'M d, Y');
                         $actualStartRow['memberName'] = $progress->user->name;
@@ -686,48 +689,7 @@ class TeamLeadDashboard extends Component
                 });
 
                 if ($taskRow) {
-                    if ($actualSegments->count() > 1) {
-                        $combinedStart = $actualSegments
-                            ->pluck('rawStart')
-                            ->sortBy(fn (Carbon $date) => $date->timestamp)
-                            ->first();
-                        $combinedEnd = $actualSegments
-                            ->pluck('rawEnd')
-                            ->sortByDesc(fn (Carbon $date) => $date->timestamp)
-                            ->first();
-                        $memberNames = $actualSegments
-                            ->pluck('memberName')
-                            ->filter()
-                            ->unique()
-                            ->values();
-                        $totalLoggedMinutes = $actualSegments->sum('loggedMinutes');
-                        $combinedSegment = $makeRow(
-                            'actual',
-                            'Start to End',
-                            $memberNames->join(', ').' - '.$combinedStart->format('M d').' to '.$combinedEnd->format('M d'),
-                            $combinedStart,
-                            $combinedEnd,
-                        );
-
-                        if ($combinedSegment) {
-                            $combinedSegment['tooltipLines'] = [
-                                'Start to End',
-                                'Task: '.$task->title,
-                                'Members: '.$memberNames->join(', '),
-                                'Scheduled start: '.($task->start_date ? $task->start_date->format('M d, Y').($task->start_time ? ' '.Carbon::parse($task->start_time)->format('h:i A') : '') : 'Not scheduled'),
-                                'Actual started: '.$combinedStart->format('M d, Y'),
-                                'End: '.$combinedEnd->format('M d, Y'),
-                                'Logged: '.intdiv($totalLoggedMinutes, 60).'h '.($totalLoggedMinutes % 60).'m',
-                                'Due: '.($task->due_date ? $task->due_date->format('M d, Y') : 'No due date'),
-                            ];
-                            $combinedSegment['tooltip'] = implode("\n", $combinedSegment['tooltipLines']);
-                            $taskRow['segments'] = collect([$combinedSegment]);
-                        } else {
-                            $taskRow['segments'] = collect();
-                        }
-                    } else {
-                        $taskRow['segments'] = $actualSegments->values();
-                    }
+                    $taskRow['segments'] = $actualSegments->values();
 
                     $rows->push($taskRow);
                 }
@@ -768,6 +730,7 @@ class TeamLeadDashboard extends Component
                     return;
                 }
 
+                $segment['displayTitle'] = $userName.' - General work';
                 $segment['tooltipLines'] = [
                     $userName,
                     'Type: General work',

@@ -38,6 +38,15 @@
             color: #0f172a;
             box-shadow: 0 1px 1px rgb(15 23 42 / 0.02);
         }
+        main select:not([multiple]) {
+            appearance: none;
+            background-color: #ffffff;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+            background-position: right 0.85rem center;
+            background-repeat: no-repeat;
+            background-size: 1rem 1rem;
+            padding-right: 2.75rem !important;
+        }
         main input:not([type='checkbox']):not([type='radio']):focus,
         main select:focus,
         main textarea:focus {
@@ -295,11 +304,32 @@
                     <button type="button" @click="openSidebar()" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 lg:hidden" aria-label="Open navigation">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                     </button>
+                    @php
+                        $pageDescription = match (true) {
+                            request()->routeIs('admin.dashboard') => 'Review system activity, project health, and overall workload.',
+                            request()->routeIs('admin.users') => 'Manage accounts, roles, and team access from one place.',
+                            request()->routeIs('admin.projects') => 'Create projects, connect teams, and keep delivery timelines organized.',
+                            request()->routeIs('admin.teams') => 'Create teams, assign leads, and keep member responsibilities clear.',
+                            request()->routeIs('admin.assign-teams') => 'Build reusable teams now and attach them to projects later.',
+                            request()->routeIs('admin.tasks') => 'View task status and workload across all projects.',
+                            request()->routeIs('lead.dashboard') => 'Monitor timeline progress, team workload, and urgent project activity.',
+                            request()->routeIs('lead.analytics') => 'Track completion, punctuality, and logged hours for the selected team.',
+                            request()->routeIs('lead.tasks') => 'Assign work, review member progress, and keep task ownership clear.',
+                            request()->routeIs('lead.journals') => 'Review team logs, general work, and task-specific time entries.',
+                            request()->routeIs('lead.evaluations') => 'Evaluate members and keep feedback visible and actionable.',
+                            request()->routeIs('member.dashboard') => 'Focus on assigned work, due dates, and personal task progress.',
+                            request()->routeIs('member.logs') => 'Record daily work, timer sessions, and general team activity.',
+                            request()->routeIs('member.evaluations') => 'Review feedback from your team leads.',
+                            request()->routeIs('client.dashboard') => 'Follow project progress, milestones, and delivery updates.',
+                            request()->routeIs('projects.*') => 'Choose a project to open the dashboard for your role.',
+                            default => 'Keep project work, teams, and progress in one clear workspace.',
+                        };
+                    @endphp
                     <div class="min-w-0">
-                    <h1 class="truncate text-xl font-bold tracking-tight text-slate-950">{{ $title ?? 'Dashboard' }}</h1>
-                    <p class="mt-0.5 hidden text-sm text-slate-500 sm:block">
-                        Keep project work, teams, and progress in one clear workspace.
-                    </p>
+                        <h1 class="truncate text-xl font-bold tracking-tight text-slate-950">{{ $title ?? 'Dashboard' }}</h1>
+                        <p class="mt-0.5 hidden text-sm text-slate-500 sm:block">
+                            {{ $pageDescription }}
+                        </p>
                     </div>
                 </div>
                 @auth

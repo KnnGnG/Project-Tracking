@@ -13,11 +13,14 @@
         'general' => 'bg-emerald-500 border-emerald-600',
         default => 'bg-gray-400 border-gray-500',
     };
+    $segments = collect($row['segments'] ?? []);
+    $segmentCount = $segments->count();
+    $rowHeightRem = 3.5 + max(0, $segmentCount - 1) * 1.45;
 @endphp
 
 <div class="py-2">
-    <div class="grid h-14 rounded-md bg-gray-50 ring-1 ring-gray-100 overflow-visible"
-         style="grid-template-columns: repeat({{ $totalDays }}, minmax(0, 1fr)); grid-template-rows: 1fr;">
+    <div class="grid rounded-md bg-gray-50 ring-1 ring-gray-100 overflow-visible"
+         style="height: {{ $rowHeightRem }}rem; grid-template-columns: repeat({{ $totalDays }}, minmax(0, 1fr)); grid-template-rows: 1fr;">
         @foreach($ticks as $tick)
             <div class="border-r {{ $tick['major'] ? 'border-gray-300' : 'border-gray-200/60' }}"
                  style="grid-column: {{ $tick['day'] }}; grid-row: 1;"></div>
@@ -53,12 +56,7 @@
                     <span class="rounded bg-white/20 px-1.5 py-0.5 text-[9px] uppercase tracking-wide leading-none">
                         {{ $row['label'] }}
                     </span>
-                    <span class="truncate">{{ $row['title'] }}</span>
-                    @if(!empty($row['statusLabel']))
-                        <span class="hidden rounded bg-white/20 px-1.5 py-0.5 text-[9px] uppercase tracking-wide leading-none sm:inline">
-                            {{ $row['statusLabel'] }}
-                        </span>
-                    @endif
+                    <span class="truncate">{{ $row['displayTitle'] ?? $row['title'] }}</span>
                 </div>
                 <template x-teleport="body">
                     <div x-ref="tip"
@@ -75,7 +73,7 @@
             </div>
         @endunless
 
-        @foreach(($row['segments'] ?? collect()) as $segment)
+        @foreach($segments as $segment)
             @php
                 $segmentClass = match($segment['kind'] ?? null) {
                     'project' => 'bg-indigo-600 border-indigo-700',
@@ -101,15 +99,15 @@
                  @mouseleave="open = false"
                  @focus="open = true; $nextTick(() => { const rect = $el.getBoundingClientRect(); place({ clientX: rect.left, clientY: rect.bottom }) })"
                  @blur="open = false"
-                 class="relative z-30 mb-1 self-end h-5 rounded-md border px-2 text-[10px] font-semibold leading-5 text-white shadow-sm outline-none {{ $segmentClass }}"
-                 style="grid-column: {{ $segment['startDay'] }} / span {{ $segment['span'] }}; grid-row: 1;"
+                 class="relative z-30 self-end h-5 rounded-md border px-2 text-[10px] font-semibold leading-5 text-white shadow-sm outline-none {{ $segmentClass }}"
+                 style="grid-column: {{ $segment['startDay'] }} / span {{ $segment['span'] }}; grid-row: 1; margin-bottom: {{ 0.25 + ($loop->index * 1.35) }}rem;"
                  tabindex="0"
                  aria-label="{{ $segment['tooltip'] }}">
                 <div class="flex min-w-0 items-center gap-1.5 truncate">
                     <span class="rounded bg-white/20 px-1.5 py-0.5 text-[8px] uppercase tracking-wide leading-none">
                         {{ $segment['label'] }}
                     </span>
-                    <span class="truncate">{{ $segment['title'] }}</span>
+                    <span class="truncate">{{ $segment['displayTitle'] ?? $segment['title'] }}</span>
                 </div>
                 <template x-teleport="body">
                     <div x-ref="tip"
