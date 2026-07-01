@@ -15,7 +15,8 @@
     };
     $segments = collect($row['segments'] ?? []);
     $segmentCount = $segments->count();
-    $rowHeightRem = 3.5 + max(0, $segmentCount - 1) * 1.45;
+    $hasOverflow = ($row['segmentOverflowCount'] ?? 0) > 0;
+    $rowHeightRem = 3.5 + max(0, $segmentCount - 1) * 1.45 + ($hasOverflow ? 1.35 : 0);
 @endphp
 
 <div class="py-2">
@@ -125,7 +126,7 @@
         @endforeach
         @if(($row['segmentOverflowCount'] ?? 0) > 0)
             <div class="relative z-30 self-end justify-self-end rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 shadow-sm"
-                 style="grid-column: {{ max(1, $totalDays - 5) }} / span 6; grid-row: 1; margin-bottom: 0.25rem;">
+                 style="grid-column: {{ max(1, $totalDays - 5) }} / span 6; grid-row: 1; margin-bottom: {{ 0.25 + ($segmentCount * 1.35) }}rem;">
                 +{{ $row['segmentOverflowCount'] }} more
             </div>
         @endif

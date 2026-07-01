@@ -839,6 +839,7 @@ class TeamLeadDashboard extends Component
 
                         if (! $showActualTimeline) {
                             $row['segments'] = collect();
+                            $row['segmentOverflowCount'] = 0;
                         }
 
                         return $row;
