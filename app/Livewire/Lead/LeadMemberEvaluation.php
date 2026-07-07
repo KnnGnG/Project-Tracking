@@ -11,6 +11,7 @@ use App\Models\TeamMemberEvaluation;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -45,12 +46,11 @@ class LeadMemberEvaluation extends Component
             ? request()->integer('team')
             : session('active_team_id');
 
-        $team = auth()->user()
-            ->ledTeams()
-            ->whereNotNull('project_id')
-            ->when($requestedTeamId, fn ($query) => $query->whereKey($requestedTeamId))
-            ->first()
-            ?? auth()->user()->ledTeams()->whereNotNull('project_id')->first();
+        $teams = $this->leadTeams();
+        $team = $requestedTeamId
+            ? $teams->firstWhere('id', $requestedTeamId)
+            : null;
+        $team ??= $teams->first();
 
         if ($team) {
             $this->selectedTeamId = $team->id;
@@ -238,12 +238,31 @@ class LeadMemberEvaluation extends Component
         $this->resetValidation();
     }
 
-    private function ownedTeam(int $teamId): ?Team
+    private function leadTeams(): Collection
     {
+        $activeProjectId = (int) session('active_project_id', 0);
+
         return auth()->user()
             ->ledTeams()
-            ->whereNotNull('project_id')
-            ->find($teamId);
+            ->with(['project', 'projects', 'regularMembers'])
+            ->get()
+            ->filter(fn (Team $team) => $activeProjectId > 0
+                ? $team->isAssignedToProject($activeProjectId)
+                : $team->assignedProjects()->isNotEmpty())
+            ->values();
+    }
+
+    private function activeProjectForTeam(Team $team)
+    {
+        $activeProjectId = (int) session('active_project_id', 0);
+        $projects = $team->assignedProjects();
+
+        return $projects->firstWhere('id', $activeProjectId) ?? $projects->first();
+    }
+
+    private function ownedTeam(int $teamId): ?Team
+    {
+        return $this->leadTeams()->firstWhere('id', $teamId);
     }
 
     private function memberBelongsToSelectedTeam(int $memberId): bool
@@ -262,7 +281,7 @@ class LeadMemberEvaluation extends Component
     private function refreshActiveTeamContext(Team $team): void
     {
         session([
-            'active_project_id' => $team->project_id,
+            'active_project_id' => $this->activeProjectForTeam($team)?->id,
             'active_team_id' => $team->id,
             'active_project_role' => 'lead',
         ]);
@@ -339,8 +358,11 @@ class LeadMemberEvaluation extends Component
             ];
         }
 
+        $activeProjectId = (int) session('active_project_id', 0);
+
         $taskQuery = Task::query()
             ->where('team_id', $teamId)
+            ->when($activeProjectId > 0, fn ($query) => $query->where('project_id', $activeProjectId))
             ->where(fn ($query) => $query
                 ->where('assigned_to', $memberId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($memberId)));
@@ -360,9 +382,14 @@ class LeadMemberEvaluation extends Component
             'active' => $memberStatuses->filter(fn ($status) => in_array($status, ['pending', 'in_progress'], true))->count(),
             'loggedMinutes' => JournalLog::query()
                 ->where('user_id', $memberId)
-                ->where(function ($query) use ($teamId) {
-                    $query->where('team_id', $teamId)
-                        ->orWhereHas('task', fn ($task) => $task->where('team_id', $teamId));
+                ->where(function ($query) use ($teamId, $activeProjectId) {
+                    $query->where(function ($general) use ($teamId) {
+                        $general->where('team_id', $teamId)
+                            ->whereNull('task_id');
+                    })->orWhereHas('task', function ($task) use ($teamId, $activeProjectId) {
+                        $task->where('team_id', $teamId)
+                            ->when($activeProjectId > 0, fn ($projectQuery) => $projectQuery->where('project_id', $activeProjectId));
+                    });
                 })
                 ->sum('minutes'),
         ];
@@ -370,12 +397,7 @@ class LeadMemberEvaluation extends Component
 
     public function render()
     {
-        $teams = auth()->user()
-            ->ledTeams()
-            ->whereNotNull('project_id')
-            ->with(['project', 'regularMembers'])
-            ->orderBy('name')
-            ->get();
+        $teams = $this->leadTeams()->sortBy('name')->values();
 
         if ($this->selectedTeamId && ! $teams->contains('id', $this->selectedTeamId)) {
             $this->selectedTeamId = $teams->first()?->id;
@@ -400,7 +422,7 @@ class LeadMemberEvaluation extends Component
             ? $members->firstWhere('id', $this->selectedMemberId)
             : null;
 
-        $evaluations = TeamMemberEvaluation::with(['member', 'team.project'])
+        $evaluations = TeamMemberEvaluation::with(['member', 'evaluator', 'team.project', 'team.projects'])
             ->whereIn('team_id', $teams->pluck('id'))
             ->when($this->selectedTeamId, fn ($query) => $query->where('team_id', $this->selectedTeamId))
             ->latest()
@@ -423,3 +445,4 @@ class LeadMemberEvaluation extends Component
         ));
     }
 }
+

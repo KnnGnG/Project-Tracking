@@ -87,6 +87,25 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
             ->assertSet('filterTeam', 0);
     }
 
+    public function test_team_lead_can_open_member_dashboard_for_same_project_member_role(): void
+    {
+        $user = User::factory()->create(['role' => 'team_lead']);
+        $project = Project::create($this->projectPayload('Mixed Role Project', $user->id));
+        $leadTeam = Team::create(['name' => 'Lead Team', 'project_id' => $project->id, 'lead_id' => $user->id]);
+        $memberTeam = Team::create(['name' => 'Member Team', 'project_id' => $project->id, 'lead_id' => $user->id]);
+
+        $leadTeam->members()->attach($user->id, ['role' => 'lead']);
+        $memberTeam->members()->attach($user->id, ['role' => 'member']);
+
+        $this->actingAs($user)
+            ->withSession([
+                'active_project_id' => $project->id,
+                'active_team_id' => $leadTeam->id,
+                'active_project_role' => 'lead',
+            ])
+            ->get(route('member.dashboard', ['team' => $leadTeam->id, 'project' => $project->id]))
+            ->assertOk();
+    }
     private function projectPayload(string $name, int $creatorId): array
     {
         return [
@@ -99,3 +118,4 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
         ];
     }
 }
+

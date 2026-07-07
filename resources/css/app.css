@@ -61,6 +61,28 @@
     display: grid;
     gap: 0.625rem;
     margin-top: 1rem;
+    max-height: 14rem;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+.project-team-list::-webkit-scrollbar {
+    width: 0.5rem;
+}
+
+.project-team-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.project-team-list::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: #cbd5e1;
+}
+
+.project-team-list:hover::-webkit-scrollbar-thumb {
+    background: #94a3b8;
 }
 
 .project-team-link {
@@ -71,6 +93,7 @@
     border: 1px solid #e5e7eb;
     border-radius: 0.75rem;
     background: #f8fafc;
+    min-height: 4.25rem;
     padding: 0.75rem 0.875rem;
     transition: all 150ms ease;
 }

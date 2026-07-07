@@ -9,6 +9,12 @@
         {{-- Team selector --}}
         <div class="flex gap-2 flex-wrap">
             @foreach($teams as $team)
+                @php
+                    $activeProjectId = (int) session('active_project_id', 0);
+                    $teamProject = $activeProjectId > 0
+                        ? $team->assignedProjects()->firstWhere('id', $activeProjectId)
+                        : $team->assignedProjects()->first();
+                @endphp
                 <button wire:click="selectTeam({{ $team->id }})"
                         type="button"
                         class="px-4 py-2 rounded-lg text-sm font-medium transition border
@@ -16,7 +22,7 @@
                                   ? 'bg-indigo-600 text-white border-indigo-600'
                                   : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-400 hover:text-indigo-600' }}">
                     {{ $team->name }}
-                    <span class="ml-1.5 text-xs opacity-70">{{ $team->project->name }}</span>
+                    <span class="ml-1.5 text-xs opacity-70">{{ $teamProject?->name }}</span>
                 </button>
             @endforeach
         </div>
@@ -345,3 +351,4 @@
 </script>
 @endpush
 @endonce
+

@@ -4,8 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Project extends Model
 {
@@ -39,9 +39,9 @@ class Project extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function teams(): HasMany
+    public function teams(): BelongsToMany
     {
-        return $this->hasMany(Team::class);
+        return $this->belongsToMany(Team::class, 'project_team')->withTimestamps();
     }
 
     public function tasks(): HasMany

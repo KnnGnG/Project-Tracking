@@ -42,7 +42,7 @@ class TaskAssigner extends Component
 
     public function render()
     {
-        $tasks = Task::with(['project', 'team', 'assignee', 'creator'])
+        $tasks = Task::with(['project', 'team', 'assignee', 'assignees', 'creator', 'memberProgress.user'])
             ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))
             ->when($this->filterProject, fn ($q) => $q->where('project_id', $this->filterProject))
             ->latest('updated_at')

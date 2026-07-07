@@ -3,8 +3,12 @@
         <x-floating-notification :message="session('success')" />
     @endif
 
-    @if(!$showForm)
-        <div class="flex justify-end">
+    <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <div class="min-w-0">
+            <p class="text-sm font-semibold text-gray-900">Premade Teams</p>
+            <p class="mt-0.5 text-xs text-gray-400">Build reusable teams before assigning them to projects.</p>
+        </div>
+        @if(!$showForm)
             <button wire:click="openCreate"
                     wire:loading.attr="disabled"
                     wire:target="openCreate"
@@ -12,15 +16,15 @@
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
-                New Premade Team
+                Add Premade Team
             </button>
-        </div>
-    @endif
+        @endif
+    </div>
 
     @if($showForm)
         <div class="ui-soft-panel p-5">
             <h3 class="mb-4 text-base font-semibold text-gray-800">
-                {{ $editingId ? 'Edit Team' : 'New Premade Team' }}
+                {{ $editingId ? 'Edit Team' : 'Add Premade Team' }}
             </h3>
 
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -78,7 +82,6 @@
                                             </span>
                                             <span class="min-w-0">
                                                 <span class="block truncate font-medium text-gray-800">{{ $member->name }}</span>
-                                                <span class="block truncate text-xs text-gray-400">{{ $member->roleName() }}</span>
                                             </span>
                                         </label>
                                         @if($isSelectedMember)
@@ -103,7 +106,7 @@
                         wire:loading.attr="disabled"
                         wire:target="save"
                         class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed">
-                    <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Team' : 'Create Team' }}</span>
+                    <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Team' : 'Add Premade Team' }}</span>
                     <span wire:loading wire:target="save">Saving...</span>
                 </button>
                 <button wire:click="cancelForm"

@@ -36,8 +36,13 @@ class MemberEvaluations extends Component
             return;
         }
 
+        $activeProjectId = (int) session('active_project_id', 0);
+
         if (! Team::query()
             ->whereKey($this->filterTeam)
+            ->when($activeProjectId > 0, fn ($query) => $query->where(fn ($projectScope) => $projectScope
+                ->where('project_id', $activeProjectId)
+                ->orWhereHas('projects', fn ($projects) => $projects->whereKey($activeProjectId))))
             ->whereHas('members', fn ($members) => $members->whereKey(auth()->id()))
             ->exists()) {
             $this->filterTeam = 0;
@@ -47,19 +52,25 @@ class MemberEvaluations extends Component
     public function render()
     {
         $userId = auth()->id();
+        $activeProjectId = (int) session('active_project_id', 0);
 
         $teams = Team::query()
-            ->with('project')
+            ->with(['project', 'projects'])
             ->whereHas('members', fn ($members) => $members->whereKey($userId))
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->filter(fn (Team $team) => $activeProjectId > 0
+                ? $team->isAssignedToProject($activeProjectId)
+                : true)
+            ->values();
 
         if ($this->filterTeam > 0 && ! $teams->contains('id', $this->filterTeam)) {
             $this->filterTeam = 0;
         }
 
-        $evaluations = TeamMemberEvaluation::with(['team.project', 'evaluator'])
+        $evaluations = TeamMemberEvaluation::with(['team.project', 'team.projects', 'evaluator'])
             ->where('member_id', $userId)
+            ->whereIn('team_id', $teams->pluck('id'))
             ->when($this->filterTeam > 0, fn ($query) => $query->where('team_id', $this->filterTeam))
             ->latest()
             ->get();
@@ -75,3 +86,4 @@ class MemberEvaluations extends Component
         return view('livewire.member.member-evaluations', compact('teams', 'evaluations', 'summary'));
     }
 }
+

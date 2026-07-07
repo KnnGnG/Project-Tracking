@@ -4,25 +4,29 @@
         <x-floating-notification :message="session('success')" />
     @endif
 
-    @if(!$showForm)
-        <div class="flex justify-end">
-            <button wire:click="openCreate"
-                    wire:loading.attr="disabled"
-                    wire:target="openCreate"
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                </svg>
-                New Project
-            </button>
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <div class="min-w-0">
+            <p class="text-sm font-semibold text-gray-900">Projects</p>
+            <p class="mt-0.5 text-xs text-gray-400">Search and manage project records.</p>
         </div>
-    @endif
+        <div class="flex flex-wrap items-center gap-3">
+            <input wire:model.live.debounce.300ms="search"
+                   type="text"
+                   placeholder="Search projects..."
+                   class="w-64 max-w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
 
-    <div class="mb-5 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-        <input wire:model.live.debounce.300ms="search"
-               type="text"
-               placeholder="Search projects..."
-               class="w-full max-w-md px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            @if(!$showForm)
+                <button wire:click="openCreate"
+                        wire:loading.attr="disabled"
+                        wire:target="openCreate"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    New Project
+                </button>
+            @endif
+        </div>
     </div>
 
     {{-- Create / Edit form --}}
@@ -107,7 +111,7 @@
                                     <span class="min-w-0 flex-1">
                                         <span class="block truncate font-medium text-gray-800">{{ $teamOption->name }}</span>
                                         <span class="block text-xs text-gray-500">
-                                            {{ $teamOption->project?->name ?? 'No project' }} · {{ $teamOption->lead?->name ?? 'No lead' }}
+                                            {{ $teamOption->projects->pluck('name')->join(', ') ?: ($teamOption->project?->name ?? 'No project') }} · {{ $teamOption->lead?->name ?? 'No lead' }}
                                         </span>
                                     </span>
                                 </label>
@@ -496,7 +500,7 @@
         </x-slot>
 
         <x-slot name="content">
-            This will remove the project, all of its teams, and all related tasks.
+            This will remove the project, its project assignments, and all related tasks. Shared teams will remain available for other projects.
         </x-slot>
 
         <x-slot name="footer">

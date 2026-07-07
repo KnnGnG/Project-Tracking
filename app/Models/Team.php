@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class Team extends Model
 {
@@ -20,6 +21,26 @@ class Team extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function projects(): BelongsToMany
+    {
+        return $this->belongsToMany(Project::class, 'project_team')->withTimestamps();
+    }
+
+    public function assignedProjects(): Collection
+    {
+        $this->loadMissing(['project', 'projects']);
+
+        return $this->projects
+            ->when($this->project, fn (Collection $projects) => $projects->push($this->project))
+            ->unique('id')
+            ->values();
+    }
+
+    public function isAssignedToProject(int $projectId): bool
+    {
+        return $this->assignedProjects()->contains('id', $projectId);
     }
 
     public function lead(): BelongsTo

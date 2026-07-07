@@ -1,12 +1,14 @@
 <div wire:poll.visible.60s>
     {{-- Filters --}}
-    <div class="flex flex-wrap items-end gap-4 mb-6" role="group" aria-label="Filter tasks">
-        <div class="flex flex-col gap-1 min-w-[10rem]">
-            <label for="task-oversight-filter-status" class="text-xs font-medium text-gray-700">
-                Status
-            </label>
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm" role="group" aria-label="Filter tasks">
+        <div class="min-w-0">
+            <p class="text-sm font-semibold text-gray-900">Task Oversight</p>
+            <p class="mt-0.5 text-xs text-gray-400">Filter tasks by status, project, and page size.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
             <select id="task-oversight-filter-status"
                     wire:model.live="filterStatus"
+                    aria-label="Status"
                     class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="">All statuses</option>
                 <option value="pending">Pending</option>
@@ -14,28 +16,20 @@
                 <option value="review">Review</option>
                 <option value="done">Done</option>
             </select>
-        </div>
 
-        <div class="flex flex-col gap-1 min-w-[12rem]">
-            <label for="task-oversight-filter-project" class="text-xs font-medium text-gray-700">
-                Project
-            </label>
             <select id="task-oversight-filter-project"
                     wire:model.live="filterProject"
+                    aria-label="Project"
                     class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="">All projects</option>
                 @foreach($projects as $project)
                     <option value="{{ $project->id }}">{{ $project->name }}</option>
                 @endforeach
             </select>
-        </div>
 
-        <div class="flex flex-col gap-1 min-w-[9rem]">
-            <label for="task-oversight-per-page" class="text-xs font-medium text-gray-700">
-                Per page
-            </label>
             <select id="task-oversight-per-page"
                     wire:model.live="perPage"
+                    aria-label="Per page"
                     class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="15">15 per page</option>
                 <option value="20">20 per page</option>
@@ -44,7 +38,6 @@
             </select>
         </div>
     </div>
-
     {{-- Tasks table (read-only) --}}
     <div class="ui-soft-panel overflow-hidden">
         @if($tasks->isEmpty())
@@ -63,13 +56,14 @@
                 tasks
             </p>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm min-w-[800px]">
+                <table class="w-full text-sm min-w-[1050px]">
                     <thead class="bg-gray-50 border-b border-gray-200">
                         <tr>
                             <th class="px-6 py-3 text-left font-semibold text-gray-600">Task</th>
                             <th class="px-6 py-3 text-left font-semibold text-gray-600">Project / team</th>
-                            <th class="px-6 py-3 text-left font-semibold text-gray-600">Assigned to</th>
+                            <th class="px-6 py-3 text-left font-semibold text-gray-600">Assigned / actual start</th>
                             <th class="px-6 py-3 text-left font-semibold text-gray-600">Created by</th>
+                            <th class="px-6 py-3 text-left font-semibold text-gray-600">Scheduled start</th>
                             <th class="px-6 py-3 text-left font-semibold text-gray-600">Due date</th>
                             <th class="px-6 py-3 text-left font-semibold text-gray-600">Priority</th>
                             <th class="px-6 py-3 text-left font-semibold text-gray-600">Status</th>
@@ -79,6 +73,11 @@
                         @foreach($tasks as $task)
                             @php
                                 $exceeded = $task->isExceededDeadline();
+                                $assignees = $task->getAllAssignees();
+                                $progressByUser = $task->memberProgress->keyBy('user_id');
+                                $scheduledStart = $task->start_date
+                                    ? $task->start_date->format('M d, Y') . ($task->start_time ? ' ' . \Illuminate\Support\Str::of((string) $task->start_time)->substr(0, 5) : '')
+                                    : null;
                             @endphp
                             <tr class="hover:bg-gray-50 transition {{ $exceeded ? 'bg-red-50/80 hover:bg-red-50' : '' }}">
                                 <td class="px-6 py-4">
@@ -91,9 +90,28 @@
                                     <p>{{ $task->project?->name ?? '—' }}</p>
                                     <p class="text-xs text-gray-400">{{ $task->team?->name ?? '—' }}</p>
                                 </td>
-                                <td class="px-6 py-4 text-gray-700">{{ $task->assignee?->name ?? '—' }}</td>
+                                <td class="px-6 py-4 text-gray-700">
+                                    @if($assignees->isEmpty())
+                                        <span class="text-gray-400">—</span>
+                                    @else
+                                        <div class="space-y-2">
+                                            @foreach($assignees as $member)
+                                                @php $actualStart = $progressByUser->get($member->id)?->started_at; @endphp
+                                                <div>
+                                                    <p class="font-medium text-gray-800">{{ $member->name }}</p>
+                                                    <p class="text-xs {{ $actualStart ? 'text-emerald-700' : 'text-gray-400' }}">
+                                                        Actual: {{ $actualStart?->format('M d, Y h:i A') ?? 'Not started' }}
+                                                    </p>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </td>
                                 <td class="px-6 py-4 text-gray-600">
                                     {{ $task->creator?->name ?? '—' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-gray-600">
+                                    {{ $scheduledStart ?? '—' }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="{{ $exceeded ? 'text-red-600 font-semibold' : 'text-gray-600' }}">

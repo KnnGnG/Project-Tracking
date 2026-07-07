@@ -9,6 +9,7 @@ use App\Models\TaskActivity;
 use App\Models\TaskMemberProgress;
 use App\Models\Team;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -17,6 +18,12 @@ use Livewire\Component;
 #[Title('My Tasks')]
 class MemberDashboard extends Component
 {
+    #[On('journal-log-changed')]
+    public function refreshJournalLinkedData(): void
+    {
+        // Listener intentionally empty; Livewire rerenders after the event action.
+    }
+
     /** Active tab: pending | in_progress | review | exceeded | done */
     #[Url(as: 'tab')]
     public string $activeTab = 'pending';
@@ -173,30 +180,56 @@ class MemberDashboard extends Component
     private function normalizeAccessibleFilters(): void
     {
         $userId = auth()->id();
+        $activeProjectId = (int) session('active_project_id', 0);
 
-        if ($this->filterTeam > 0 && ! Team::query()
-            ->whereKey($this->filterTeam)
-            ->where(fn ($query) => $query
-                ->whereHas('members', fn ($members) => $members->whereKey($userId))
-                ->orWhereHas('tasks', fn ($tasks) => $tasks
-                    ->where('assigned_to', $userId)
-                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId))))
-            ->exists()) {
-            $this->filterTeam = 0;
+        if ($activeProjectId > 0) {
+            $this->filterProject = $activeProjectId;
+        }
+
+        if ($this->filterTeam > 0) {
+            $teamIsAccessible = Team::query()
+                ->whereKey($this->filterTeam)
+                ->when($this->filterProject > 0, fn ($query) => $query->where(function ($projectScope) {
+                    $projectScope->where('teams.project_id', $this->filterProject)
+                        ->orWhereHas('projects', fn ($projects) => $projects->whereKey($this->filterProject));
+                }))
+                ->where(function ($query) use ($userId) {
+                    $query->whereHas('members', fn ($members) => $members
+                        ->whereKey($userId)
+                        ->where('team_members.role', 'member'))
+                        ->orWhereHas('tasks', function ($tasks) use ($userId) {
+                            $tasks->when($this->filterProject > 0, fn ($taskScope) => $taskScope->where('project_id', $this->filterProject))
+                                ->where(function ($taskScope) use ($userId) {
+                                    $taskScope->where('assigned_to', $userId)
+                                        ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId));
+                                });
+                        });
+                })
+                ->exists();
+
+            if (! $teamIsAccessible) {
+                $this->filterTeam = 0;
+            }
         }
 
         if ($this->filterProject > 0 && ! Project::query()
             ->whereKey($this->filterProject)
-            ->whereHas('tasks', fn ($tasks) => $tasks
-                ->where(fn ($query) => $query
-                    ->where('assigned_to', $userId)
-                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
-                ->when($this->filterTeam > 0, fn ($query) => $query->where('team_id', $this->filterTeam)))
+            ->where(function ($project) use ($userId) {
+                $project->whereHas('teams', fn ($teams) => $teams
+                    ->whereHas('members', fn ($members) => $members
+                        ->whereKey($userId)
+                        ->where('team_members.role', 'member')))
+                    ->orWhereHas('tasks', fn ($tasks) => $tasks
+                        ->where(function ($query) use ($userId) {
+                            $query->where('assigned_to', $userId)
+                                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId));
+                        })
+                        ->when($this->filterTeam > 0, fn ($query) => $query->where('team_id', $this->filterTeam)));
+            })
             ->exists()) {
             $this->filterProject = 0;
         }
     }
-
     private function ownedTask(int $id): ?Task
     {
         return Task::where('id', $id)
@@ -342,16 +375,22 @@ class MemberDashboard extends Component
 
         $userId = auth()->id();
         $today = now()->toDateString();
+        $activeProjectId = (int) session('active_project_id', 0);
 
         $teams = Team::query()
-            ->with('project')
+            ->with(['project', 'projects'])
+            ->when($this->filterProject > 0, fn ($query) => $query->where(fn ($projectScope) => $projectScope
+                ->where('teams.project_id', $this->filterProject)
+                ->orWhereHas('projects', fn ($projects) => $projects->whereKey($this->filterProject))))
             ->where(fn ($query) => $query
                 ->whereHas('members', fn ($members) => $members
                     ->whereKey($userId)
                     ->where('team_members.role', 'member'))
                 ->orWhereHas('tasks', fn ($tasks) => $tasks
-                    ->where('assigned_to', $userId)
-                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId))))
+                    ->where(fn ($taskScope) => $taskScope
+                        ->where('assigned_to', $userId)
+                        ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+                    ->when($this->filterProject > 0, fn ($taskScope) => $taskScope->where('project_id', $this->filterProject))))
             ->orderBy('name')
             ->get();
 
@@ -360,15 +399,21 @@ class MemberDashboard extends Component
         }
 
         // ── Gather projects this member has tasks in (for filter dropdown) ──────
-        $projects = Project::whereHas('tasks', function ($q) use ($userId) {
-            $q->where(function ($inner) use ($userId) {
-                $inner->where('assigned_to', $userId)
-                    ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId));
-            });
-            if ($this->filterTeam > 0) {
-                $q->where('team_id', $this->filterTeam);
-            }
-        })
+        $projects = Project::where(fn ($project) => $project
+            ->whereHas('teams', fn ($teams) => $teams
+                ->whereHas('members', fn ($members) => $members
+                    ->whereKey($userId)
+                    ->where('team_members.role', 'member')))
+            ->orWhereHas('tasks', function ($q) use ($userId) {
+                $q->where(function ($inner) use ($userId) {
+                    $inner->where('assigned_to', $userId)
+                        ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId));
+                });
+                if ($this->filterTeam > 0) {
+                    $q->where('team_id', $this->filterTeam);
+                }
+            }))
+            ->when($activeProjectId > 0, fn ($query) => $query->whereKey($activeProjectId))
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -445,3 +490,5 @@ class MemberDashboard extends Component
         return view('livewire.member.member-dashboard', compact('tasks', 'counts', 'projects', 'focusTasks', 'teams'));
     }
 }
+
+

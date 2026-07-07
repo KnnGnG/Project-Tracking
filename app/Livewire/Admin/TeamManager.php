@@ -156,7 +156,13 @@ class TeamManager extends Component
                 ->unique()
                 ->values();
 
-            Team::whereIn('id', $projectTeamIds->all())->update(['project_id' => $team->project_id]);
+            Project::findOrFail((int) $data['projectId'])
+                ->teams()
+                ->sync($projectTeamIds->all());
+
+            Team::whereIn('id', $projectTeamIds->all())
+                ->whereNull('project_id')
+                ->update(['project_id' => $team->project_id]);
 
             $this->syncTeamPeople($team, (int) $data['leadId'], $data['memberIds'] ?? [], $data['memberNotes'] ?? []);
         });
@@ -245,20 +251,21 @@ class TeamManager extends Component
             return;
         }
 
-        $this->projectTeamIds = Team::where('project_id', $this->projectId)
-            ->pluck('id')
+        $this->projectTeamIds = Project::find($this->projectId)
+            ?->teams()
+            ->pluck('teams.id')
             ->when($this->editingId, fn ($ids) => $ids->push($this->editingId))
             ->map(fn ($id) => (int) $id)
             ->unique()
             ->values()
-            ->all();
+            ->all() ?? [];
         $this->previousProjectTeamIds = $this->projectTeamIds;
     }
 
     private function projectTeamOptions()
     {
-        // Intentionally global: selected teams are reassigned into the chosen project on save.
-        return Team::with(['project', 'lead'])
+        // Intentionally global: selected teams are attached to the chosen project on save.
+        return Team::with(['project', 'projects', 'lead'])
             ->when($this->teamSearch, fn ($q) => $q->where('name', 'like', "%{$this->teamSearch}%"))
             ->orderBy('name')
             ->get();
@@ -303,18 +310,18 @@ class TeamManager extends Component
 
     public function render()
     {
-        $teams    = Team::with(['project', 'lead', 'members'])->withCount('tasks')->latest()->paginate($this->perPage);
+        $teams    = Team::with(['project', 'projects', 'lead', 'members'])->withCount('tasks')->latest()->paginate($this->perPage);
         $projects = Project::orderBy('name')->get();
         $people   = User::whereIn('role', ['team_lead', 'member'])->orderBy('name')->get();
         $leads    = $people;
         $members  = $people;
         $projectTeamOptions = $this->projectTeamOptions();
-        $selectedProjectTeams = Team::with(['project', 'lead'])
+        $selectedProjectTeams = Team::with(['project', 'projects', 'lead'])
             ->whereIn('id', array_map('intval', $this->projectTeamIds))
             ->orderBy('name')
             ->get();
         $detailsTeam = $this->detailsTeamId
-            ? Team::with(['project', 'lead', 'members'])
+            ? Team::with(['project', 'projects', 'lead', 'members'])
                 ->withCount('tasks')
                 ->find($this->detailsTeamId)
             : null;

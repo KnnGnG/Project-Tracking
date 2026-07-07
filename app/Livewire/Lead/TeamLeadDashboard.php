@@ -10,6 +10,7 @@ use App\Models\Team;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -18,6 +19,12 @@ use Livewire\Component;
 #[Title('Team Dashboard')]
 class TeamLeadDashboard extends Component
 {
+    #[On('journal-log-changed')]
+    public function refreshJournalLinkedData(): void
+    {
+        // Listener intentionally empty; Livewire rerenders after the event action.
+    }
+
     #[Url(as: 'team')]
     public ?int $selectedTeamId = null;
 
@@ -53,12 +60,11 @@ class TeamLeadDashboard extends Component
             ? request()->integer('team')
             : session('active_team_id');
 
-        $first = auth()->user()
-            ->ledTeams()
-            ->whereNotNull('project_id')
-            ->when($requestedTeamId, fn ($query) => $query->whereKey($requestedTeamId))
-            ->first()
-            ?? auth()->user()->ledTeams()->whereNotNull('project_id')->first();
+        $leadTeams = $this->leadTeams();
+        $first = $requestedTeamId
+            ? $leadTeams->firstWhere('id', $requestedTeamId)
+            : null;
+        $first ??= $leadTeams->first();
 
         if ($first) {
             $this->selectedTeamId = $first->id;
@@ -67,7 +73,7 @@ class TeamLeadDashboard extends Component
 
     public function selectTeam(int $id): void
     {
-        $team = auth()->user()->ledTeams()->whereNotNull('project_id')->find($id);
+        $team = $this->leadTeams()->firstWhere('id', $id);
 
         if (! $team) {
             return;
@@ -81,14 +87,42 @@ class TeamLeadDashboard extends Component
 
     private function refreshActiveTeamContext(Team $team): void
     {
+        $project = $this->activeProjectForTeam($team);
+
+        if (! $project) {
+            return;
+        }
+
         session([
-            'active_project_id' => $team->project_id,
+            'active_project_id' => $project->id,
             'active_team_id' => $team->id,
             'active_project_role' => 'lead',
-            'active_has_self_assigned_task' => $this->hasSelfAssignedTask($team->project_id),
+            'active_has_self_assigned_task' => $this->hasSelfAssignedTask($project->id),
         ]);
     }
 
+
+    private function leadTeams(): Collection
+    {
+        $activeProjectId = (int) session('active_project_id', 0);
+
+        return auth()->user()
+            ->ledTeams()
+            ->with(['project', 'projects'])
+            ->get()
+            ->filter(fn (Team $team) => $activeProjectId > 0
+                ? $team->isAssignedToProject($activeProjectId)
+                : $team->assignedProjects()->isNotEmpty())
+            ->values();
+    }
+
+    private function activeProjectForTeam(Team $team)
+    {
+        $activeProjectId = (int) session('active_project_id', 0);
+        $projects = $team->assignedProjects();
+
+        return $projects->firstWhere('id', $activeProjectId) ?? $projects->first();
+    }
     private function hasSelfAssignedTask(int $projectId): bool
     {
         return Task::query()
@@ -285,10 +319,10 @@ class TeamLeadDashboard extends Component
     /** Ensures the event belongs to a project managed by this team lead. */
     private function authorizeEvent(ProjectEvent $event): void
     {
-        $projectIds = auth()->user()
-            ->ledTeams()
-            ->whereNotNull('project_id')
-            ->pluck('project_id');
+        $projectIds = $this->leadTeams()
+            ->flatMap(fn (Team $team) => $team->assignedProjects()->pluck('id'))
+            ->unique()
+            ->values();
 
         abort_unless($projectIds->contains($event->project_id), 403);
     }
@@ -296,7 +330,9 @@ class TeamLeadDashboard extends Component
     /** Returns the Project for the currently selected team. */
     private function currentProject()
     {
-        return auth()->user()->ledTeams()->whereNotNull('project_id')->findOrFail($this->selectedTeamId)->project;
+        $team = $this->leadTeams()->firstWhere('id', $this->selectedTeamId) ?? abort(404);
+
+        return $this->activeProjectForTeam($team) ?? abort(404);
     }
 
     /**
@@ -305,26 +341,28 @@ class TeamLeadDashboard extends Component
      * @return Collection<int, Collection<int, array<string, mixed>>>
      */
     private function calendarItemsByDay(
-        Project $project,
+        Collection $projects,
         Collection $tasks,
         Carbon $monthStart,
         Carbon $monthEnd,
     ): Collection {
         $byDay = collect();
 
-        $monthEvents = $project->events()
-            ->whereBetween('event_date', [$monthStart, $monthEnd])
-            ->orderBy('event_date')
-            ->get();
+        $projects->each(function (Project $project) use ($byDay, $monthStart, $monthEnd): void {
+            $monthEvents = $project->events()
+                ->whereBetween('event_date', [$monthStart, $monthEnd])
+                ->orderBy('event_date')
+                ->get();
 
-        foreach ($monthEvents as $event) {
-            $day = $event->event_date->day;
-            $byDay[$day] = ($byDay[$day] ?? collect())->push([
-                'kind' => 'event',
-                'title' => $event->title,
-                'type' => $event->type,
-            ]);
-        }
+            foreach ($monthEvents as $event) {
+                $day = $event->event_date->day;
+                $byDay[$day] = ($byDay[$day] ?? collect())->push([
+                    'kind' => 'event',
+                    'title' => $project->name.': '.$event->title,
+                    'type' => $event->type,
+                ]);
+            }
+        });
 
         $tasks->each(function ($task) use ($byDay, $monthStart, $monthEnd) {
             $dueInMonth = $task->due_date
@@ -399,16 +437,17 @@ class TeamLeadDashboard extends Component
         return $grid;
     }
 
-    private function buildCalendarWeekBars(Project $project, Collection $tasks, array $calendarGrid): array
+    private function buildCalendarWeekBars(Collection $projects, Collection $tasks, array $calendarGrid): array
     {
-        $ranges = collect([
-            [
+        $ranges = $projects
+            ->filter(fn (Project $project) => $project->start_date && $project->end_date)
+            ->map(fn (Project $project) => [
                 'kind' => 'project',
-                'title' => 'Project timeline',
+                'title' => $project->name,
                 'start' => $project->start_date,
                 'end' => $project->end_date,
-            ],
-        ]);
+            ])
+            ->values();
 
         $tasks
             ->filter(fn ($task) => $task->start_date || $task->due_date)
@@ -456,7 +495,7 @@ class TeamLeadDashboard extends Component
                     ->filter(fn ($range) => $range['start']->lte($weekEnd) && $range['end']->gte($weekStart))
                     ->groupBy('kind')
                     ->flatMap(function (Collection $items, string $kind) {
-                        return $kind === 'project' ? $items->take(1) : $items->take(3);
+                        return $items->take(3);
                     })
                     ->map(function (array $range) use ($weekStart, $weekEnd) {
                         $start = $range['start']->copy()->max($weekStart);
@@ -476,7 +515,7 @@ class TeamLeadDashboard extends Component
     }
 
     private function buildTimelineGraph(
-        Project $project,
+        Collection $projects,
         Collection $tasks,
         Carbon $monthStart,
         Carbon $monthEnd,
@@ -523,9 +562,12 @@ class TeamLeadDashboard extends Component
             ];
         };
 
-        $rows = collect([
-            $makeRow('project', 'Project', $project->name, $project->start_date, $project->end_date),
-        ])->filter();
+        $rows = $projects
+            ->map(fn (Project $project) => $project->start_date && $project->end_date
+                ? $makeRow('project', 'Project', $project->name, $project->start_date, $project->end_date)
+                : null)
+            ->filter()
+            ->values();
 
         $tasks
             ->filter(fn ($task) => $task->start_date || $task->due_date)
@@ -550,6 +592,7 @@ class TeamLeadDashboard extends Component
                     $taskRow['tooltipLines'] = [
                         'Task',
                         $task->title,
+                        'Project: '.($task->project?->name ?? 'No project'),
                         'Members: '.($assigneeNames->isNotEmpty() ? $assigneeNames->join(', ') : 'Unassigned'),
                         'Status: '.$taskRow['statusLabel'],
                         'Priority: '.ucfirst($task->priority ?? 'normal'),
@@ -674,6 +717,7 @@ class TeamLeadDashboard extends Component
                         $actualStartRow['loggedMinutes'] = $loggedMinutes;
                         $actualStartRow['tooltipLines'] = [
                             $progress->user->name,
+                            'Project: '.($task->project?->name ?? 'No project'),
                             'Task: '.$task->title,
                             'Scheduled start: '.$scheduledStartLabel,
                             'Actual started: '.$actualStartedLabel,
@@ -782,11 +826,7 @@ class TeamLeadDashboard extends Component
 
     public function render()
     {
-        $teams = auth()->user()
-            ->ledTeams()
-            ->whereNotNull('project_id')
-            ->with('project')
-            ->get();
+        $teams = $this->leadTeams();
 
         $selectedTeam = null;
         $project = null;
@@ -809,9 +849,11 @@ class TeamLeadDashboard extends Component
         $monthLabel = Carbon::create($this->year, $this->month, 1)->format('F Y');
 
         if ($this->selectedTeamId) {
-            $selectedTeam = auth()->user()->ledTeams()->whereNotNull('project_id')->with([
+            $selectedTeam = auth()->user()->ledTeams()->with([
                 'project.events',
+                'projects.events',
                 'members',
+                'tasks.project',
                 'tasks.assignee',
                 'tasks.assignees',
                 'tasks.memberProgress.user',
@@ -819,8 +861,11 @@ class TeamLeadDashboard extends Component
             ])->find($this->selectedTeamId);
 
             if ($selectedTeam) {
-                $project = $selectedTeam->project;
-                $tasks = $selectedTeam->tasks;
+                $project = $this->activeProjectForTeam($selectedTeam);
+                $timelineProjects = collect([$project])->filter();
+                $tasks = $selectedTeam->tasks
+                    ->where('project_id', $project->id)
+                    ->values();
                 $monthStart = Carbon::create($this->year, $this->month, 1)->startOfDay();
                 $monthEnd = $monthStart->copy()->endOfMonth();
                 $generalLogs = JournalLog::with('user')
@@ -830,10 +875,10 @@ class TeamLeadDashboard extends Component
                     ->orderBy('log_date')
                     ->get();
                 $calendarGrid = $this->buildCalendarGrid(
-                    $this->calendarItemsByDay($project, $tasks, $monthStart, $monthEnd)
+                    $this->calendarItemsByDay($timelineProjects, $tasks, $monthStart, $monthEnd)
                 );
-                $calendarWeekBars = $this->buildCalendarWeekBars($project, $tasks, $calendarGrid);
-                $timelineGraph = $this->buildTimelineGraph($project, $tasks, $monthStart, $monthEnd, $generalLogs);
+                $calendarWeekBars = $this->buildCalendarWeekBars($timelineProjects, $tasks, $calendarGrid);
+                $timelineGraph = $this->buildTimelineGraph($timelineProjects, $tasks, $monthStart, $monthEnd, $generalLogs);
                 $showTaskTimeline = in_array('task', $this->timelineKinds, true);
                 $showActualTimeline = in_array('actual', $this->timelineKinds, true);
                 $timelineGraph['rows'] = $timelineGraph['rows']

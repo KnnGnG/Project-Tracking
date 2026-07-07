@@ -159,34 +159,6 @@
     {{-- ── Filter + Sort bar ──────────────────────────────────────────────────── --}}
     <div class="flex flex-wrap items-center gap-3">
 
-        @if($teams->isNotEmpty())
-            <div class="flex items-center gap-2">
-                <label class="text-xs font-medium text-gray-500">Working in</label>
-                <select wire:model.live="filterTeam"
-                        class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                    <option value="0">All my teams</option>
-                    @foreach($teams as $team)
-                        <option value="{{ $team->id }}">
-                            {{ $team->name }}@if($team->project) / {{ $team->project->name }}@endif
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-        @endif
-
-        {{-- Project filter --}}
-        @if($projects->isNotEmpty())
-            <div class="flex items-center gap-2">
-                <label class="text-xs font-medium text-gray-500">Project</label>
-                <select wire:model.live="filterProject"
-                        class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                    <option value="0">All projects</option>
-                    @foreach($projects as $proj)
-                        <option value="{{ $proj->id }}">{{ $proj->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-        @endif
 
         {{-- Sort controls --}}
         <div class="flex items-center gap-2 ml-auto">
