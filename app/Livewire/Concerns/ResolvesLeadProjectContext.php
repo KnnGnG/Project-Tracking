@@ -23,10 +23,7 @@ trait ResolvesLeadProjectContext
 
     private function activeProjectForTeam(Team $team)
     {
-        $activeProjectId = (int) session('active_project_id', 0);
-        $projects = $team->assignedProjects();
-
-        return $projects->firstWhere('id', $activeProjectId) ?? $projects->first();
+        return $team->activeProject((int) session('active_project_id', 0));
     }
 
     protected function leadTeamRelations(): array
@@ -34,4 +31,3 @@ trait ResolvesLeadProjectContext
         return ['project', 'projects'];
     }
 }
-

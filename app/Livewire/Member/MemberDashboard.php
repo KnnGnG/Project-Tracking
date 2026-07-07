@@ -2,12 +2,13 @@
 
 namespace App\Livewire\Member;
 
+use App\Models\InAppNotification;
 use App\Models\Project;
 use App\Models\Task;
-use App\Models\InAppNotification;
 use App\Models\TaskActivity;
 use App\Models\TaskMemberProgress;
 use App\Models\Team;
+use App\Models\User;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
@@ -182,7 +183,7 @@ class MemberDashboard extends Component
         $userId = auth()->id();
         $activeProjectId = (int) session('active_project_id', 0);
 
-        if ($activeProjectId > 0) {
+        if ($activeProjectId > 0 && $this->filterProject < 1) {
             $this->filterProject = $activeProjectId;
         }
 
@@ -231,6 +232,7 @@ class MemberDashboard extends Component
             }
         }
     }
+
     private function ownedTask(int $id): ?Task
     {
         return Task::where('id', $id)
@@ -260,7 +262,7 @@ class MemberDashboard extends Component
                     'user_id' => $userId,
                     'type' => 'task_completed',
                     'title' => 'Task completed',
-                    'body' => $task->title . ' was marked done.',
+                    'body' => $task->title.' was marked done.',
                     'url' => $this->taskCompletionNotificationUrl($task, $userId),
                     'data' => ['task_id' => $task->id, 'team_id' => $task->team_id],
                 ]);
@@ -269,7 +271,7 @@ class MemberDashboard extends Component
 
     private function taskCompletionNotificationUrl(Task $task, int $userId): string
     {
-        $recipient = \App\Models\User::find($userId);
+        $recipient = User::find($userId);
 
         if ($recipient && $task->team_id && $recipient->ledTeams()->whereKey($task->team_id)->exists()) {
             return route('lead.tasks', ['team' => $task->team_id]);
@@ -365,7 +367,7 @@ class MemberDashboard extends Component
             'task_id' => $task->id,
             'user_id' => auth()->id(),
             'type' => 'status_changed',
-            'description' => auth()->user()->name . ' changed status from ' . str_replace('_', ' ', $oldStatus) . ' to ' . str_replace('_', ' ', $newStatus) . '.',
+            'description' => auth()->user()->name.' changed status from '.str_replace('_', ' ', $oldStatus).' to '.str_replace('_', ' ', $newStatus).'.',
             'data' => ['old_status' => $oldStatus, 'new_status' => $newStatus],
         ]);
     }
@@ -484,16 +486,8 @@ class MemberDashboard extends Component
             default => collect(),
         };
 
-
         $tasks = $this->sortTaskCollection($tasks);
 
         return view('livewire.member.member-dashboard', compact('tasks', 'counts', 'projects', 'focusTasks', 'teams'));
     }
 }
-
-
-
-
-
-
-

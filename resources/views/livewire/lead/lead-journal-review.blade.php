@@ -1,4 +1,4 @@
-<div class="space-y-6" wire:poll.visible.15s>
+<div class="space-y-6" wire:poll.visible.30s>
     <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="min-w-0">
             <p class="text-sm font-semibold text-gray-900">Journal Review</p>
@@ -12,12 +12,7 @@
             <select id="teamId" wire:model.live="teamId" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
                 <option value="">All teams</option>
                 @foreach($leadTeams as $team)
-                    @php
-                        $activeProjectId = (int) session('active_project_id', 0);
-                        $teamProject = $activeProjectId > 0
-                            ? $team->assignedProjects()->firstWhere('id', $activeProjectId)
-                            : $team->assignedProjects()->first();
-                    @endphp
+                    @php($teamProject = $team->activeProject((int) session('active_project_id', 0)))
                     <option value="{{ $team->id }}">{{ $team->name }}@if($teamProject) / {{ $teamProject->name }}@endif</option>
                 @endforeach
             </select>
@@ -54,7 +49,7 @@
                         <p class="mt-0.5 text-xs text-gray-500">
                             {{ $log->user?->name ?? 'Deleted user' }}
                             / {{ $log->task?->team?->name ?? $log->team?->name ?? 'No team' }}
-                            / {{ $log->task?->project?->name ?? ((int) session('active_project_id', 0) > 0 ? $log->team?->assignedProjects()->firstWhere('id', (int) session('active_project_id', 0))?->name : $log->team?->assignedProjects()->first()?->name) ?? 'No project' }}
+                            / {{ $log->task?->project?->name ?? $log->team?->activeProject((int) session('active_project_id', 0))?->name ?? 'No project' }}
                         </p>
                     </div>
                     <div class="text-right">
@@ -79,5 +74,6 @@
 
     {{ $logs->links() }}
 </div>
+
 
 

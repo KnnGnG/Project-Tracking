@@ -3,9 +3,9 @@
 namespace App\Livewire\Lead;
 
 use App\Livewire\Concerns\ResolvesLeadProjectContext;
+use App\Models\JournalLog;
 use App\Models\Project;
 use App\Models\ProjectEvent;
-use App\Models\JournalLog;
 use App\Models\Task;
 use App\Models\Team;
 use Carbon\Carbon;
@@ -104,7 +104,6 @@ class TeamLeadDashboard extends Component
         ]);
     }
 
-
     private function hasSelfAssignedTask(int $projectId): bool
     {
         return Task::query()
@@ -175,6 +174,7 @@ class TeamLeadDashboard extends Component
 
         if (in_array($kind, $this->timelineKinds, true)) {
             $this->timelineKinds = array_values(array_diff($this->timelineKinds, [$kind]));
+
             return;
         }
 
@@ -851,112 +851,114 @@ class TeamLeadDashboard extends Component
 
                 if (! $project) {
                     $selectedTeam = null;
-                } else {
+                }
+
+                if ($project) {
                     $timelineProjects = collect([$project])->filter();
                     $tasks = $selectedTeam->tasks
                         ->where('project_id', $project->id)
                         ->values();
-                $monthStart = Carbon::create($this->year, $this->month, 1)->startOfDay();
-                $monthEnd = $monthStart->copy()->endOfMonth();
-                $generalLogs = JournalLog::with('user')
-                    ->where('team_id', $selectedTeam->id)
-                    ->whereNull('task_id')
-                    ->whereBetween('log_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-                    ->orderBy('log_date')
-                    ->get();
-                $calendarGrid = $this->buildCalendarGrid(
-                    $this->calendarItemsByDay($timelineProjects, $tasks, $monthStart, $monthEnd)
-                );
-                $calendarWeekBars = $this->buildCalendarWeekBars($timelineProjects, $tasks, $calendarGrid);
-                $timelineGraph = $this->buildTimelineGraph($timelineProjects, $tasks, $monthStart, $monthEnd, $generalLogs);
-                $showTaskTimeline = in_array('task', $this->timelineKinds, true);
-                $showActualTimeline = in_array('actual', $this->timelineKinds, true);
-                $timelineGraph['rows'] = $timelineGraph['rows']
-                    ->map(function ($row) use ($showActualTimeline, $showTaskTimeline) {
-                        if (($row['kind'] ?? null) === 'task') {
-                            $row['hidePrimary'] = ! $showTaskTimeline;
-                        }
+                    $monthStart = Carbon::create($this->year, $this->month, 1)->startOfDay();
+                    $monthEnd = $monthStart->copy()->endOfMonth();
+                    $generalLogs = JournalLog::with('user')
+                        ->where('team_id', $selectedTeam->id)
+                        ->whereNull('task_id')
+                        ->whereBetween('log_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+                        ->orderBy('log_date')
+                        ->get();
+                    $calendarGrid = $this->buildCalendarGrid(
+                        $this->calendarItemsByDay($timelineProjects, $tasks, $monthStart, $monthEnd)
+                    );
+                    $calendarWeekBars = $this->buildCalendarWeekBars($timelineProjects, $tasks, $calendarGrid);
+                    $timelineGraph = $this->buildTimelineGraph($timelineProjects, $tasks, $monthStart, $monthEnd, $generalLogs);
+                    $showTaskTimeline = in_array('task', $this->timelineKinds, true);
+                    $showActualTimeline = in_array('actual', $this->timelineKinds, true);
+                    $timelineGraph['rows'] = $timelineGraph['rows']
+                        ->map(function ($row) use ($showActualTimeline, $showTaskTimeline) {
+                            if (($row['kind'] ?? null) === 'task') {
+                                $row['hidePrimary'] = ! $showTaskTimeline;
+                            }
 
-                        if (! $showActualTimeline) {
-                            $row['segments'] = collect();
-                            $row['segmentOverflowCount'] = 0;
-                        }
+                            if (! $showActualTimeline) {
+                                $row['segments'] = collect();
+                                $row['segmentOverflowCount'] = 0;
+                            }
 
-                        return $row;
-                    })
-                    ->filter(function ($row) use ($showActualTimeline) {
-                        if (($row['kind'] ?? null) === 'task') {
-                            return in_array('task', $this->timelineKinds, true)
-                                || ($showActualTimeline && collect($row['segments'] ?? [])->isNotEmpty());
-                        }
+                            return $row;
+                        })
+                        ->filter(function ($row) use ($showActualTimeline) {
+                            if (($row['kind'] ?? null) === 'task') {
+                                return in_array('task', $this->timelineKinds, true)
+                                    || ($showActualTimeline && collect($row['segments'] ?? [])->isNotEmpty());
+                            }
 
-                        if (($row['kind'] ?? null) === 'general') {
-                            return $showActualTimeline && collect($row['segments'] ?? [])->isNotEmpty();
-                        }
+                            if (($row['kind'] ?? null) === 'general') {
+                                return $showActualTimeline && collect($row['segments'] ?? [])->isNotEmpty();
+                            }
 
-                        return in_array($row['kind'], $this->timelineKinds, true);
-                    })
-                    ->values();
+                            return in_array($row['kind'], $this->timelineKinds, true);
+                        })
+                        ->values();
 
-                $total = $tasks->count();
-                $done = $tasks->where('status', 'done')->count();
-                $progressPct = $total > 0 ? (int) round(($done / $total) * 100) : 0;
+                    $total = $tasks->count();
+                    $done = $tasks->where('status', 'done')->count();
+                    $progressPct = $total > 0 ? (int) round(($done / $total) * 100) : 0;
 
-                $stats = [
-                    'total' => $total,
-                    'done' => $done,
-                    'inProgress' => $tasks->where('status', 'in_progress')->count(),
-                    'review' => $tasks->where('status', 'review')->count(),
-                    'pending' => $tasks->where('status', 'pending')->count(),
-                    'overdue' => $tasks->filter(fn ($t) => $t->isExceededDeadline())->count(),
-                    'members' => $selectedTeam->members->count(),
-                ];
+                    $stats = [
+                        'total' => $total,
+                        'done' => $done,
+                        'inProgress' => $tasks->where('status', 'in_progress')->count(),
+                        'review' => $tasks->where('status', 'review')->count(),
+                        'pending' => $tasks->where('status', 'pending')->count(),
+                        'overdue' => $tasks->filter(fn ($t) => $t->isExceededDeadline())->count(),
+                        'members' => $selectedTeam->members->count(),
+                    ];
 
-                $tasksByPriority = $tasks->groupBy('priority');
-                $atRiskTasks = $tasks
-                    ->filter(fn ($task) => $task->status !== 'done'
-                        && $task->due_date
-                        && ! $task->isExceededDeadline()
-                        && now()->startOfDay()->diffInDays($task->due_date, false) <= 3)
-                    ->sortBy('due_date')
-                    ->take(5)
-                    ->values();
-                $memberTasksMap = collect();
-                $tasks
-                    ->sortBy(fn ($task) => optional($task->due_date)->timestamp ?? PHP_INT_MAX)
-                    ->each(function ($task) use ($memberTasksMap) {
-                        $assigneeIds = $task->assignees->pluck('id');
+                    $tasksByPriority = $tasks->groupBy('priority');
+                    $atRiskTasks = $tasks
+                        ->filter(fn ($task) => $task->status !== 'done'
+                            && $task->due_date
+                            && ! $task->isExceededDeadline()
+                            && now()->startOfDay()->diffInDays($task->due_date, false) <= 3)
+                        ->sortBy('due_date')
+                        ->take(5)
+                        ->values();
+                    $memberTasksMap = collect();
+                    $tasks
+                        ->sortBy(fn ($task) => optional($task->due_date)->timestamp ?? PHP_INT_MAX)
+                        ->each(function ($task) use ($memberTasksMap) {
+                            $assigneeIds = $task->assignees->pluck('id');
 
-                        if ($assigneeIds->isEmpty() && $task->assigned_to) {
-                            $assigneeIds = collect([$task->assigned_to]);
-                        }
+                            if ($assigneeIds->isEmpty() && $task->assigned_to) {
+                                $assigneeIds = collect([$task->assigned_to]);
+                            }
 
-                        foreach ($assigneeIds as $assigneeId) {
-                            $memberTasksMap->put(
-                                $assigneeId,
-                                $memberTasksMap->get($assigneeId, collect())->push($task)
-                            );
-                        }
-                    });
-                $memberStartActivities = $tasks
-                    ->filter(fn ($task) => ! is_null($task->start_date))
-                    ->sortByDesc('start_date')
-                    ->values();
+                            foreach ($assigneeIds as $assigneeId) {
+                                $memberTasksMap->put(
+                                    $assigneeId,
+                                    $memberTasksMap->get($assigneeId, collect())->push($task)
+                                );
+                            }
+                        });
+                    $memberStartActivities = $tasks
+                        ->filter(fn ($task) => ! is_null($task->start_date))
+                        ->sortByDesc('start_date')
+                        ->values();
 
-                $events = $project->events()
-                    ->orderBy('event_date')
-                    ->get()
-                    ->map(function ($event) {
-                        $event->is_past = $event->event_date->isPast();
-                        $event->is_today = $event->event_date->isToday();
-                        $event->days_diff = (int) now()->startOfDay()
-                            ->diffInDays($event->event_date, false);
+                    $events = $project->events()
+                        ->orderBy('event_date')
+                        ->get()
+                        ->map(function ($event) {
+                            $event->is_past = $event->event_date->isPast();
+                            $event->is_today = $event->event_date->isToday();
+                            $event->days_diff = (int) now()->startOfDay()
+                                ->diffInDays($event->event_date, false);
 
-                        return $event;
-                    });
+                            return $event;
+                        });
 
-                $daysRemaining = (int) now()->startOfDay()
-                    ->diffInDays($project->end_date, false);
+                    $daysRemaining = (int) now()->startOfDay()
+                        ->diffInDays($project->end_date, false);
                 }
             }
         }
@@ -976,7 +978,3 @@ class TeamLeadDashboard extends Component
         ));
     }
 }
-
-
-
-

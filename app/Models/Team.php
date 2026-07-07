@@ -34,9 +34,18 @@ class Team extends Model
         $this->loadMissing(['project', 'projects']);
 
         return $this->projects
-            ->when($this->project, fn (Collection $projects) => $projects->push($this->project))
+            ->concat($this->project ? [$this->project] : [])
             ->unique('id')
             ->values();
+    }
+
+    public function activeProject(?int $activeProjectId = null)
+    {
+        $projects = $this->assignedProjects();
+
+        return $activeProjectId && $activeProjectId > 0
+            ? ($projects->firstWhere('id', $activeProjectId) ?? $projects->first())
+            : $projects->first();
     }
 
     public function isAssignedToProject(int $projectId): bool
@@ -51,6 +60,7 @@ class Team extends Model
                 ->orWhereHas('projects', fn (Builder $projects) => $projects->whereKey($projectId));
         });
     }
+
     public function lead(): BelongsTo
     {
         return $this->belongsTo(User::class, 'lead_id');
@@ -99,4 +109,3 @@ class Team extends Model
         return (int) round(($done / $total) * 100);
     }
 }
-
