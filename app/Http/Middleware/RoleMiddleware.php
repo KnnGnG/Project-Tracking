@@ -42,13 +42,26 @@ class RoleMiddleware
     private function hasTeamRole(Request $request, string $role): bool
     {
         $teamId = $request->integer('team') ?: session('active_team_id');
+        $projectId = $request->integer('project') ?: session('active_project_id');
 
-        if ($teamId) {
+        if ($teamId && $request->user()
+            ->teams()
+            ->whereKey($teamId)
+            ->wherePivot('role', $role)
+            ->exists()) {
+            return true;
+        }
+
+        if ($projectId) {
             return $request->user()
                 ->teams()
-                ->whereKey($teamId)
                 ->wherePivot('role', $role)
+                ->assignedToProject($projectId)
                 ->exists();
+        }
+
+        if ($teamId) {
+            return false;
         }
 
         return $request->user()
@@ -67,8 +80,11 @@ class RoleMiddleware
             ->where(fn ($query) => $query
                 ->where('assigned_to', $userId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
-            ->when($teamId, fn ($query) => $query->where('team_id', $teamId))
             ->when($projectId, fn ($query) => $query->where('project_id', $projectId))
+            ->when($teamId && ! $projectId, fn ($query) => $query->where('team_id', $teamId))
             ->exists();
     }
 }
+
+
+

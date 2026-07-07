@@ -107,6 +107,7 @@ class MemberJournal extends Component
             $this->recomputeActualStartFromLogs($taskId);
         });
 
+        $this->dispatch('journal-log-changed');
         $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
         $this->flash = 'Timer session added to your journal.';
     }
@@ -157,6 +158,7 @@ class MemberJournal extends Component
             $this->recomputeActualStartFromLogs($taskId);
         });
 
+        $this->dispatch('journal-log-changed');
         $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
         $this->flash = 'Journal log added.';
     }
@@ -181,6 +183,7 @@ class MemberJournal extends Component
         });
 
         if ($deleted) {
+            $this->dispatch('journal-log-changed');
             $this->flash = 'Journal log deleted.';
         }
     }
@@ -268,10 +271,13 @@ class MemberJournal extends Component
     {
         $userId = auth()->id();
 
+        $activeProjectId = (int) session('active_project_id', 0);
+
         return Task::whereKey($taskId)
             ->where(fn ($q) => $q
                 ->where('assigned_to', $userId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+            ->when($activeProjectId > 0, fn ($q) => $q->where('project_id', $activeProjectId))
             ->when($this->filterTeam > 0, fn ($q) => $q->where('team_id', $this->filterTeam))
             ->exists();
     }
@@ -336,8 +342,11 @@ class MemberJournal extends Component
     {
         $userId = auth()->id();
 
+        $activeProjectId = (int) session('active_project_id', 0);
+
         return Team::query()
             ->whereKey($teamId)
+            ->when($activeProjectId > 0, fn ($query) => $query->assignedToProject($activeProjectId))
             ->where(fn ($query) => $query
                 ->whereHas('members', fn ($members) => $members->whereKey($userId))
                 ->orWhereHas('tasks', fn ($tasks) => $tasks
@@ -361,9 +370,10 @@ class MemberJournal extends Component
         $this->normalizeAccessibleTeamFilter();
 
         $userId = auth()->id();
+        $activeProjectId = (int) session('active_project_id', 0);
 
         $teams = Team::query()
-            ->with('project')
+            ->with(['project', 'projects'])
             ->where(fn ($query) => $query
                 ->whereHas('members', fn ($members) => $members
                     ->whereKey($userId)
@@ -372,23 +382,32 @@ class MemberJournal extends Component
                     ->where('assigned_to', $userId)
                     ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId))))
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->filter(fn (Team $team) => $activeProjectId > 0
+                ? $team->isAssignedToProject($activeProjectId)
+                : true)
+            ->values();
+
+        $teamIds = $teams->pluck('id');
 
         if ($this->filterTeam > 0 && ! $teams->contains('id', $this->filterTeam)) {
             $this->filterTeam = 0;
         }
 
         $tasks = Task::with(['project', 'team'])
+            ->whereIn('team_id', $teamIds)
             ->where(fn ($q) => $q
                 ->where('assigned_to', $userId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+            ->when($activeProjectId > 0, fn ($q) => $q->where('project_id', $activeProjectId))
             ->when($this->filterTeam > 0, fn ($q) => $q->where('team_id', $this->filterTeam))
-            ->where('status', 'in_progress')
+            ->whereIn('status', ['pending', 'in_progress', 'review'])
             ->orderBy('title')
             ->get();
 
         $logs = JournalLog::with(['task.project', 'task.team', 'team.project'])
             ->where('user_id', $userId)
+            ->whereIn('team_id', $teamIds)
             ->whereDate('log_date', $this->logDate)
             ->when($this->filterTeam > 0, fn ($q) => $q->where('team_id', $this->filterTeam))
             ->latest()
@@ -398,6 +417,7 @@ class MemberJournal extends Component
 
         $recentLogs = JournalLog::with(['task.project', 'task.team', 'team.project'])
             ->where('user_id', $userId)
+            ->whereIn('team_id', $teamIds)
             ->whereDate('log_date', '!=', $this->logDate)
             ->when($this->filterTeam > 0, fn ($q) => $q->where('team_id', $this->filterTeam))
             ->latest('log_date')
@@ -408,3 +428,7 @@ class MemberJournal extends Component
         return view('livewire.member.member-journal', compact('tasks', 'logs', 'dailyMinutes', 'recentLogs', 'teams'));
     }
 }
+
+
+
+

@@ -118,12 +118,19 @@ class ProjectManager extends Component
                 $project = Project::findOrFail($this->editingId);
                 $project->update($payload);
 
-                Team::where('project_id', $project->id)
-                    ->when($selectedTeamIds->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $selectedTeamIds))
-                    ->update(['project_id' => null]);
+                $previousTeamIds = $project->teams()->pluck('teams.id');
+                $project->teams()->sync($selectedTeamIds->all());
+                $removedTeamIds = $previousTeamIds->diff($selectedTeamIds);
+
+                if ($removedTeamIds->isNotEmpty()) {
+                    Team::whereIn('id', $removedTeamIds->all())
+                        ->where('project_id', $project->id)
+                        ->update(['project_id' => null]);
+                }
 
                 if ($selectedTeamIds->isNotEmpty()) {
                     Team::whereIn('id', $selectedTeamIds->all())
+                        ->whereNull('project_id')
                         ->update(['project_id' => $project->id]);
                 }
 
@@ -132,7 +139,10 @@ class ProjectManager extends Component
                 $project = Project::create(array_merge($payload, ['created_by' => auth()->id()]));
 
                 if ($selectedTeamIds->isNotEmpty()) {
+                    $project->teams()->sync($selectedTeamIds->all());
+
                     Team::whereIn('id', $selectedTeamIds->all())
+                        ->whereNull('project_id')
                         ->update(['project_id' => $project->id]);
                 }
 
@@ -204,7 +214,7 @@ class ProjectManager extends Component
 
     private function projectTeamOptions()
     {
-        return Team::with(['project:id,name', 'lead:id,name'])
+        return Team::with(['project:id,name', 'projects:id,name', 'lead:id,name'])
             ->select('id', 'name', 'project_id', 'lead_id')
             ->when($this->teamSearch, fn ($q) => $q->where('name', 'like', "%{$this->teamSearch}%"))
             ->orderBy('name')
@@ -227,7 +237,7 @@ class ProjectManager extends Component
 
         $clients = User::where('role', 'client')->orderBy('name')->get();
         $projectTeamOptions = $this->projectTeamOptions();
-        $selectedProjectTeams = Team::with(['project:id,name', 'lead:id,name'])
+        $selectedProjectTeams = Team::with(['project:id,name', 'projects:id,name', 'lead:id,name'])
             ->select('id', 'name', 'project_id', 'lead_id')
             ->whereIn('id', array_map('intval', $this->projectTeamIds))
             ->orderBy('name')
@@ -255,4 +265,5 @@ class ProjectManager extends Component
         return view('livewire.admin.project-manager', compact('projects', 'clients', 'detailsProject', 'detailsProjectTasks', 'projectTeamOptions', 'selectedProjectTeams'));
     }
 }
+
 

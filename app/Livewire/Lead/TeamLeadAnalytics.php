@@ -2,13 +2,16 @@
 
 namespace App\Livewire\Lead;
 
+use App\Livewire\Concerns\ResolvesLeadProjectContext;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\JournalLog;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
+use App\Models\Team;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -16,6 +19,14 @@ use Livewire\Component;
 #[Title('Team Analytics')]
 class TeamLeadAnalytics extends Component
 {
+    use ResolvesLeadProjectContext;
+
+    #[On('journal-log-changed')]
+    public function refreshJournalLinkedData(): void
+    {
+        // Listener intentionally empty; Livewire rerenders after the event action.
+    }
+
     public ?int $selectedTeamId = null;
 
     public int $velocityDays = 14;
@@ -36,12 +47,11 @@ class TeamLeadAnalytics extends Component
             ? request()->integer('team')
             : session('active_team_id');
 
-        $first = auth()->user()
-            ->ledTeams()
-            ->whereNotNull('project_id')
-            ->when($requestedTeamId, fn ($query) => $query->whereKey($requestedTeamId))
-            ->first()
-            ?? auth()->user()->ledTeams()->whereNotNull('project_id')->first();
+        $leadTeams = $this->leadTeams();
+        $first = $requestedTeamId
+            ? $leadTeams->firstWhere('id', $requestedTeamId)
+            : null;
+        $first ??= $leadTeams->first();
 
         if ($first) {
             $this->selectedTeamId = $first->id;
@@ -50,7 +60,7 @@ class TeamLeadAnalytics extends Component
 
     public function selectTeam(int $id): void
     {
-        if (! auth()->user()->ledTeams()->whereNotNull('project_id')->whereKey($id)->exists()) {
+        if (! $this->leadTeams()->contains('id', $id)) {
             return;
         }
 
@@ -61,7 +71,7 @@ class TeamLeadAnalytics extends Component
 
     public function render()
     {
-        $teams = auth()->user()->ledTeams()->whereNotNull('project_id')->with('project')->get();
+        $teams = $this->leadTeams();
 
         $selectedTeam = null;
         $project = null;
@@ -71,12 +81,16 @@ class TeamLeadAnalytics extends Component
         $summary = null;
         $velocity = null;
 
+        if ($this->selectedTeamId && ! $teams->contains('id', $this->selectedTeamId)) {
+            $this->selectedTeamId = $teams->first()?->id;
+        }
+
         if ($this->selectedTeamId) {
-            $selectedTeam = auth()->user()->ledTeams()->whereNotNull('project_id')->with(['project', 'tasks.assignees', 'tasks.memberProgress', 'members'])->find($this->selectedTeamId);
+            $selectedTeam = auth()->user()->ledTeams()->with(['project', 'projects', 'tasks.assignees', 'tasks.memberProgress', 'members'])->find($this->selectedTeamId);
 
             if ($selectedTeam) {
-                $project = $selectedTeam->project;
-                $tasks = $selectedTeam->tasks;
+                $project = $this->activeProjectForTeam($selectedTeam);
+                $tasks = $selectedTeam->tasks->where('project_id', $project->id)->values();
 
                 $validMemberIds = $selectedTeam->members->pluck('id');
                 if ($this->completionMemberId !== 0 && ! $validMemberIds->contains($this->completionMemberId)) {
@@ -125,6 +139,7 @@ class TeamLeadAnalytics extends Component
             'velocity',
         ));
     }
+
 
     /** @return array<string, mixed> */
     private function buildSummary(Collection $tasks): array
@@ -505,4 +520,5 @@ class TeamLeadAnalytics extends Component
         ];
     }
 }
+
 

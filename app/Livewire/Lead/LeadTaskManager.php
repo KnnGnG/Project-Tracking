@@ -6,8 +6,10 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskMemberProgress;
 use App\Models\Team;
+use App\Livewire\Concerns\ResolvesLeadProjectContext;
 use App\Models\InAppNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -58,12 +60,11 @@ class LeadTaskManager extends Component
             ? request()->integer('team')
             : session('active_team_id');
 
-        $first = auth()->user()
-            ->ledTeams()
-            ->whereNotNull('project_id')
-            ->when($requestedTeamId, fn ($query) => $query->whereKey($requestedTeamId))
-            ->first()
-            ?? auth()->user()->ledTeams()->whereNotNull('project_id')->first();
+        $leadTeams = $this->leadTeams();
+        $first = $requestedTeamId
+            ? $leadTeams->firstWhere('id', $requestedTeamId)
+            : null;
+        $first ??= $leadTeams->first();
 
         if ($first) {
             $this->filterTeamId = $first->id;
@@ -148,6 +149,14 @@ class LeadTaskManager extends Component
 
         // Ensure the team belongs to this lead
         $team = $this->ownedTeam($data['teamId']);
+        $project = $this->activeProjectForTeam($team);
+
+        if (! $project) {
+            $this->addError('teamId', 'Choose a team from the selected project.');
+
+            return;
+        }
+
         $assigneeIds = collect($data['assignedTo'])
             ->map(fn ($id) => (int) $id)
             ->unique()
@@ -163,7 +172,7 @@ class LeadTaskManager extends Component
         $payload = [
             'title' => $data['title'],
             'description' => $data['description'],
-            'project_id' => $team->project_id,
+            'project_id' => $project->id,
             'team_id' => $team->id,
             'assigned_to' => $assigneeIds->first(),
             'start_date' => $data['startDate'] ?: null,
@@ -301,11 +310,14 @@ class LeadTaskManager extends Component
         $this->assignedTo = [];
     }
 
+
     /** Returns a task only if it belongs to one of this lead's teams. */
     private function ownedTask(int $id): Task
     {
-        $teamIds = auth()->user()->ledTeams()->whereNotNull('project_id')->pluck('id');
-        $task = Task::whereIn('team_id', $teamIds)->findOrFail($id);
+        $teamIds = $this->leadTeams()->pluck('id');
+        $task = Task::whereIn('team_id', $teamIds)
+            ->when((int) session('active_project_id', 0) > 0, fn ($q) => $q->where('project_id', (int) session('active_project_id')))
+            ->findOrFail($id);
 
         return $task;
     }
@@ -313,7 +325,7 @@ class LeadTaskManager extends Component
     /** Returns a team only if this user leads it. */
     private function ownedTeam(int $id): Team
     {
-        return auth()->user()->ledTeams()->whereNotNull('project_id')->findOrFail($id);
+        return $this->leadTeams()->firstWhere('id', $id) ?? abort(404);
     }
 
     private function resetForm(): void
@@ -450,7 +462,7 @@ class LeadTaskManager extends Component
 
     public function render()
     {
-        $leadTeams = auth()->user()->ledTeams()->whereNotNull('project_id')->with('project')->get();
+        $leadTeams = $this->leadTeams();
 
         if ($this->filterTeamId && ! $leadTeams->contains('id', $this->filterTeamId)) {
             $this->filterTeamId = $leadTeams->first()?->id;
@@ -460,6 +472,7 @@ class LeadTaskManager extends Component
         $tasks = Task::with(['assignee', 'assignees', 'team', 'project', 'memberProgress.user'])
             ->whereIn('team_id', $leadTeams->pluck('id'))
             ->when($this->filterTeamId, fn ($q) => $q->where('team_id', $this->filterTeamId))
+            ->when((int) session('active_project_id', 0) > 0, fn ($q) => $q->where('project_id', (int) session('active_project_id')))
             ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))
             ->orderByRaw("CASE WHEN status = 'in_progress' THEN 0 WHEN status = 'review' THEN 1 WHEN status = 'pending' THEN 2 WHEN status = 'done' THEN 3 ELSE 4 END")
             ->orderBy('due_date')
@@ -485,4 +498,6 @@ class LeadTaskManager extends Component
             ->get();
     }
 }
+
+
 

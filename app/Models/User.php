@@ -151,6 +151,18 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
+    public function teamIdForProjectRole(int $projectId, string $role): ?int
+    {
+        if ($projectId < 1 || ! in_array($role, ['lead', 'member'], true)) {
+            return null;
+        }
+
+        return $this->teams()
+            ->wherePivot('role', $role)
+            ->assignedToProject($projectId)
+            ->orderBy('teams.name')
+            ->value('teams.id');
+    }
     public function assignedTasks(): HasMany
     {
         return $this->hasMany(Task::class, 'assigned_to');
@@ -187,5 +199,6 @@ class User extends Authenticatable
         return $this->hasMany(TaskMemberProgress::class);
     }
 }
+
 
 

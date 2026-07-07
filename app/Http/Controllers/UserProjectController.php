@@ -7,6 +7,7 @@ use App\Models\Task;
 use App\Models\Team;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class UserProjectController extends Controller
@@ -14,22 +15,30 @@ class UserProjectController extends Controller
     public function index(Request $request): View
     {
         $teams = $this->involvedTeams($request)
-            ->with(['project', 'members' => fn ($query) => $query->whereKey($request->user()->id)])
+            ->with([
+                'project',
+                'projects',
+                'members' => fn ($query) => $query->whereKey($request->user()->id),
+            ])
             ->orderBy('name')
-            ->get()
-            ->filter(fn (Team $team) => $team->project)
-            ->groupBy('project_id');
+            ->get();
 
-        $projects = $teams->map(function ($projectTeams) {
-            $project = $projectTeams->first()->project;
-            $roles = $projectTeams
+        $projectTeams = $teams
+            ->flatMap(fn (Team $team) => $team->assignedProjects()
+                ->map(fn (Project $project) => ['project' => $project, 'team' => $team]))
+            ->groupBy(fn (array $item) => $item['project']->id);
+
+        $projects = $projectTeams->map(function (Collection $items) {
+            $teams = $items->pluck('team')->unique('id')->values();
+            $item = ['project' => $items->first()['project'], 'teams' => $teams];
+            $roles = $teams
                 ->map(fn (Team $team) => $this->roleForTeam($team))
                 ->unique()
                 ->values();
 
             return [
-                'project' => $project,
-                'teams' => $projectTeams->values(),
+                'project' => $item['project'],
+                'teams' => $teams,
                 'role' => $roles->contains('lead') ? 'lead' : 'member',
                 'roles' => $roles,
             ];
@@ -42,12 +51,14 @@ class UserProjectController extends Controller
     {
         $requestedTeamId = $request->integer('team');
 
-        $team = $this->involvedTeams($request)
-            ->where('project_id', $project->id)
+        $teams = $this->involvedTeams($request)
+            ->with(['project', 'projects'])
             ->when($requestedTeamId, fn ($query) => $query->whereKey($requestedTeamId))
             ->orderByRaw("CASE WHEN team_members.role = 'lead' THEN 0 ELSE 1 END")
             ->orderBy('teams.name')
-            ->first();
+            ->get();
+
+        $team = $teams->first(fn (Team $team) => $team->isAssignedToProject($project->id));
 
         if (! $team) {
             return redirect()
@@ -77,9 +88,12 @@ class UserProjectController extends Controller
             ->wherePivotIn('role', ['lead', 'member']);
     }
 
+
     private function roleForTeam(Team $team): string
     {
-        return $team->members->first()?->pivot?->role ?? 'member';
+        return $team->pivot?->role
+            ?? $team->members->first()?->pivot?->role
+            ?? 'member';
     }
 
     private function hasSelfAssignedTask(Request $request, int $projectId): bool
@@ -94,3 +108,4 @@ class UserProjectController extends Controller
             ->exists();
     }
 }
+

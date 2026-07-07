@@ -156,16 +156,28 @@
 
                     $canLead = $authUser->isTeamLead();
                     $canMember = $authUser->isMember();
-                    $showTeamLeadNav = $canLead
-                        && ($activeProjectRole === 'lead' || ! $activeProjectRole);
-                    $showMemberNav = ($canMember && ($activeProjectRole === 'member' || ! $activeProjectRole))
-                        || ($canMember && $hasSelfAssignedTask && $showTeamLeadNav);
+                    $leadTeamForActiveProject = null;
+                    $memberTeamForActiveProject = null;
+
+                    if ($activeProjectId > 0) {
+                        $leadTeamForActiveProject = $authUser->teamIdForProjectRole($activeProjectId, 'lead');
+                        $memberTeamForActiveProject = $authUser->teamIdForProjectRole($activeProjectId, 'member');
+                    }
+
+                    $hasLeadContext = $activeProjectId > 0 ? (bool) $leadTeamForActiveProject : $canLead;
+                    $hasMemberContext = $activeProjectId > 0
+                        ? ((bool) $memberTeamForActiveProject || $hasSelfAssignedTask)
+                        : $canMember;
+                    $showTeamLeadNav = $canLead && $hasLeadContext;
+                    $showMemberNav = $canMember && $hasMemberContext;
+                    $activeLeadTeamId = $leadTeamForActiveProject ?: $activeTeamId;
+                    $activeMemberTeamId = $memberTeamForActiveProject ?: $activeTeamId;
                     $activeMemberRouteParams = array_filter([
-                        'team' => $activeTeamId ?: null,
+                        'team' => $activeMemberTeamId ?: null,
                         'project' => $activeProjectId ?: null,
                     ]);
                     $activeLeadRouteParams = array_filter([
-                        'team' => $activeTeamId ?: null,
+                        'team' => $activeLeadTeamId ?: null,
                     ]);
                     $navActive = 'bg-indigo-500 text-white shadow-sm shadow-indigo-950/20';
                     $navIdle = 'text-slate-300 hover:bg-white/10 hover:text-white';
@@ -197,7 +209,7 @@
                     </a>
                     <a href="{{ route('admin.tasks') }}" class="{{ $navClass }} {{ request()->routeIs('admin.tasks') ? $navActive : $navIdle }}">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                        Task oversight
+                        Task Oversight
                     </a>
                 @elseif($isClient)
                     <p class="{{ $sectionClass }}">Client</p>
@@ -334,5 +346,8 @@
 @stack('scripts')
 </body>
 </html>
+
+
+
 
 

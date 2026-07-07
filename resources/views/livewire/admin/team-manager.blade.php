@@ -4,8 +4,12 @@
         <x-floating-notification :message="session('success')" />
     @endif
 
-    @if(!$showForm)
-        <div class="flex justify-end">
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <div class="min-w-0">
+            <p class="text-sm font-semibold text-gray-900">Teams</p>
+            <p class="mt-0.5 text-xs text-gray-400">Create and maintain project teams.</p>
+        </div>
+        @if(!$showForm)
             <button wire:click="openCreate"
                     wire:loading.attr="disabled"
                     wire:target="openCreate"
@@ -15,8 +19,8 @@
                 </svg>
                 New Team
             </button>
-        </div>
-    @endif
+        @endif
+    </div>
 
     {{-- Create / Edit form --}}
     @if($showForm)
@@ -149,7 +153,7 @@
                                             <span class="min-w-0 flex-1">
                                                 <span class="block font-medium text-gray-700 truncate">{{ $teamOption->name }}</span>
                                                 <span class="block text-xs text-gray-400 truncate">
-                                                    {{ $teamOption->project?->name ?? 'No project' }} / Lead: {{ $teamOption->lead?->name ?? 'Unassigned' }}
+                                                    {{ $teamOption->projects->pluck('name')->join(', ') ?: ($teamOption->project?->name ?? 'No project') }} / Lead: {{ $teamOption->lead?->name ?? 'Unassigned' }}
                                                 </span>
                                             </span>
                                         </label>
@@ -201,7 +205,7 @@
                 <div class="flex items-center gap-4 px-6 py-4">
                     <div class="flex-1 min-w-0">
                         <p class="font-semibold text-gray-900">{{ $team->name }}</p>
-                        <p class="text-xs text-gray-400 mt-0.5">{{ $team->project?->name ?? 'No project assigned' }}</p>
+                        <p class="text-xs text-gray-400 mt-0.5">{{ $team->projects->pluck('name')->join(', ') ?: ($team->project?->name ?? 'No project assigned') }}</p>
                     </div>
                     <div class="text-sm text-gray-600 hidden md:block">
                         Lead: <span class="font-medium text-gray-800">{{ $team->lead->name }}</span>
@@ -261,7 +265,7 @@
                             <div class="flex items-start justify-between">
                                 <div>
                                     <h3 class="text-lg font-semibold text-gray-900">{{ $detailsTeam->name }}</h3>
-                                    <p class="mt-1 text-sm text-gray-500">{{ $detailsTeam->project?->name ?? 'No project assigned' }}</p>
+                                    <p class="mt-1 text-sm text-gray-500">{{ $detailsTeam->projects->pluck('name')->join(', ') ?: ($detailsTeam->project?->name ?? 'No project assigned') }}</p>
                                 </div>
                                 <div class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-700 shadow-sm">
                                     {{ $completion }}% complete

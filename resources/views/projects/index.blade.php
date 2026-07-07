@@ -80,8 +80,6 @@
                     @foreach($projects as $item)
                         @php
                             $project = $item['project'];
-                            $visibleTeams = $item['teams']->take(3);
-                            $hiddenTeamCount = max(0, $item['teams']->count() - $visibleTeams->count());
                             $statusClass = match($project->status) {
                                 'active' => 'bg-emerald-100 text-emerald-700',
                                 'on_hold' => 'bg-amber-100 text-amber-700',
@@ -111,7 +109,7 @@
                                 </p>
 
                                 <div class="project-team-list">
-                                    @foreach($visibleTeams as $team)
+                                    @foreach($item['teams'] as $team)
                                         @php
                                             $teamRole = $team->pivot->role ?? 'member';
                                             $roleLabel = $teamRole === 'lead' ? 'Team Lead' : 'Member';
@@ -135,14 +133,9 @@
                                         </a>
                                     @endforeach
 
-                                    @if($hiddenTeamCount > 0)
-                                        <div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-                                            +{{ $hiddenTeamCount }} more team{{ $hiddenTeamCount === 1 ? '' : 's' }} in this project
-                                        </div>
-                                    @endif
                                 </div>
 
-                                <div class="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-4 text-sm">
+                                <div class="mt-auto border-t border-slate-100 pt-4 text-sm">
                                     <span class="text-slate-500">
                                         @if($project->start_date || $project->end_date)
                                             {{ $project->start_date?->format('M d, Y') ?? 'TBD' }}
@@ -153,10 +146,6 @@
                                             Dates not set
                                         @endif
                                     </span>
-                                    <a href="{{ route('projects.open', $project) }}"
-                                       class="shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-bold text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                        Open project
-                                    </a>
                                 </div>
                             </div>
                         </article>

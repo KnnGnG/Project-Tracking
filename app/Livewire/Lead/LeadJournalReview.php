@@ -6,6 +6,7 @@ use App\Models\JournalLog;
 use App\Models\Task;
 use App\Models\User;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -14,6 +15,12 @@ use Livewire\WithPagination;
 #[Title('Journal Review')]
 class LeadJournalReview extends Component
 {
+    #[On('journal-log-changed')]
+    public function refreshJournalLinkedData(): void
+    {
+        // Listener intentionally empty; Livewire rerenders after the event action.
+    }
+
     use WithPagination;
 
     public string $logDate = '';
@@ -35,6 +42,8 @@ class LeadJournalReview extends Component
 
     private function normalizeFilters($teamIds): void
     {
+        $activeProjectId = (int) session('active_project_id', 0);
+
         if ($this->teamId !== '' && ! $teamIds->contains((int) $this->teamId)) {
             $this->teamId = '';
         }
@@ -49,6 +58,7 @@ class LeadJournalReview extends Component
         if ($this->taskId !== '' && ! Task::query()
             ->whereKey((int) $this->taskId)
             ->whereIn('team_id', $teamIds)
+            ->when($activeProjectId > 0, fn ($query) => $query->where('project_id', $activeProjectId))
             ->exists()) {
             $this->taskId = '';
         }
@@ -56,7 +66,13 @@ class LeadJournalReview extends Component
 
     public function render()
     {
-        $leadTeams = auth()->user()->ledTeams()->whereNotNull('project_id')->with('project')->get();
+        $activeProjectId = (int) session('active_project_id', 0);
+
+        $leadTeams = auth()->user()->ledTeams()->with(['project', 'projects'])->get()
+            ->filter(fn ($team) => $activeProjectId > 0
+                ? $team->isAssignedToProject($activeProjectId)
+                : $team->assignedProjects()->isNotEmpty())
+            ->values();
         $teamIds = $leadTeams->pluck('id');
         $this->normalizeFilters($teamIds);
 
@@ -65,13 +81,19 @@ class LeadJournalReview extends Component
             ->get();
 
         $tasks = Task::whereIn('team_id', $teamIds)
+            ->when($activeProjectId > 0, fn ($q) => $q->where('project_id', $activeProjectId))
             ->orderBy('title')
             ->get();
 
-        $query = JournalLog::with(['user', 'task.project', 'task.team', 'team.project'])
-            ->where(function ($q) use ($teamIds) {
-                $q->whereIn('team_id', $teamIds)
-                    ->orWhereHas('task', fn ($taskQuery) => $taskQuery->whereIn('team_id', $teamIds));
+        $query = JournalLog::with(['user', 'task.project', 'task.team', 'team.project', 'team.projects'])
+            ->where(function ($q) use ($teamIds, $activeProjectId) {
+                $q->where(function ($general) use ($teamIds) {
+                    $general->whereIn('team_id', $teamIds)
+                        ->whereNull('task_id');
+                })->orWhereHas('task', function ($taskQuery) use ($teamIds, $activeProjectId) {
+                    $taskQuery->whereIn('team_id', $teamIds)
+                        ->when($activeProjectId > 0, fn ($projectQuery) => $projectQuery->where('project_id', $activeProjectId));
+                });
             })
             ->when($this->logDate, fn ($q) => $q->whereDate('log_date', $this->logDate))
             ->when($this->teamId !== '', function ($q) {
@@ -93,4 +115,8 @@ class LeadJournalReview extends Component
         return view('livewire.lead.lead-journal-review', compact('leadTeams', 'members', 'tasks', 'logs', 'totalMinutes'));
     }
 }
+
+
+
+
 

@@ -1,7 +1,34 @@
 <div class="space-y-6">
 
-    @if(!$showForm)
-        <div class="flex justify-end">
+    <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <div class="flex flex-wrap items-center gap-3">
+            <select wire:model.live="filterTeamId"
+                    aria-label="Team"
+                    class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">All My Teams</option>
+                @foreach($leadTeams as $team)
+                    @php
+                        $activeProjectId = (int) session('active_project_id', 0);
+                        $teamProject = $activeProjectId > 0
+                            ? $team->assignedProjects()->firstWhere('id', $activeProjectId)
+                            : $team->assignedProjects()->first();
+                    @endphp
+                    <option value="{{ $team->id }}">{{ $team->name }}@if($teamProject) - {{ $teamProject->name }}@endif</option>
+                @endforeach
+            </select>
+
+            <select wire:model.live="filterStatus"
+                    aria-label="Status"
+                    class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="review">Review</option>
+                <option value="done">Done</option>
+            </select>
+        </div>
+
+        @if(!$showForm)
             <button wire:click="openCreate"
                     wire:loading.attr="disabled"
                     wire:target="openCreate"
@@ -11,28 +38,7 @@
                 </svg>
                 Assign Task
             </button>
-        </div>
-    @endif
-
-    <div class="flex flex-wrap items-center gap-3 justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-        <div class="flex flex-wrap items-center gap-3">
-            <select wire:model.live="filterTeamId"
-                    class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="">All My Teams</option>
-                @foreach($leadTeams as $team)
-                    <option value="{{ $team->id }}">{{ $team->name }} - {{ $team->project->name }}</option>
-                @endforeach
-            </select>
-
-            <select wire:model.live="filterStatus"
-                    class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="">All Statuses</option>
-                <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
-                <option value="review">Review</option>
-                <option value="done">Done</option>
-            </select>
-        </div>
+        @endif
     </div>
 
     {{-- ── Task form ─────────────────────────────────────────────────────────── --}}
@@ -64,6 +70,7 @@
                 <div>
                     @php
                         $selectedFormTeam = $teamId ? $leadTeams->firstWhere('id', (int) $teamId) : null;
+                        $selectedFormProject = $selectedFormTeam ? ($selectedFormTeam->assignedProjects()->firstWhere('id', (int) session('active_project_id', 0)) ?? $selectedFormTeam->assignedProjects()->first()) : null;
                     @endphp
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Team <span class="text-red-500">*</span>
@@ -75,11 +82,11 @@
                             <option value="{{ $team->id }}">{{ $team->name }}</option>
                         @endforeach
                     </select>
-                    @if($selectedFormTeam?->project)
+                    @if($selectedFormProject)
                         <div class="mt-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
-                            <p class="font-semibold">{{ $selectedFormTeam->project->name }}</p>
+                            <p class="font-semibold">{{ $selectedFormProject->name }}</p>
                             <p class="mt-0.5">
-                                Project starts {{ $selectedFormTeam->project->start_date?->format('M d, Y') ?? 'Not set' }}
+                                Project starts {{ $selectedFormProject->start_date?->format('M d, Y') ?? 'Not set' }}
                             </p>
                         </div>
                     @endif
@@ -464,3 +471,4 @@
     </x-confirmation-modal>
 
 </div>
+
