@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Lead;
 
+use App\Livewire\Concerns\ResolvesLeadProjectContext;
 use App\Models\Project;
 use App\Models\ProjectEvent;
 use App\Models\JournalLog;
@@ -19,6 +20,8 @@ use Livewire\Component;
 #[Title('Team Dashboard')]
 class TeamLeadDashboard extends Component
 {
+    use ResolvesLeadProjectContext;
+
     #[On('journal-log-changed')]
     public function refreshJournalLinkedData(): void
     {
@@ -102,27 +105,6 @@ class TeamLeadDashboard extends Component
     }
 
 
-    private function leadTeams(): Collection
-    {
-        $activeProjectId = (int) session('active_project_id', 0);
-
-        return auth()->user()
-            ->ledTeams()
-            ->with(['project', 'projects'])
-            ->get()
-            ->filter(fn (Team $team) => $activeProjectId > 0
-                ? $team->isAssignedToProject($activeProjectId)
-                : $team->assignedProjects()->isNotEmpty())
-            ->values();
-    }
-
-    private function activeProjectForTeam(Team $team)
-    {
-        $activeProjectId = (int) session('active_project_id', 0);
-        $projects = $team->assignedProjects();
-
-        return $projects->firstWhere('id', $activeProjectId) ?? $projects->first();
-    }
     private function hasSelfAssignedTask(int $projectId): bool
     {
         return Task::query()
@@ -848,6 +830,10 @@ class TeamLeadDashboard extends Component
         ];
         $monthLabel = Carbon::create($this->year, $this->month, 1)->format('F Y');
 
+        if ($this->selectedTeamId && ! $teams->contains('id', $this->selectedTeamId)) {
+            $this->selectedTeamId = $teams->first()?->id;
+        }
+
         if ($this->selectedTeamId) {
             $selectedTeam = auth()->user()->ledTeams()->with([
                 'project.events',
@@ -862,10 +848,14 @@ class TeamLeadDashboard extends Component
 
             if ($selectedTeam) {
                 $project = $this->activeProjectForTeam($selectedTeam);
-                $timelineProjects = collect([$project])->filter();
-                $tasks = $selectedTeam->tasks
-                    ->where('project_id', $project->id)
-                    ->values();
+
+                if (! $project) {
+                    $selectedTeam = null;
+                } else {
+                    $timelineProjects = collect([$project])->filter();
+                    $tasks = $selectedTeam->tasks
+                        ->where('project_id', $project->id)
+                        ->values();
                 $monthStart = Carbon::create($this->year, $this->month, 1)->startOfDay();
                 $monthEnd = $monthStart->copy()->endOfMonth();
                 $generalLogs = JournalLog::with('user')
@@ -967,6 +957,7 @@ class TeamLeadDashboard extends Component
 
                 $daysRemaining = (int) now()->startOfDay()
                     ->diffInDays($project->end_date, false);
+                }
             }
         }
 
@@ -985,5 +976,7 @@ class TeamLeadDashboard extends Component
         ));
     }
 }
+
+
 
 

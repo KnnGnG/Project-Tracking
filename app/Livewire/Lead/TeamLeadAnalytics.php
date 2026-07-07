@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Lead;
 
+use App\Livewire\Concerns\ResolvesLeadProjectContext;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\JournalLog;
@@ -18,6 +19,8 @@ use Livewire\Component;
 #[Title('Team Analytics')]
 class TeamLeadAnalytics extends Component
 {
+    use ResolvesLeadProjectContext;
+
     #[On('journal-log-changed')]
     public function refreshJournalLinkedData(): void
     {
@@ -138,27 +141,6 @@ class TeamLeadAnalytics extends Component
     }
 
 
-    private function leadTeams(): Collection
-    {
-        $activeProjectId = (int) session('active_project_id', 0);
-
-        return auth()->user()
-            ->ledTeams()
-            ->with(['project', 'projects'])
-            ->get()
-            ->filter(fn (Team $team) => $activeProjectId > 0
-                ? $team->isAssignedToProject($activeProjectId)
-                : $team->assignedProjects()->isNotEmpty())
-            ->values();
-    }
-
-    private function activeProjectForTeam(Team $team)
-    {
-        $activeProjectId = (int) session('active_project_id', 0);
-        $projects = $team->assignedProjects();
-
-        return $projects->firstWhere('id', $activeProjectId) ?? $projects->first();
-    }
     /** @return array<string, mixed> */
     private function buildSummary(Collection $tasks): array
     {
@@ -538,4 +520,5 @@ class TeamLeadAnalytics extends Component
         ];
     }
 }
+
 

@@ -23,24 +23,14 @@ class UserProjectController extends Controller
             ->orderBy('name')
             ->get();
 
-        $projectTeams = collect();
+        $projectTeams = $teams
+            ->flatMap(fn (Team $team) => $team->assignedProjects()
+                ->map(fn (Project $project) => ['project' => $project, 'team' => $team]))
+            ->groupBy(fn (array $item) => $item['project']->id);
 
-        $teams->each(function (Team $team) use ($projectTeams): void {
-            $projects = $team->assignedProjects();
-
-            $projects->each(function (Project $project) use ($projectTeams, $team): void {
-                $projectTeams->put(
-                    $project->id,
-                    [
-                        'project' => $project,
-                        'teams' => collect($projectTeams->get($project->id, ['teams' => collect()])['teams'])->push($team),
-                    ]
-                );
-            });
-        });
-
-        $projects = $projectTeams->map(function (array $item) {
-            $teams = $item['teams']->unique('id')->values();
+        $projects = $projectTeams->map(function (Collection $items) {
+            $teams = $items->pluck('team')->unique('id')->values();
+            $item = ['project' => $items->first()['project'], 'teams' => $teams];
             $roles = $teams
                 ->map(fn (Team $team) => $this->roleForTeam($team))
                 ->unique()
@@ -118,3 +108,4 @@ class UserProjectController extends Controller
             ->exists();
     }
 }
+

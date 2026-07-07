@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskMemberProgress;
 use App\Models\Team;
+use App\Livewire\Concerns\ResolvesLeadProjectContext;
 use App\Models\InAppNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
@@ -148,6 +149,14 @@ class LeadTaskManager extends Component
 
         // Ensure the team belongs to this lead
         $team = $this->ownedTeam($data['teamId']);
+        $project = $this->activeProjectForTeam($team);
+
+        if (! $project) {
+            $this->addError('teamId', 'Choose a team from the selected project.');
+
+            return;
+        }
+
         $assigneeIds = collect($data['assignedTo'])
             ->map(fn ($id) => (int) $id)
             ->unique()
@@ -302,27 +311,6 @@ class LeadTaskManager extends Component
     }
 
 
-    private function leadTeams(): Collection
-    {
-        $activeProjectId = (int) session('active_project_id', 0);
-
-        return auth()->user()
-            ->ledTeams()
-            ->with(['project', 'projects'])
-            ->get()
-            ->filter(fn (Team $team) => $activeProjectId > 0
-                ? $team->isAssignedToProject($activeProjectId)
-                : $team->assignedProjects()->isNotEmpty())
-            ->values();
-    }
-
-    private function activeProjectForTeam(Team $team)
-    {
-        $activeProjectId = (int) session('active_project_id', 0);
-        $projects = $team->assignedProjects();
-
-        return $projects->firstWhere('id', $activeProjectId) ?? $projects->first();
-    }
     /** Returns a task only if it belongs to one of this lead's teams. */
     private function ownedTask(int $id): Task
     {
@@ -510,4 +498,6 @@ class LeadTaskManager extends Component
             ->get();
     }
 }
+
+
 

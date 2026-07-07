@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -43,6 +44,13 @@ class Team extends Model
         return $this->assignedProjects()->contains('id', $projectId);
     }
 
+    public function scopeAssignedToProject(Builder $query, int $projectId): Builder
+    {
+        return $query->where(function (Builder $projectScope) use ($projectId): void {
+            $projectScope->where('teams.project_id', $projectId)
+                ->orWhereHas('projects', fn (Builder $projects) => $projects->whereKey($projectId));
+        });
+    }
     public function lead(): BelongsTo
     {
         return $this->belongsTo(User::class, 'lead_id');
@@ -91,3 +99,4 @@ class Team extends Model
         return (int) round(($done / $total) * 100);
     }
 }
+

@@ -108,7 +108,7 @@
                                     {{ $project->description ?: 'No description provided.' }}
                                 </p>
 
-                                <div class="project-team-list" style="max-height: calc((4.25rem * 3) + (0.625rem * 2)); overflow-y: auto; padding-right: 0.25rem; overscroll-behavior: contain; scrollbar-gutter: stable;">
+                                <div class="project-team-list">
                                     @foreach($item['teams'] as $team)
                                         @php
                                             $teamRole = $team->pivot->role ?? 'member';

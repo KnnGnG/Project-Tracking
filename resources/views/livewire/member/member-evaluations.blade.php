@@ -93,7 +93,7 @@
                     $evaluationProject = $activeProjectId > 0
                         ? $evaluation->team?->assignedProjects()?->firstWhere('id', $activeProjectId)
                         : $evaluation->team?->assignedProjects()?->first();
-                    $projectNames = $evaluation->team?->project?->name ?? $evaluationProject?->name ?? 'No project';
+                    $projectNames = $evaluationProject?->name ?? $evaluation->team?->project?->name ?? 'No project';
                 @endphp
 
                 <article class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -167,3 +167,4 @@
         </div>
     @endif
 </div>
+

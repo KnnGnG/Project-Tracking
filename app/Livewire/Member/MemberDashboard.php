@@ -189,10 +189,7 @@ class MemberDashboard extends Component
         if ($this->filterTeam > 0) {
             $teamIsAccessible = Team::query()
                 ->whereKey($this->filterTeam)
-                ->when($this->filterProject > 0, fn ($query) => $query->where(function ($projectScope) {
-                    $projectScope->where('teams.project_id', $this->filterProject)
-                        ->orWhereHas('projects', fn ($projects) => $projects->whereKey($this->filterProject));
-                }))
+                ->when($this->filterProject > 0, fn ($query) => $query->assignedToProject($this->filterProject))
                 ->where(function ($query) use ($userId) {
                     $query->whereHas('members', fn ($members) => $members
                         ->whereKey($userId)
@@ -212,22 +209,26 @@ class MemberDashboard extends Component
             }
         }
 
-        if ($this->filterProject > 0 && ! Project::query()
-            ->whereKey($this->filterProject)
-            ->where(function ($project) use ($userId) {
-                $project->whereHas('teams', fn ($teams) => $teams
-                    ->whereHas('members', fn ($members) => $members
-                        ->whereKey($userId)
-                        ->where('team_members.role', 'member')))
-                    ->orWhereHas('tasks', fn ($tasks) => $tasks
-                        ->where(function ($query) use ($userId) {
-                            $query->where('assigned_to', $userId)
-                                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId));
-                        })
-                        ->when($this->filterTeam > 0, fn ($query) => $query->where('team_id', $this->filterTeam)));
-            })
-            ->exists()) {
-            $this->filterProject = 0;
+        if ($this->filterProject > 0) {
+            $projectIsAccessible = Team::query()
+                ->assignedToProject($this->filterProject)
+                ->whereHas('members', fn ($members) => $members
+                    ->whereKey($userId)
+                    ->where('team_members.role', 'member'))
+                ->when($this->filterTeam > 0, fn ($query) => $query->whereKey($this->filterTeam))
+                ->exists()
+                || Task::query()
+                    ->where('project_id', $this->filterProject)
+                    ->where(function ($query) use ($userId) {
+                        $query->where('assigned_to', $userId)
+                            ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId));
+                    })
+                    ->when($this->filterTeam > 0, fn ($query) => $query->where('team_id', $this->filterTeam))
+                    ->exists();
+
+            if (! $projectIsAccessible) {
+                $this->filterProject = 0;
+            }
         }
     }
     private function ownedTask(int $id): ?Task
@@ -379,9 +380,7 @@ class MemberDashboard extends Component
 
         $teams = Team::query()
             ->with(['project', 'projects'])
-            ->when($this->filterProject > 0, fn ($query) => $query->where(fn ($projectScope) => $projectScope
-                ->where('teams.project_id', $this->filterProject)
-                ->orWhereHas('projects', fn ($projects) => $projects->whereKey($this->filterProject))))
+            ->when($this->filterProject > 0, fn ($query) => $query->assignedToProject($this->filterProject))
             ->where(fn ($query) => $query
                 ->whereHas('members', fn ($members) => $members
                     ->whereKey($userId)
@@ -401,6 +400,7 @@ class MemberDashboard extends Component
         // ── Gather projects this member has tasks in (for filter dropdown) ──────
         $projects = Project::where(fn ($project) => $project
             ->whereHas('teams', fn ($teams) => $teams
+                ->when($this->filterTeam > 0, fn ($teamQuery) => $teamQuery->whereKey($this->filterTeam))
                 ->whereHas('members', fn ($members) => $members
                     ->whereKey($userId)
                     ->where('team_members.role', 'member')))
@@ -490,5 +490,10 @@ class MemberDashboard extends Component
         return view('livewire.member.member-dashboard', compact('tasks', 'counts', 'projects', 'focusTasks', 'teams'));
     }
 }
+
+
+
+
+
 
 

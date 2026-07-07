@@ -1,4 +1,4 @@
-<div class="space-y-6" wire:poll.visible.60s>
+<div class="space-y-6" wire:poll.visible.15s>
     <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="min-w-0">
             <p class="text-sm font-semibold text-gray-900">Journal Review</p>
@@ -79,4 +79,5 @@
 
     {{ $logs->links() }}
 </div>
+
 

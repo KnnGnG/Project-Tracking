@@ -66,8 +66,12 @@ class LeadJournalReview extends Component
 
     public function render()
     {
+        $activeProjectId = (int) session('active_project_id', 0);
+
         $leadTeams = auth()->user()->ledTeams()->with(['project', 'projects'])->get()
-            ->filter(fn ($team) => $team->assignedProjects()->isNotEmpty())
+            ->filter(fn ($team) => $activeProjectId > 0
+                ? $team->isAssignedToProject($activeProjectId)
+                : $team->assignedProjects()->isNotEmpty())
             ->values();
         $teamIds = $leadTeams->pluck('id');
         $this->normalizeFilters($teamIds);
@@ -111,6 +115,8 @@ class LeadJournalReview extends Component
         return view('livewire.lead.lead-journal-review', compact('leadTeams', 'members', 'tasks', 'logs', 'totalMinutes'));
     }
 }
+
+
 
 
 

@@ -160,21 +160,8 @@
                     $memberTeamForActiveProject = null;
 
                     if ($activeProjectId > 0) {
-                        $leadTeamForActiveProject = $authUser->teams()
-                            ->wherePivot('role', 'lead')
-                            ->where(fn ($query) => $query
-                                ->where('teams.project_id', $activeProjectId)
-                                ->orWhereHas('projects', fn ($projects) => $projects->whereKey($activeProjectId)))
-                            ->orderBy('teams.name')
-                            ->value('teams.id');
-
-                        $memberTeamForActiveProject = $authUser->teams()
-                            ->wherePivot('role', 'member')
-                            ->where(fn ($query) => $query
-                                ->where('teams.project_id', $activeProjectId)
-                                ->orWhereHas('projects', fn ($projects) => $projects->whereKey($activeProjectId)))
-                            ->orderBy('teams.name')
-                            ->value('teams.id');
+                        $leadTeamForActiveProject = $authUser->teamIdForProjectRole($activeProjectId, 'lead');
+                        $memberTeamForActiveProject = $authUser->teamIdForProjectRole($activeProjectId, 'member');
                     }
 
                     $hasLeadContext = $activeProjectId > 0 ? (bool) $leadTeamForActiveProject : $canLead;
@@ -359,6 +346,8 @@
 @stack('scripts')
 </body>
 </html>
+
+
 
 
 

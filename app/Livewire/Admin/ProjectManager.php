@@ -118,7 +118,15 @@ class ProjectManager extends Component
                 $project = Project::findOrFail($this->editingId);
                 $project->update($payload);
 
+                $previousTeamIds = $project->teams()->pluck('teams.id');
                 $project->teams()->sync($selectedTeamIds->all());
+                $removedTeamIds = $previousTeamIds->diff($selectedTeamIds);
+
+                if ($removedTeamIds->isNotEmpty()) {
+                    Team::whereIn('id', $removedTeamIds->all())
+                        ->where('project_id', $project->id)
+                        ->update(['project_id' => null]);
+                }
 
                 if ($selectedTeamIds->isNotEmpty()) {
                     Team::whereIn('id', $selectedTeamIds->all())
@@ -257,4 +265,5 @@ class ProjectManager extends Component
         return view('livewire.admin.project-manager', compact('projects', 'clients', 'detailsProject', 'detailsProjectTasks', 'projectTeamOptions', 'selectedProjectTeams'));
     }
 }
+
 

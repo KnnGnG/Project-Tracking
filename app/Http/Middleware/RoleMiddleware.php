@@ -56,9 +56,7 @@ class RoleMiddleware
             return $request->user()
                 ->teams()
                 ->wherePivot('role', $role)
-                ->where(fn ($query) => $query
-                    ->where('teams.project_id', $projectId)
-                    ->orWhereHas('projects', fn ($projects) => $projects->whereKey($projectId)))
+                ->assignedToProject($projectId)
                 ->exists();
         }
 
@@ -87,4 +85,6 @@ class RoleMiddleware
             ->exists();
     }
 }
+
+
 

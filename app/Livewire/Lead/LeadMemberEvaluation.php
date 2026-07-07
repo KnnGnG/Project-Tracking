@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Lead;
 
+use App\Livewire\Concerns\ResolvesLeadProjectContext;
 use App\Models\InAppNotification;
 use App\Models\JournalLog;
 use App\Models\Task;
@@ -238,28 +239,10 @@ class LeadMemberEvaluation extends Component
         $this->resetValidation();
     }
 
-    private function leadTeams(): Collection
+    protected function leadTeamRelations(): array
     {
-        $activeProjectId = (int) session('active_project_id', 0);
-
-        return auth()->user()
-            ->ledTeams()
-            ->with(['project', 'projects', 'regularMembers'])
-            ->get()
-            ->filter(fn (Team $team) => $activeProjectId > 0
-                ? $team->isAssignedToProject($activeProjectId)
-                : $team->assignedProjects()->isNotEmpty())
-            ->values();
+        return ['project', 'projects', 'regularMembers'];
     }
-
-    private function activeProjectForTeam(Team $team)
-    {
-        $activeProjectId = (int) session('active_project_id', 0);
-        $projects = $team->assignedProjects();
-
-        return $projects->firstWhere('id', $activeProjectId) ?? $projects->first();
-    }
-
     private function ownedTeam(int $teamId): ?Team
     {
         return $this->leadTeams()->firstWhere('id', $teamId);
@@ -445,4 +428,5 @@ class LeadMemberEvaluation extends Component
         ));
     }
 }
+
 

@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Lead\LeadJournalReview;
 use App\Livewire\Member\MemberDashboard;
+use App\Models\JournalLog;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\Team;
@@ -87,6 +89,48 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
             ->assertSet('filterTeam', 0);
     }
 
+    public function test_team_lead_journal_review_shows_member_logs_for_selected_project(): void
+    {
+        $lead = User::factory()->create(['role' => 'team_lead']);
+        $member = User::factory()->create(['role' => 'member']);
+        $project = Project::create($this->projectPayload('Journal Project', $lead->id));
+        $team = Team::create(['name' => 'Journal Team', 'project_id' => $project->id, 'lead_id' => $lead->id]);
+        $team->members()->attach($lead->id, ['role' => 'lead']);
+        $team->members()->attach($member->id, ['role' => 'member']);
+
+        $task = Task::create([
+            'title' => 'Write integration notes',
+            'project_id' => $project->id,
+            'team_id' => $team->id,
+            'assigned_to' => $member->id,
+            'created_by' => $lead->id,
+            'start_date' => now()->toDateString(),
+            'due_date' => now()->addDay()->toDateString(),
+            'status' => 'in_progress',
+            'priority' => 'medium',
+        ]);
+
+        JournalLog::create([
+            'user_id' => $member->id,
+            'task_id' => $task->id,
+            'team_id' => $team->id,
+            'log_date' => now()->toDateString(),
+            'minutes' => 45,
+            'notes' => 'Connected from member journal.',
+        ]);
+
+        $this->actingAs($lead)
+            ->withSession([
+                'active_project_id' => $project->id,
+                'active_team_id' => $team->id,
+                'active_project_role' => 'lead',
+            ]);
+
+        Livewire::test(LeadJournalReview::class)
+            ->assertSee('Write integration notes')
+            ->assertSee('Connected from member journal.')
+            ->assertSee('0h 45m');
+    }
     public function test_team_lead_can_open_member_dashboard_for_same_project_member_role(): void
     {
         $user = User::factory()->create(['role' => 'team_lead']);
@@ -105,6 +149,31 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
             ])
             ->get(route('member.dashboard', ['team' => $leadTeam->id, 'project' => $project->id]))
             ->assertOk();
+
+        Livewire::withQueryParams(['team' => $leadTeam->id, 'project' => $project->id])
+            ->test(MemberDashboard::class)
+            ->assertSet('filterProject', $project->id)
+            ->assertSet('filterTeam', 0);
+    }
+
+    public function test_team_assigned_projects_include_pivot_linked_projects(): void
+    {
+        $lead = User::factory()->create(['role' => 'team_lead']);
+        $firstProject = Project::create($this->projectPayload('Pivot Project A', $lead->id));
+        $secondProject = Project::create($this->projectPayload('Pivot Project B', $lead->id));
+        $outsideProject = Project::create($this->projectPayload('Outside Project', $lead->id));
+        $team = Team::create(['name' => 'Pivot Team', 'lead_id' => $lead->id]);
+
+        $team->projects()->attach([$firstProject->id, $secondProject->id]);
+        $team->refresh();
+
+        $this->assertEqualsCanonicalizing(
+            [$firstProject->id, $secondProject->id],
+            $team->assignedProjects()->pluck('id')->all()
+        );
+        $this->assertTrue($team->isAssignedToProject($firstProject->id));
+        $this->assertTrue($team->isAssignedToProject($secondProject->id));
+        $this->assertFalse($team->isAssignedToProject($outsideProject->id));
     }
     private function projectPayload(string $name, int $creatorId): array
     {
@@ -118,4 +187,6 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
         ];
     }
 }
+
+
 

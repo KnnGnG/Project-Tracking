@@ -158,7 +158,7 @@ class TeamManager extends Component
 
             Project::findOrFail((int) $data['projectId'])
                 ->teams()
-                ->sync($projectTeamIds->all());
+                ->syncWithoutDetaching($projectTeamIds->all());
 
             Team::whereIn('id', $projectTeamIds->all())
                 ->whereNull('project_id')
@@ -338,3 +338,5 @@ class TeamManager extends Component
             compact('teams', 'projects', 'leads', 'members', 'projectTeamOptions', 'selectedProjectTeams', 'detailsTeam'));
     }
 }
+
+

@@ -40,9 +40,7 @@ class MemberEvaluations extends Component
 
         if (! Team::query()
             ->whereKey($this->filterTeam)
-            ->when($activeProjectId > 0, fn ($query) => $query->where(fn ($projectScope) => $projectScope
-                ->where('project_id', $activeProjectId)
-                ->orWhereHas('projects', fn ($projects) => $projects->whereKey($activeProjectId))))
+            ->when($activeProjectId > 0, fn ($query) => $query->assignedToProject($activeProjectId))
             ->whereHas('members', fn ($members) => $members->whereKey(auth()->id()))
             ->exists()) {
             $this->filterTeam = 0;
@@ -86,4 +84,7 @@ class MemberEvaluations extends Component
         return view('livewire.member.member-evaluations', compact('teams', 'evaluations', 'summary'));
     }
 }
+
+
+
 

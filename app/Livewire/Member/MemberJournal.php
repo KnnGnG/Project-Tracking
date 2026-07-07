@@ -346,9 +346,7 @@ class MemberJournal extends Component
 
         return Team::query()
             ->whereKey($teamId)
-            ->when($activeProjectId > 0, fn ($query) => $query->where(fn ($projectScope) => $projectScope
-                ->where('project_id', $activeProjectId)
-                ->orWhereHas('projects', fn ($projects) => $projects->whereKey($activeProjectId))))
+            ->when($activeProjectId > 0, fn ($query) => $query->assignedToProject($activeProjectId))
             ->where(fn ($query) => $query
                 ->whereHas('members', fn ($members) => $members->whereKey($userId))
                 ->orWhereHas('tasks', fn ($tasks) => $tasks
@@ -430,4 +428,7 @@ class MemberJournal extends Component
         return view('livewire.member.member-journal', compact('tasks', 'logs', 'dailyMinutes', 'recentLogs', 'teams'));
     }
 }
+
+
+
 
