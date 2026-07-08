@@ -45,7 +45,7 @@ class TaskAssigner extends Component
         $tasks = Task::with(['project', 'team', 'assignee', 'assignees', 'creator', 'memberProgress.user'])
             ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))
             ->when($this->filterProject, fn ($q) => $q->where('project_id', $this->filterProject))
-            ->latest('updated_at')
+            ->latest('created_at')
             ->paginate($this->perPage);
 
         $projects = Project::orderBy('name')->get();

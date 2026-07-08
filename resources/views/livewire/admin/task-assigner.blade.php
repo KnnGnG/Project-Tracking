@@ -1,6 +1,6 @@
-<div wire:poll.visible.60s>
+<div class="space-y-4" wire:poll.visible.60s>
     {{-- Filters --}}
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm" role="group" aria-label="Filter tasks">
+    <div class="sticky z-30 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm" style="top: 0.75rem;" role="group" aria-label="Filter tasks">
         <div class="min-w-0">
             <p class="text-sm font-semibold text-gray-900">Task Oversight</p>
             <p class="mt-0.5 text-xs text-gray-400">Filter tasks by status, project, and page size.</p>
@@ -46,30 +46,31 @@
                 <p class="mt-1 text-sm text-gray-500">Try changing the status or project filter.</p>
             </div>
         @else
-            <p class="px-6 py-3 text-xs text-gray-500 border-b border-gray-100 bg-gray-50/80">
+            <p class="border-b border-gray-100 bg-gray-50/80 px-6 py-3 text-xs text-gray-500">
                 Showing
                 <span class="font-medium text-gray-700">{{ $tasks->firstItem() }}</span>
-                –
+                &ndash;
                 <span class="font-medium text-gray-700">{{ $tasks->lastItem() }}</span>
                 of
                 <span class="font-medium text-gray-700">{{ $tasks->total() }}</span>
                 tasks
             </p>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm min-w-[1050px]">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                            <th class="px-6 py-3 text-left font-semibold text-gray-600">Task</th>
-                            <th class="px-6 py-3 text-left font-semibold text-gray-600">Project / team</th>
-                            <th class="px-6 py-3 text-left font-semibold text-gray-600">Assigned / actual start</th>
-                            <th class="px-6 py-3 text-left font-semibold text-gray-600">Created by</th>
-                            <th class="px-6 py-3 text-left font-semibold text-gray-600">Scheduled start</th>
-                            <th class="px-6 py-3 text-left font-semibold text-gray-600">Due date</th>
-                            <th class="px-6 py-3 text-left font-semibold text-gray-600">Priority</th>
-                            <th class="px-6 py-3 text-left font-semibold text-gray-600">Status</th>
+                <table class="w-full min-w-[1120px] text-sm" style="table-layout: fixed;">
+                    <thead class="block border-b border-gray-200 bg-gray-50">
+                        <tr style="display: table; width: 100%; table-layout: fixed;">
+                            <th class="bg-gray-50 px-6 py-3 text-left font-semibold text-gray-600" style="width: 4.5rem;">No.</th>
+                            <th class="bg-gray-50 px-6 py-3 text-left font-semibold text-gray-600">Task</th>
+                            <th class="bg-gray-50 px-6 py-3 text-left font-semibold text-gray-600">Project / team</th>
+                            <th class="bg-gray-50 px-6 py-3 text-left font-semibold text-gray-600">Assigned / actual start</th>
+                            <th class="bg-gray-50 px-6 py-3 text-left font-semibold text-gray-600">Created by</th>
+                            <th class="bg-gray-50 px-6 py-3 text-left font-semibold text-gray-600">Scheduled start</th>
+                            <th class="bg-gray-50 px-6 py-3 text-left font-semibold text-gray-600">Due date</th>
+                            <th class="bg-gray-50 px-6 py-3 text-left font-semibold text-gray-600">Priority</th>
+                            <th class="bg-gray-50 px-6 py-3 text-left font-semibold text-gray-600">Status</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
+                    <tbody class="block divide-y divide-gray-100 overflow-y-auto" style="max-height: calc(100vh - 22rem);">
                         @foreach($tasks as $task)
                             @php
                                 $exceeded = $task->isExceededDeadline();
@@ -79,7 +80,10 @@
                                     ? $task->start_date->format('M d, Y') . ($task->start_time ? ' ' . \Illuminate\Support\Str::of((string) $task->start_time)->substr(0, 5) : '')
                                     : null;
                             @endphp
-                            <tr class="hover:bg-gray-50 transition {{ $exceeded ? 'bg-red-50/80 hover:bg-red-50' : '' }}">
+                            <tr class="hover:bg-gray-50 transition {{ $exceeded ? 'bg-red-50/80 hover:bg-red-50' : '' }}" style="display: table; width: 100%; table-layout: fixed;">
+                                <td class="px-6 py-4 font-semibold text-gray-500" style="width: 4.5rem;">
+                                    {{ $tasks->firstItem() + $loop->index }}
+                                </td>
                                 <td class="px-6 py-4">
                                     <p class="font-medium text-gray-900">{{ $task->title }}</p>
                                     @if($task->description)

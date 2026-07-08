@@ -129,7 +129,7 @@
                     <p class="text-xs font-semibold uppercase tracking-wide text-red-600">Overdue Tasks</p>
                     <span class="text-xs font-bold text-red-600">{{ $attention['overdueTasks']->count() }}</span>
                 </div>
-                <div class="space-y-2">
+                <div class="space-y-2 pr-1" style="max-height: 13.5rem; overflow-y: auto;">
                     @forelse($attention['overdueTasks'] as $task)
                         <div class="rounded-lg bg-red-50 px-3 py-2">
                             <p class="truncate text-sm font-semibold text-red-900">{{ $task->title }}</p>
@@ -146,7 +146,7 @@
                     <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Ending Soon</p>
                     <span class="text-xs font-bold text-amber-700">{{ $attention['endingSoonProjects']->count() }}</span>
                 </div>
-                <div class="space-y-2">
+                <div class="space-y-2 pr-1" style="max-height: 13.5rem; overflow-y: auto;">
                     @forelse($attention['endingSoonProjects'] as $project)
                         <div class="rounded-lg bg-amber-50 px-3 py-2">
                             <p class="truncate text-sm font-semibold text-amber-950">{{ $project->name }}</p>
@@ -163,7 +163,7 @@
                     <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">No Teams</p>
                     <span class="text-xs font-bold text-indigo-700">{{ $attention['projectsWithoutTeams']->count() }}</span>
                 </div>
-                <div class="space-y-2">
+                <div class="space-y-2 pr-1" style="max-height: 13.5rem; overflow-y: auto;">
                     @forelse($attention['projectsWithoutTeams'] as $project)
                         <div class="rounded-lg bg-indigo-50 px-3 py-2">
                             <p class="truncate text-sm font-semibold text-indigo-950">{{ $project->name }}</p>
@@ -180,7 +180,7 @@
                     <p class="text-xs font-semibold uppercase tracking-wide text-gray-700">Empty Teams</p>
                     <span class="text-xs font-bold text-gray-700">{{ $attention['teamsWithoutMembers']->count() }}</span>
                 </div>
-                <div class="space-y-2">
+                <div class="space-y-2 pr-1" style="max-height: 13.5rem; overflow-y: auto;">
                     @forelse($attention['teamsWithoutMembers'] as $team)
                         <div class="rounded-lg bg-gray-50 px-3 py-2">
                             <p class="truncate text-sm font-semibold text-gray-900">{{ $team->name }}</p>

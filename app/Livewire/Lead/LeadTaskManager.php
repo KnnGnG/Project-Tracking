@@ -18,6 +18,8 @@ use Livewire\Component;
 #[Title('Manage Tasks')]
 class LeadTaskManager extends Component
 {
+    use ResolvesLeadProjectContext;
+
     // ── Filter state ─────────────────────────────────────────────────────────
     public ?int $filterTeamId = null;
 
@@ -498,6 +500,3 @@ class LeadTaskManager extends Component
             ->get();
     }
 }
-
-
-

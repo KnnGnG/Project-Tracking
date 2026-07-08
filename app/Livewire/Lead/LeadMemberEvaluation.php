@@ -23,6 +23,8 @@ use Livewire\Component;
 #[Title('Member Evaluation')]
 class LeadMemberEvaluation extends Component
 {
+    use ResolvesLeadProjectContext;
+
     #[Url(as: 'team')]
     public ?int $selectedTeamId = null;
 
@@ -428,5 +430,3 @@ class LeadMemberEvaluation extends Component
         ));
     }
 }
-
-
