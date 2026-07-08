@@ -1,3 +1,5 @@
+@props(['lockMainScroll' => false])
+
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
@@ -98,7 +100,7 @@
 
 <div wire:loading.delay class="ui-loading-bar" aria-hidden="true"></div>
 
-@php($lockMainScroll = request()->routeIs('admin.tasks'))
+@php($isAuthed = auth()->check())
 
 <div
     x-data="{
@@ -142,7 +144,7 @@
 
         {{-- Navigation --}}
         <nav @click="if ($event.target.closest('a')) closeSidebar()" class="app-scrollbar flex-1 space-y-1 overflow-y-auto px-4 py-5">
-            <?php if (auth()->check()) { ?>
+            <?php if ($isAuthed) { ?>
                 <?php
                     $authUser = auth()->user();
                     $isAdmin = $authUser->isAdmin();
@@ -266,7 +268,7 @@
         </nav>
 
         {{-- User info --}}
-        <?php if (auth()->check()) { ?>
+        <?php if ($isAuthed) { ?>
         <div class="border-t border-white/10 px-4 py-4">
             <?php
                 $activeRoleLabel = match (true) {
@@ -322,7 +324,7 @@
                         </p>
                     </div>
                 </div>
-                @if(auth()->check())
+                @if($isAuthed)
                     <div class="flex items-center gap-3">
                         <span class="hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 md:inline-flex">
                             {{ $roleLabel ?? $authUser->roleName() }}

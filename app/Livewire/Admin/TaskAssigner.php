@@ -9,7 +9,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-#[Layout('components.layouts.app')]
+#[Layout('components.layouts.app', ['lockMainScroll' => true])]
 #[Title('Task oversight')]
 class TaskAssigner extends Component
 {
@@ -46,6 +46,7 @@ class TaskAssigner extends Component
             ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))
             ->when($this->filterProject, fn ($q) => $q->where('project_id', $this->filterProject))
             ->latest('created_at')
+            ->latest('id')
             ->paginate($this->perPage);
 
         $projects = Project::orderBy('name')->get();

@@ -1,6 +1,36 @@
-<div x-data="{ open: false }" class="relative" wire:poll.visible.60s>
+<div
+    x-data="{
+        open: false,
+        panelStyle: '',
+        positionPanel() {
+            const trigger = this.$refs.trigger;
+            if (! trigger) return;
+
+            const rect = trigger.getBoundingClientRect();
+            const gap = 8;
+            const margin = 16;
+            const width = Math.min(384, window.innerWidth - (margin * 2));
+            const left = Math.min(
+                Math.max(margin, rect.right - width),
+                window.innerWidth - width - margin
+            );
+            const top = Math.min(rect.bottom + gap, window.innerHeight - margin);
+
+            this.panelStyle = `top: ${top}px; left: ${left}px; z-index: 9999; width: ${width}px; max-height: calc(100vh - ${top + margin}px);`;
+        },
+        toggle() {
+            this.open = ! this.open;
+            if (this.open) this.$nextTick(() => this.positionPanel());
+        }
+    }"
+    @resize.window="if (open) positionPanel()"
+    @scroll.window="if (open) positionPanel()"
+    class="relative"
+    wire:poll.visible.60s
+>
     <button type="button"
-            @click="open = ! open"
+            x-ref="trigger"
+            @click="toggle()"
             :aria-expanded="open.toString()"
             aria-controls="notifications-panel"
             class="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
@@ -17,14 +47,14 @@
         @endif
     </button>
 
-    <template x-teleport="body">
+    @teleport('body')
         <div x-cloak
              id="notifications-panel"
              x-show="open"
              :aria-hidden="(! open).toString()"
              @click.outside="open = false"
              x-transition
-             style="top: 5rem; right: 2rem; z-index: 9999; width: min(24rem, calc(100vw - 2rem)); max-height: calc(100vh - 6.5rem);"
+             :style="panelStyle"
              class="fixed flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl shadow-slate-900/10">
             <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
                 <div>
@@ -105,5 +135,5 @@
                 @endforelse
             </div>
         </div>
-    </template>
+    @endteleport
 </div>

@@ -43,7 +43,7 @@
             </div>
         </header>
 
-        <main class="mx-auto max-w-7xl px-6 py-8 lg:py-10" style="max-width: 90rem; padding-top: 2rem; padding-bottom: 2.5rem;">
+        <main class="mx-auto max-w-[90rem] px-6 py-8 lg:py-10">
             @if(session('error'))
                 <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
                     {{ session('error') }}
@@ -89,15 +89,18 @@
                             $teamOverflow = max(0, $item['teams']->count() - 4);
                         @endphp
 
-                        <article class="project-picker-card group" style="min-height: 390px;">
-                            <div class="project-picker-card-body" style="padding: 1.05rem;">
+                        <article class="project-picker-card group">
+                            <div class="project-picker-card-body">
                                 <div class="flex items-start justify-between gap-3">
                                     <div class="min-w-0">
                                         <h3 class="truncate text-base font-bold text-slate-950 group-hover:text-indigo-700">
                                             {{ $project->name }}
                                         </h3>
-                                        <p class="mt-1 text-sm text-slate-500">
-                                            {{ $item['teams']->count() }} team{{ $item['teams']->count() !== 1 ? 's' : '' }}
+                                        <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                                            <span>{{ $item['teams']->count() }} team{{ $item['teams']->count() !== 1 ? 's' : '' }}</span>
+                                            @if($teamOverflow > 0)
+                                                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">+{{ $teamOverflow }} more</span>
+                                            @endif
                                         </p>
                                     </div>
                                     <span class="project-status-pill {{ $statusClass }}">
@@ -105,12 +108,12 @@
                                     </span>
                                 </div>
 
-                                <p class="mt-4 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-slate-600" style="margin-top: 0.875rem; min-height: 2.25rem;">
+                                <p class="mt-4 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-slate-600">
                                     {{ $project->description ?: 'No description provided.' }}
                                 </p>
 
-                                <div class="project-team-list-frame" style="position: relative; margin-top: 0.875rem;">
-                                    <div class="project-team-list" style="max-height: calc((3.55rem * 4) + (0.5rem * 3)); overflow-y: auto; scroll-behavior: smooth;">
+                                <div class="project-team-list-frame">
+                                    <div class="project-team-list">
                                     @foreach($item['teams'] as $team)
                                         @php
                                             $teamRole = $team->pivot->role ?? 'member';
@@ -120,7 +123,7 @@
                                                 : 'bg-emerald-50 text-emerald-700 border-emerald-100';
                                         @endphp
                                         <a href="{{ route('projects.open', ['project' => $project, 'team' => $team->id]) }}"
-                                           class="project-team-link focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" style="min-height: 3.55rem; padding: 0.6rem 0.75rem; border-radius: 0.7rem;">
+                                           class="project-team-link focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
                                             <div class="min-w-0">
                                                 <p class="truncate text-sm font-bold text-slate-800">
                                                     {{ $team->name }}
@@ -137,7 +140,7 @@
                                     </div>
                                 </div>
 
-                                <div class="mt-auto border-t border-slate-100 pt-4 text-sm" style="padding-top: 0.875rem;">
+                                <div class="mt-auto border-t border-slate-100 pt-4 text-sm">
                                     <span class="text-slate-500">
                                         @if($project->start_date || $project->end_date)
                                             {{ $project->start_date?->format('M d, Y') ?? 'TBD' }}
