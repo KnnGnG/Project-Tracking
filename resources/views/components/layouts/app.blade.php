@@ -101,6 +101,75 @@
 <div wire:loading.delay class="ui-loading-bar" aria-hidden="true"></div>
 
 @php($isAuthed = auth()->check())
+<?php
+    $authUser = null;
+    $isAdmin = false;
+    $isClient = false;
+    $showTeamLeadNav = false;
+    $showMemberNav = false;
+    $roleLabel = null;
+    $activeMemberRouteParams = [];
+    $activeLeadRouteParams = [];
+    $navActive = 'bg-indigo-500 text-white shadow-sm shadow-indigo-950/20';
+    $navIdle = 'text-slate-300 hover:bg-white/10 hover:text-white';
+    $navClass = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition';
+    $sectionClass = 'px-3 pb-1 pt-4 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500';
+
+    if ($isAuthed) {
+        $authUser = auth()->user();
+        $isAdmin = $authUser->isAdmin();
+        $isClient = $authUser->isClient();
+        $activeTeamId = (int) (request()->integer('team') ?: session('active_team_id', 0));
+        $activeProjectId = (int) (request()->integer('project') ?: session('active_project_id', 0));
+        $activeProjectRole = match (true) {
+            request()->routeIs('lead.*') => 'lead',
+            request()->routeIs('member.*') => 'member',
+            default => session('active_project_role'),
+        };
+        $hasSelfAssignedTask = (bool) session('active_has_self_assigned_task', false);
+
+        $canLead = $authUser->isTeamLead();
+        $canMember = $authUser->isMember();
+        $leadTeamForActiveProject = null;
+        $memberTeamForActiveProject = null;
+
+        if ($activeProjectId > 0) {
+            $leadTeamForActiveProject = $authUser->teamIdForProjectRole($activeProjectId, 'lead');
+            $memberTeamForActiveProject = $authUser->teamIdForProjectRole($activeProjectId, 'member');
+        }
+
+        $hasLeadContext = $activeProjectId > 0 ? (bool) $leadTeamForActiveProject : $canLead;
+        $hasMemberContext = $activeProjectId > 0
+            ? ((bool) $memberTeamForActiveProject || $hasSelfAssignedTask)
+            : $canMember;
+        $showTeamLeadNav = $canLead && $hasLeadContext;
+        $showMemberNav = $canMember && $hasMemberContext;
+        $activeLeadTeamId = $leadTeamForActiveProject ?: $activeTeamId;
+        $activeMemberTeamId = $memberTeamForActiveProject ?: $activeTeamId;
+        $activeMemberRouteParams = array_filter([
+            'team' => $activeMemberTeamId ?: null,
+            'project' => $activeProjectId ?: null,
+        ]);
+        $activeLeadRouteParams = array_filter([
+            'team' => $activeLeadTeamId ?: null,
+        ]);
+
+        $activeRoleLabel = match (true) {
+            request()->routeIs('admin.*') => 'Admin',
+            request()->routeIs('client.*') => 'Client',
+            request()->routeIs('lead.*') => 'Team Lead',
+            request()->routeIs('member.*') => 'Member',
+            default => null,
+        };
+
+        $contextRoles = collect();
+        if ($isAdmin) { $contextRoles->push('Admin'); }
+        if ($isClient) { $contextRoles->push('Client'); }
+        if ($showTeamLeadNav) { $contextRoles->push('Team Lead'); }
+        if ($showMemberNav) { $contextRoles->push('Member'); }
+        $roleLabel = $activeRoleLabel ?? ($contextRoles->join(' / ') ?: $authUser->roleName());
+    }
+?>
 
 <div
     x-data="{
@@ -145,50 +214,6 @@
         {{-- Navigation --}}
         <nav @click="if ($event.target.closest('a')) closeSidebar()" class="app-scrollbar flex-1 space-y-1 overflow-y-auto px-4 py-5">
             <?php if ($isAuthed) { ?>
-                <?php
-                    $authUser = auth()->user();
-                    $isAdmin = $authUser->isAdmin();
-                    $isClient = $authUser->isClient();
-                    $activeTeamId = (int) (request()->integer('team') ?: session('active_team_id', 0));
-                    $activeProjectId = (int) (request()->integer('project') ?: session('active_project_id', 0));
-                    $activeProjectRole = match (true) {
-                        request()->routeIs('lead.*') => 'lead',
-                        request()->routeIs('member.*') => 'member',
-                        default => session('active_project_role'),
-                    };
-                    $hasSelfAssignedTask = (bool) session('active_has_self_assigned_task', false);
-
-                    $canLead = $authUser->isTeamLead();
-                    $canMember = $authUser->isMember();
-                    $leadTeamForActiveProject = null;
-                    $memberTeamForActiveProject = null;
-
-                    if ($activeProjectId > 0) {
-                        $leadTeamForActiveProject = $authUser->teamIdForProjectRole($activeProjectId, 'lead');
-                        $memberTeamForActiveProject = $authUser->teamIdForProjectRole($activeProjectId, 'member');
-                    }
-
-                    $hasLeadContext = $activeProjectId > 0 ? (bool) $leadTeamForActiveProject : $canLead;
-                    $hasMemberContext = $activeProjectId > 0
-                        ? ((bool) $memberTeamForActiveProject || $hasSelfAssignedTask)
-                        : $canMember;
-                    $showTeamLeadNav = $canLead && $hasLeadContext;
-                    $showMemberNav = $canMember && $hasMemberContext;
-                    $activeLeadTeamId = $leadTeamForActiveProject ?: $activeTeamId;
-                    $activeMemberTeamId = $memberTeamForActiveProject ?: $activeTeamId;
-                    $activeMemberRouteParams = array_filter([
-                        'team' => $activeMemberTeamId ?: null,
-                        'project' => $activeProjectId ?: null,
-                    ]);
-                    $activeLeadRouteParams = array_filter([
-                        'team' => $activeLeadTeamId ?: null,
-                    ]);
-                    $navActive = 'bg-indigo-500 text-white shadow-sm shadow-indigo-950/20';
-                    $navIdle = 'text-slate-300 hover:bg-white/10 hover:text-white';
-                    $navClass = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition';
-                    $sectionClass = 'px-3 pb-1 pt-4 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500';
-                ?>
-
                 <?php if ($isAdmin) { ?>
                     <p class="<?= e($sectionClass) ?>">Admin</p>
                     <a href="<?= e(route('admin.dashboard')) ?>" class="<?= e($navClass) ?> <?= e(request()->routeIs('admin.dashboard') ? $navActive : $navIdle) ?>">
@@ -270,22 +295,6 @@
         {{-- User info --}}
         <?php if ($isAuthed) { ?>
         <div class="border-t border-white/10 px-4 py-4">
-            <?php
-                $activeRoleLabel = match (true) {
-                    request()->routeIs('admin.*') => 'Admin',
-                    request()->routeIs('client.*') => 'Client',
-                    request()->routeIs('lead.*') => 'Team Lead',
-                    request()->routeIs('member.*') => 'Member',
-                    default => null,
-                };
-
-                $contextRoles = collect();
-                if ($isAdmin) { $contextRoles->push('Admin'); }
-                if ($isClient) { $contextRoles->push('Client'); }
-                if ($showTeamLeadNav) { $contextRoles->push('Team Lead'); }
-                if ($showMemberNav) { $contextRoles->push('Member'); }
-                $roleLabel = $activeRoleLabel ?? ($contextRoles->join(' / ') ?: $authUser->roleName());
-            ?>
             <div class="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
                 <div class="flex items-center gap-3">
                     <div class="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500 text-sm font-bold text-white">
