@@ -33,6 +33,7 @@ class TeamManager extends Component
     public string $teamSearch = '';
 
     public bool $showForm  = false;
+    public bool $premadeMode = false;
     public ?int $editingId = null;
 
     public bool $confirmingDelete = false;
@@ -45,8 +46,8 @@ class TeamManager extends Component
     {
         return [
             'name'      => 'required|string|max:255',
-            'projectId' => 'required|exists:projects,id',
-            'leadId'    => ['required', Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', self::ALLOWED_TEAM_ROLES))],
+            'projectId' => [$this->premadeMode ? 'nullable' : 'required', 'exists:projects,id'],
+            'leadId'    => ['nullable', Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', self::ALLOWED_TEAM_ROLES))],
             'memberIds' => 'nullable|array',
             'memberIds.*' => ['integer', Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', self::ALLOWED_TEAM_ROLES))],
             'memberNotes' => 'nullable|array',
@@ -60,6 +61,15 @@ class TeamManager extends Component
     {
         $this->resetForm();
         $this->showForm  = true;
+        $this->premadeMode = false;
+        $this->editingId = null;
+    }
+
+    public function openPremadeCreate(): void
+    {
+        $this->resetForm();
+        $this->showForm = true;
+        $this->premadeMode = true;
         $this->editingId = null;
     }
 
@@ -78,6 +88,7 @@ class TeamManager extends Component
             ->all();
         $this->loadProjectTeamSelection();
         $this->showForm  = true;
+        $this->premadeMode = ! $team->project_id;
     }
 
     public function updatedProjectId(): void
@@ -137,8 +148,8 @@ class TeamManager extends Component
         DB::transaction(function () use ($data): void {
             $payload = [
                 'name'       => $data['name'],
-                'project_id' => $data['projectId'],
-                'lead_id'    => $data['leadId'],
+                'project_id' => $this->premadeMode ? null : $data['projectId'],
+                'lead_id'    => $data['leadId'] ?: null,
             ];
 
             if ($this->editingId) {
@@ -150,21 +161,23 @@ class TeamManager extends Component
                 session()->flash('success', 'Team created successfully.');
             }
 
-            $projectTeamIds = collect($data['projectTeamIds'] ?? [])
-                ->map(fn ($id) => (int) $id)
-                ->push($team->id)
-                ->unique()
-                ->values();
+            if (! $this->premadeMode && $team->project_id) {
+                $projectTeamIds = collect($data['projectTeamIds'] ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->push($team->id)
+                    ->unique()
+                    ->values();
 
-            Project::findOrFail((int) $data['projectId'])
-                ->teams()
-                ->syncWithoutDetaching($projectTeamIds->all());
+                Project::findOrFail((int) $data['projectId'])
+                    ->teams()
+                    ->syncWithoutDetaching($projectTeamIds->all());
 
-            Team::whereIn('id', $projectTeamIds->all())
-                ->whereNull('project_id')
-                ->update(['project_id' => $team->project_id]);
+                Team::whereIn('id', $projectTeamIds->all())
+                    ->whereNull('project_id')
+                    ->update(['project_id' => $team->project_id]);
+            }
 
-            $this->syncTeamPeople($team, (int) $data['leadId'], $data['memberIds'] ?? [], $data['memberNotes'] ?? []);
+            $this->syncTeamPeople($team, $data['leadId'] ? (int) $data['leadId'] : null, $data['memberIds'] ?? [], $data['memberNotes'] ?? []);
         });
 
         $this->resetForm();
@@ -240,6 +253,7 @@ class TeamManager extends Component
         $this->previousProjectTeamIds = [];
         $this->teamSearch     = '';
         $this->editingId      = null;
+        $this->premadeMode    = false;
         $this->resetValidation();
     }
 
@@ -271,30 +285,36 @@ class TeamManager extends Component
             ->get();
     }
 
-    private function syncTeamPeople(Team $team, int $leadId, array $memberIds, array $memberNotes): void
+    private function syncTeamPeople(Team $team, ?int $leadId, array $memberIds, array $memberNotes): void
     {
         $candidateIds = collect($memberIds)
             ->map(fn ($id) => (int) $id)
-            ->push($leadId)
+            ->when($leadId, fn ($ids) => $ids->push($leadId))
+            ->filter()
             ->unique()
             ->values();
-        $allowedIds = User::whereIn('role', self::ALLOWED_TEAM_ROLES)
-            ->whereIn('id', $candidateIds)
-            ->pluck('id');
 
-        if (! $allowedIds->contains($leadId)) {
+        $allowedIds = $candidateIds->isEmpty()
+            ? collect()
+            : User::whereIn('role', self::ALLOWED_TEAM_ROLES)
+                ->whereIn('id', $candidateIds)
+                ->pluck('id');
+
+        if ($leadId && ! $allowedIds->contains($leadId)) {
             throw ValidationException::withMessages([
                 'leadId' => 'Choose a valid team lead or member account.',
             ]);
         }
 
-        $sync = [
-            $leadId => ['role' => 'lead', 'notes' => null],
-        ];
+        $sync = [];
+
+        if ($leadId) {
+            $sync[$leadId] = ['role' => 'lead', 'notes' => null];
+        }
 
         collect($memberIds)
             ->map(fn ($id) => (int) $id)
-            ->reject(fn ($id) => $id === $leadId)
+            ->reject(fn ($id) => $leadId && $id === $leadId)
             ->filter(fn ($id) => $allowedIds->contains($id))
             ->unique()
             ->each(function (int $memberId) use (&$sync, $memberNotes): void {
@@ -307,7 +327,6 @@ class TeamManager extends Component
 
         $team->members()->sync($sync);
     }
-
     public function render()
     {
         $teams    = Team::with(['project', 'projects', 'lead', 'members'])->withCount('tasks')->latest()->paginate($this->perPage);
@@ -338,5 +357,3 @@ class TeamManager extends Component
             compact('teams', 'projects', 'leads', 'members', 'projectTeamOptions', 'selectedProjectTeams', 'detailsTeam'));
     }
 }
-
-

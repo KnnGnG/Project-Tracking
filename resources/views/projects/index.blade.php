@@ -43,7 +43,7 @@
             </div>
         </header>
 
-        <main class="mx-auto max-w-7xl px-6 py-8 lg:py-10">
+        <main class="mx-auto max-w-[90rem] px-6 py-8 lg:py-10">
             @if(session('error'))
                 <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
                     {{ session('error') }}
@@ -86,6 +86,7 @@
                                 'completed' => 'bg-blue-100 text-blue-700',
                                 default => 'bg-slate-100 text-slate-600',
                             };
+                            $teamOverflow = max(0, $item['teams']->count() - 4);
                         @endphp
 
                         <article class="project-picker-card group">
@@ -95,8 +96,11 @@
                                         <h3 class="truncate text-base font-bold text-slate-950 group-hover:text-indigo-700">
                                             {{ $project->name }}
                                         </h3>
-                                        <p class="mt-1 text-sm text-slate-500">
-                                            {{ $item['teams']->count() }} team{{ $item['teams']->count() !== 1 ? 's' : '' }}
+                                        <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                                            <span>{{ $item['teams']->count() }} team{{ $item['teams']->count() !== 1 ? 's' : '' }}</span>
+                                            @if($teamOverflow > 0)
+                                                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">+{{ $teamOverflow }} more</span>
+                                            @endif
                                         </p>
                                     </div>
                                     <span class="project-status-pill {{ $statusClass }}">
@@ -108,7 +112,8 @@
                                     {{ $project->description ?: 'No description provided.' }}
                                 </p>
 
-                                <div class="project-team-list">
+                                <div class="project-team-list-frame">
+                                    <div class="project-team-list">
                                     @foreach($item['teams'] as $team)
                                         @php
                                             $teamRole = $team->pivot->role ?? 'member';
@@ -132,7 +137,7 @@
                                             </span>
                                         </a>
                                     @endforeach
-
+                                    </div>
                                 </div>
 
                                 <div class="mt-auto border-t border-slate-100 pt-4 text-sm">

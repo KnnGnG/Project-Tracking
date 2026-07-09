@@ -377,7 +377,7 @@
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <p class="text-sm font-medium text-gray-800">{{ $team->name }}</p>
-                                        <p class="text-xs text-gray-400">Lead: {{ $team->lead->name }}</p>
+                                        <p class="text-xs text-gray-400">Lead: {{ $team->lead?->name ?? 'No lead assigned' }}</p>
                                     </div>
                                     @php
                                         $teamPct = $team->completionPercentage();

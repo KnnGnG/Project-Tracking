@@ -41,7 +41,7 @@ class AssignTeams extends Component
         return [
             'name' => ['required', 'string', 'max:255'],
             'projectId' => ['nullable', 'integer', 'exists:projects,id'],
-            'leadId' => ['required', 'integer', Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', self::ALLOWED_TEAM_ROLES))],
+            'leadId' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', self::ALLOWED_TEAM_ROLES))],
             'memberIds' => ['array'],
             'memberIds.*' => ['integer', Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', self::ALLOWED_TEAM_ROLES))],
             'memberNotes' => ['array'],
@@ -76,7 +76,7 @@ class AssignTeams extends Component
     public function save(): void
     {
         $data = $this->validate();
-        $leadId = (int) $data['leadId'];
+        $leadId = $data['leadId'] ? (int) $data['leadId'] : null;
 
         DB::transaction(function () use ($data, $leadId): void {
             $payload = [
@@ -143,30 +143,36 @@ class AssignTeams extends Component
         $this->resetValidation();
     }
 
-    private function syncPeople(Team $team, int $leadId, array $memberIds, array $memberNotes): void
+    private function syncPeople(Team $team, ?int $leadId, array $memberIds, array $memberNotes): void
     {
         $candidateIds = collect($memberIds)
             ->map(fn ($id) => (int) $id)
-            ->push($leadId)
+            ->when($leadId, fn ($ids) => $ids->push($leadId))
+            ->filter()
             ->unique()
             ->values();
-        $allowedIds = User::whereIn('role', self::ALLOWED_TEAM_ROLES)
-            ->whereIn('id', $candidateIds)
-            ->pluck('id');
 
-        if (! $allowedIds->contains($leadId)) {
+        $allowedIds = $candidateIds->isEmpty()
+            ? collect()
+            : User::whereIn('role', self::ALLOWED_TEAM_ROLES)
+                ->whereIn('id', $candidateIds)
+                ->pluck('id');
+
+        if ($leadId && ! $allowedIds->contains($leadId)) {
             throw ValidationException::withMessages([
                 'leadId' => 'Choose a valid team lead or member account.',
             ]);
         }
 
-        $sync = [
-            $leadId => ['role' => 'lead', 'notes' => null],
-        ];
+        $sync = [];
+
+        if ($leadId) {
+            $sync[$leadId] = ['role' => 'lead', 'notes' => null];
+        }
 
         collect($memberIds)
             ->map(fn ($id) => (int) $id)
-            ->reject(fn ($id) => $id === $leadId)
+            ->reject(fn ($id) => $leadId && $id === $leadId)
             ->filter(fn ($id) => $allowedIds->contains($id))
             ->unique()
             ->each(function (int $memberId) use (&$sync, $memberNotes): void {
@@ -179,7 +185,6 @@ class AssignTeams extends Component
 
         $team->members()->sync($sync);
     }
-
     public function render()
     {
         $teams = Team::with(['project', 'lead', 'regularMembers'])

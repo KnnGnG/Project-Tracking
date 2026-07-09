@@ -7,18 +7,29 @@
     <div class="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="min-w-0">
             <p class="text-sm font-semibold text-gray-900">Teams</p>
-            <p class="mt-0.5 text-xs text-gray-400">Create and maintain project teams.</p>
+            <p class="mt-0.5 text-xs text-gray-400">Create reusable teams or attach teams to projects.</p>
         </div>
         @if(!$showForm)
-            <button wire:click="openCreate"
-                    wire:loading.attr="disabled"
-                    wire:target="openCreate"
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                </svg>
-                New Team
-            </button>
+            <div class="flex flex-wrap items-center gap-2">
+                <button wire:click="openPremadeCreate"
+                        wire:loading.attr="disabled"
+                        wire:target="openPremadeCreate"
+                        class="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Premade Team
+                </button>
+                <button wire:click="openCreate"
+                        wire:loading.attr="disabled"
+                        wire:target="openCreate"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    New Project Team
+                </button>
+            </div>
         @endif
     </div>
 
@@ -26,7 +37,7 @@
     @if($showForm)
         <div class="ui-soft-panel p-6 mb-6">
             <h2 class="text-base font-semibold text-gray-800 mb-5">
-                {{ $editingId ? 'Edit Team' : 'New Team' }}
+                {{ $editingId ? 'Edit Team' : ($premadeMode ? 'Add Premade Team' : 'New Project Team') }}
             </h2>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -38,6 +49,7 @@
                     @error('name') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                 </div>
 
+                @unless($premadeMode)
                 {{-- Project --}}
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Project <span class="text-red-500">*</span></label>
@@ -50,13 +62,14 @@
                     </select>
                     @error('projectId') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                 </div>
+                @endunless
 
                 {{-- Team Lead --}}
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Team Lead <span class="text-red-500">*</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Team Lead</label>
                     <select wire:model="leadId"
                             class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 @error('leadId') border-red-400 @enderror">
-                        <option value="">— Select team lead —</option>
+                        <option value="">No team lead yet</option>
                         @foreach($leads as $lead)
                             <option value="{{ $lead->id }}">{{ $lead->name }}</option>
                         @endforeach
@@ -108,6 +121,7 @@
                     @error('memberIds.*') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                 </div>
 
+                @unless($premadeMode)
                 {{-- Teams in selected project --}}
                 <div class="md:col-span-3">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Select teams for this project</label>
@@ -176,6 +190,7 @@
                     @error('projectTeamIds') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                     @error('projectTeamIds.*') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                 </div>
+                @endunless
 
             </div>
 
@@ -184,7 +199,7 @@
                         wire:loading.attr="disabled"
                         wire:target="save"
                         class="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
-                    <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Team' : 'Create Team' }}</span>
+                    <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Team' : ($premadeMode ? 'Add Premade Team' : 'Create Team') }}</span>
                     <span wire:loading wire:target="save">Saving...</span>
                 </button>
                 <button wire:click="cancelForm"
@@ -208,7 +223,7 @@
                         <p class="text-xs text-gray-400 mt-0.5">{{ $team->projects->pluck('name')->join(', ') ?: ($team->project?->name ?? 'No project assigned') }}</p>
                     </div>
                     <div class="text-sm text-gray-600 hidden md:block">
-                        Lead: <span class="font-medium text-gray-800">{{ $team->lead->name }}</span>
+                        Lead: <span class="font-medium text-gray-800">{{ $team->lead?->name ?? 'No lead' }}</span>
                     </div>
                     <div class="flex items-center gap-1">
                         @foreach($team->members->take(4) as $member)
