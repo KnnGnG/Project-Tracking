@@ -129,7 +129,7 @@
         $hasSelfAssignedTask = (bool) session('active_has_self_assigned_task', false);
 
         $canLead = $authUser->isTeamLead();
-        $canMember = $authUser->isMember();
+        $canMember = $authUser->isMember() || $hasSelfAssignedTask;
         $leadTeamForActiveProject = null;
         $memberTeamForActiveProject = null;
 

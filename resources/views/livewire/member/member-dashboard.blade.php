@@ -158,7 +158,18 @@
 
     {{-- ── Filter + Sort bar ──────────────────────────────────────────────────── --}}
     <div class="flex flex-wrap items-center gap-3">
-
+        <div class="flex flex-wrap items-center gap-3">
+            <label class="flex items-center gap-2 text-sm font-medium text-gray-500">
+                <span>Working in</span>
+                <select wire:model.live="filterTeam"
+                        class="min-w-64 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-900 shadow-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100">
+                    <option value="0">All teams</option>
+                    @foreach($teams as $team)
+                        <option value="{{ $team->id }}">{{ $team->name }}</option>
+                    @endforeach
+                </select>
+            </label>
+        </div>
 
         {{-- Sort controls --}}
         <div class="flex items-center gap-2 ml-auto">
