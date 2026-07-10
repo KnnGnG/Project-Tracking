@@ -56,7 +56,6 @@ class MemberJournal extends Component
     public function updatedLogDate(): void
     {
         $this->normalizeLogDate();
-        session(['member_journal_log_date' => $this->logDate]);
     }
 
     public function updatedFilterTeam(): void
@@ -238,6 +237,7 @@ class MemberJournal extends Component
     {
         if ($this->logDate === '') {
             $this->logDate = now()->toDateString();
+            session(['member_journal_log_date' => $this->logDate]);
             return;
         }
 
@@ -253,6 +253,7 @@ class MemberJournal extends Component
                 $date = Carbon::parse($this->logDate);
             } catch (\Throwable) {
                 $this->logDate = now()->toDateString();
+                session(['member_journal_log_date' => $this->logDate]);
                 return;
             }
         }

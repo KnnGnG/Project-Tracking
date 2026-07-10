@@ -10,12 +10,6 @@
     @else
         <link rel="stylesheet" href="{{ asset('css/fallback.css') }}">
     @endif
-    <style>
-        .project-team-list {
-            max-height: calc((3.55rem * 3) + (0.5rem * 2));
-            overflow-y: scroll;
-        }
-    </style>
 </head>
 <body class="project-picker-shell min-h-screen font-sans antialiased text-slate-900">
     <div class="min-h-screen">
