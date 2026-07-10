@@ -46,6 +46,9 @@ class MemberJournal extends Component
         $this->filterTeam = request()->has('team')
             ? request()->integer('team')
             : (int) session('active_team_id', 0);
+        $this->logDate = request()->has('date')
+            ? (string) request()->query('date')
+            : (string) session('member_journal_log_date', $this->logDate);
         $this->normalizeLogDate();
         $this->normalizeAccessibleTeamFilter();
     }
@@ -53,6 +56,7 @@ class MemberJournal extends Component
     public function updatedLogDate(): void
     {
         $this->normalizeLogDate();
+        session(['member_journal_log_date' => $this->logDate]);
     }
 
     public function updatedFilterTeam(): void
@@ -254,6 +258,7 @@ class MemberJournal extends Component
         }
 
         $this->logDate = $date->toDateString();
+        session(['member_journal_log_date' => $this->logDate]);
     }
 
     private function normalizeAccessibleTeamFilter(): void
