@@ -8,6 +8,7 @@ use App\Models\JournalLog;
 use App\Models\Task;
 use App\Models\TaskMemberProgress;
 use App\Models\Team;
+use App\Models\TeamLeadEvaluation;
 use App\Models\TeamMemberEvaluation;
 use App\Models\User;
 use Illuminate\Database\QueryException;
@@ -413,6 +414,13 @@ class LeadMemberEvaluation extends Component
             ->latest()
             ->get();
 
+        $leadFeedback = TeamLeadEvaluation::with(['evaluator', 'team.project', 'team.projects'])
+            ->where('lead_id', auth()->id())
+            ->whereIn('team_id', $teams->pluck('id'))
+            ->when($this->selectedTeamId, fn ($query) => $query->where('team_id', $this->selectedTeamId))
+            ->latest()
+            ->get();
+
         $latestByMember = $evaluations
             ->groupBy('member_id')
             ->map(fn ($rows) => $rows->first());
@@ -425,6 +433,7 @@ class LeadMemberEvaluation extends Component
             'members',
             'selectedMember',
             'evaluations',
+            'leadFeedback',
             'latestByMember',
             'metrics',
         ));

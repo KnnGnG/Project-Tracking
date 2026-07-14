@@ -4,6 +4,10 @@
             <h2>My Evaluations</h2>
             <p>Review the scores, notes, and coaching feedback saved by your team leads.</p>
         </div>
+        <a href="{{ route('member.lead-evaluation', array_filter(['team' => $filterTeam ?: null])) }}"
+           class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">
+            Team Lead Evaluation
+        </a>
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">

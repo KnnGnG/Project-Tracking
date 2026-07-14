@@ -25,6 +25,7 @@ class PageDescriptions
             $request->routeIs('member.dashboard') => 'Focus on assigned work, due dates, and personal task progress.',
             $request->routeIs('member.logs') => 'Record daily work, timer sessions, and general team activity.',
             $request->routeIs('member.evaluations') => 'Review feedback from your team leads.',
+            $request->routeIs('member.lead-evaluation') => 'Evaluate team lead support, communication, and coordination.',
             $request->routeIs('client.dashboard') => 'Follow project progress, milestones, and delivery updates.',
             $request->routeIs('projects.*') => 'Choose a project to open the dashboard for your role.',
             default => 'Keep project work, teams, and progress in one clear workspace.',

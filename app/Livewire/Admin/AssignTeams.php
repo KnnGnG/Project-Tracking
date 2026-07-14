@@ -77,26 +77,33 @@ class AssignTeams extends Component
     {
         $data = $this->validate();
         $leadId = $data['leadId'] ? (int) $data['leadId'] : null;
+        $matchedExistingTeam = false;
 
-        DB::transaction(function () use ($data, $leadId): void {
+        DB::transaction(function () use ($data, $leadId, &$matchedExistingTeam): void {
             $payload = [
                 'name' => $data['name'],
                 'project_id' => $data['projectId'] ?: null,
                 'lead_id' => $leadId,
             ];
 
-            $team = $this->editingId
-                ? Team::findOrFail($this->editingId)
-                : Team::create($payload);
-
             if ($this->editingId) {
+                $team = Team::findOrFail($this->editingId);
                 $team->update($payload);
+            } else {
+                $team = $this->findMatchingTeam($data['name'], $leadId, $data['memberIds'] ?? []);
+
+                if ($team) {
+                    $team->update($payload);
+                    $matchedExistingTeam = true;
+                } else {
+                    $team = Team::create($payload);
+                }
             }
 
             $this->syncPeople($team, $leadId, $data['memberIds'] ?? [], $data['memberNotes'] ?? []);
         });
 
-        session()->flash('success', $this->editingId ? 'Team updated.' : 'Premade team created.');
+        session()->flash('success', $this->editingId || $matchedExistingTeam ? 'Team updated.' : 'Premade team created.');
 
         $this->resetForm();
         $this->showForm = false;
@@ -185,6 +192,48 @@ class AssignTeams extends Component
 
         $team->members()->sync($sync);
     }
+
+    private function findMatchingTeam(string $name, ?int $leadId, array $memberIds): ?Team
+    {
+        $teams = Team::with('regularMembers')->get();
+
+        return $teams->first(fn (Team $team) => $this->teamMatchesSignature($team, $name, $leadId, $memberIds))
+            ?? $teams->first(fn (Team $team) => $this->teamNameMatches($team, $name));
+    }
+
+    private function teamMatchesSignature(Team $team, string $name, ?int $leadId, array $memberIds): bool
+    {
+        if (! $this->teamNameMatches($team, $name)) {
+            return false;
+        }
+
+        if (($team->lead_id ? (int) $team->lead_id : null) !== $leadId) {
+            return false;
+        }
+
+        $existingMembers = $team->regularMembers
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+        $incomingMembers = collect($memberIds)
+            ->map(fn ($id) => (int) $id)
+            ->reject(fn ($id) => $leadId && $id === $leadId)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        return $existingMembers === $incomingMembers;
+    }
+
+    private function teamNameMatches(Team $team, string $name): bool
+    {
+        return mb_strtolower(trim($team->name)) === mb_strtolower(trim($name));
+    }
+
     public function render()
     {
         $teams = Team::with(['project', 'lead', 'regularMembers'])

@@ -7,19 +7,10 @@
     <div class="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="min-w-0">
             <p class="text-sm font-semibold text-gray-900">Teams</p>
-            <p class="mt-0.5 text-xs text-gray-400">Create reusable teams or attach teams to projects.</p>
+            <p class="mt-0.5 text-xs text-gray-400">Create reusable teams to assign from the Projects tab.</p>
         </div>
         @if(!$showForm)
             <div class="flex flex-wrap items-center gap-2">
-                <button wire:click="openPremadeCreate"
-                        wire:loading.attr="disabled"
-                        wire:target="openPremadeCreate"
-                        class="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    Add Premade Team
-                </button>
                 <button wire:click="openCreate"
                         wire:loading.attr="disabled"
                         wire:target="openCreate"
@@ -27,7 +18,7 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
-                    New Project Team
+                    Create New Team
                 </button>
             </div>
         @endif
@@ -37,10 +28,10 @@
     @if($showForm)
         <div class="ui-soft-panel p-6 mb-6">
             <h2 class="text-base font-semibold text-gray-800 mb-5">
-                {{ $editingId ? 'Edit Team' : ($premadeMode ? 'Add Premade Team' : 'New Project Team') }}
+                {{ $editingId ? 'Edit Team' : 'Create New Team' }}
             </h2>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {{-- Name --}}
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Team Name <span class="text-red-500">*</span></label>
@@ -48,21 +39,6 @@
                            class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 @error('name') border-red-400 @enderror">
                     @error('name') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                 </div>
-
-                @unless($premadeMode)
-                {{-- Project --}}
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Project <span class="text-red-500">*</span></label>
-                    <select wire:model.live="projectId"
-                            class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 @error('projectId') border-red-400 @enderror">
-                        <option value="">— Select project —</option>
-                        @foreach($projects as $project)
-                            <option value="{{ $project->id }}">{{ $project->name }}</option>
-                        @endforeach
-                    </select>
-                    @error('projectId') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                </div>
-                @endunless
 
                 {{-- Team Lead --}}
                 <div>
@@ -90,7 +66,12 @@
                         @else
                             <div class="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
                                 @foreach($members as $member)
-                                    @php $isSelectedMember = in_array((string) $member->id, array_map('strval', $memberIds), true); @endphp
+                                    @php
+                                        $isSelectedMember = in_array((string) $member->id, array_map('strval', $memberIds), true);
+                                        $currentTeams = $isSelectedMember
+                                            ? $member->teams->sortBy('name')->values()
+                                            : collect();
+                                    @endphp
                                     <div class="rounded-md px-2 py-2 text-sm transition hover:bg-indigo-50">
                                         <label class="flex cursor-pointer items-center gap-3">
                                             <input type="checkbox"
@@ -104,93 +85,26 @@
                                                 <span class="block truncate font-medium text-gray-700">{{ $member->name }}</span>
                                             </span>
                                         </label>
-                                        @if($isSelectedMember)
-                                            <textarea wire:model="memberNotes.{{ $member->id }}"
-                                                      rows="2"
-                                                      placeholder="Additional notes for this member..."
-                                                      class="mt-2 w-full resize-none rounded-lg border border-gray-200 px-2.5 py-2 text-xs text-gray-600 focus:border-indigo-500 focus:ring-indigo-500"></textarea>
-                                            @error('memberNotes.'.$member->id) <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                        @if($currentTeams->isNotEmpty())
+                                            <div class="mt-2 flex flex-wrap gap-1.5 pl-10">
+                                                @foreach($currentTeams as $currentTeam)
+                                                    <span class="inline-flex max-w-full items-center rounded-full bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700">
+                                                        <span class="truncate">{{ $currentTeam->name }}</span>
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @elseif($isSelectedMember)
+                                            <p class="mt-2 pl-10 text-xs text-gray-400">Not assigned to any team yet.</p>
                                         @endif
                                     </div>
                                 @endforeach
                             </div>
                         @endif
                     </div>
-                    <p class="mt-1 text-xs text-gray-400">Select the people who belong to this team. Add optional notes for responsibilities, availability, or reminders.</p>
+                    <p class="mt-1 text-xs text-gray-400">Select the people who belong to this team. Selected people show the teams they currently belong to.</p>
                     @error('memberIds') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                     @error('memberIds.*') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                 </div>
-
-                @unless($premadeMode)
-                {{-- Teams in selected project --}}
-                <div class="md:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Select teams for this project</label>
-                    <div @class([
-                        'rounded-lg border bg-white px-3 py-2',
-                        'border-red-400' => $errors->has('projectTeamIds'),
-                        'border-gray-300' => ! $errors->has('projectTeamIds'),
-                        'opacity-60' => ! $projectId,
-                    ])>
-                        @if(! $projectId)
-                            <p class="py-4 text-center text-sm text-gray-400">Select a project first.</p>
-                        @else
-                            <div class="mb-2 flex flex-wrap items-center gap-2">
-                                <input type="text"
-                                       wire:model.live.debounce.300ms="teamSearch"
-                                       placeholder="Search teams..."
-                                       class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <button type="button"
-                                        wire:click="selectAllProjectTeams"
-                                        class="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">
-                                    Select all
-                                </button>
-                                <button type="button"
-                                        wire:click="clearProjectTeams"
-                                        class="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">
-                                    Clear
-                                </button>
-                            </div>
-
-                            @if($projectTeamOptions->isEmpty())
-                                <p class="py-4 text-center text-sm text-gray-400">No teams found.</p>
-                            @else
-                                <div class="max-h-44 space-y-1 overflow-y-auto pr-1">
-                                    @foreach($projectTeamOptions as $teamOption)
-                                        <label class="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm transition hover:bg-indigo-50">
-                                            <input type="checkbox"
-                                                   wire:model="projectTeamIds"
-                                                   value="{{ $teamOption->id }}"
-                                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                            <span class="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
-                                                {{ strtoupper(substr($teamOption->name, 0, 1)) }}
-                                            </span>
-                                            <span class="min-w-0 flex-1">
-                                                <span class="block font-medium text-gray-700 truncate">{{ $teamOption->name }}</span>
-                                                <span class="block text-xs text-gray-400 truncate">
-                                                    {{ $teamOption->projects->pluck('name')->join(', ') ?: ($teamOption->project?->name ?? 'No project') }} / Lead: {{ $teamOption->lead?->name ?? 'Unassigned' }}
-                                                </span>
-                                            </span>
-                                        </label>
-                                    @endforeach
-                                </div>
-                            @endif
-                        @endif
-                    </div>
-
-                    @if(!empty($projectTeamIds))
-                        <div class="mt-2 flex flex-wrap gap-1.5">
-                            @foreach($selectedProjectTeams as $teamOption)
-                                <span class="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
-                                    {{ $teamOption->name }}
-                                </span>
-                            @endforeach
-                        </div>
-                    @endif
-                    <p class="mt-1 text-xs text-gray-400">Selecting a team copies its name, lead, and members into the form. Selected teams will be assigned to the chosen project when you save.</p>
-                    @error('projectTeamIds') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                    @error('projectTeamIds.*') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                </div>
-                @endunless
 
             </div>
 
@@ -199,7 +113,7 @@
                         wire:loading.attr="disabled"
                         wire:target="save"
                         class="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed">
-                    <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Team' : ($premadeMode ? 'Add Premade Team' : 'Create Team') }}</span>
+                    <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Team' : 'Create Team' }}</span>
                     <span wire:loading wire:target="save">Saving...</span>
                 </button>
                 <button wire:click="cancelForm"

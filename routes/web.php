@@ -17,6 +17,7 @@ use App\Livewire\Lead\TeamLeadDashboard;
 use App\Livewire\Member\MemberDashboard;
 use App\Livewire\Member\MemberEvaluations;
 use App\Livewire\Member\MemberJournal;
+use App\Livewire\Member\MemberLeadEvaluation;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -103,7 +104,7 @@ Route::middleware(['auth', 'throttle:300,1'])->group(function () {
             Route::get('/dashboard', MemberDashboard::class)->name('dashboard');
             Route::get('/logs', MemberJournal::class)->name('logs');
             Route::get('/evaluations', MemberEvaluations::class)->name('evaluations');
+            Route::get('/lead-evaluation', MemberLeadEvaluation::class)->name('lead-evaluation');
         });
 });
-
 

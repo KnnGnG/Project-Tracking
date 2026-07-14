@@ -7,6 +7,7 @@ use App\Models\Task;
 use App\Models\TaskMemberProgress;
 use App\Models\Team;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -79,7 +80,7 @@ class MemberJournal extends Component
 
         $validated = $this->validate([
             'logDate' => ['required', 'date'],
-            'selectedTaskId' => ['nullable', 'integer'],
+            'selectedTaskId' => ['required', 'integer'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
@@ -89,7 +90,7 @@ class MemberJournal extends Component
         }
 
         $totalMinutes = (int) ceil($seconds / 60);
-        $taskId = ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null;
+        $taskId = (int) $validated['selectedTaskId'];
         $teamId = $this->teamIdForLog($taskId);
 
         if (! $teamId || ! $this->memberCanLogToTeam($teamId)) {
@@ -122,7 +123,7 @@ class MemberJournal extends Component
 
         $validated = $this->validate([
             'logDate' => ['required', 'date'],
-            'selectedTaskId' => ['nullable', 'integer'],
+            'selectedTaskId' => ['required', 'integer'],
             'hours' => ['required', 'integer', 'min:0', 'max:24'],
             'minutes' => ['required', 'integer', 'min:0', 'max:59'],
             'notes' => ['nullable', 'string', 'max:5000'],
@@ -140,7 +141,7 @@ class MemberJournal extends Component
             return;
         }
 
-        $taskId = ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null;
+        $taskId = (int) $validated['selectedTaskId'];
         $teamId = $this->teamIdForLog($taskId);
 
         if (! $teamId || ! $this->memberCanLogToTeam($teamId)) {
@@ -431,7 +432,41 @@ class MemberJournal extends Component
             ->limit(8)
             ->get();
 
+        $this->attachInferredTasksToGeneralLogs($logs->concat($recentLogs), $userId);
+
         return view('livewire.member.member-journal', compact('tasks', 'logs', 'dailyMinutes', 'recentLogs', 'teams'));
+    }
+
+    /**
+     * Older entries could be saved as general work. Display a task for those
+     * logs only when the member, team, and date identify exactly one task.
+     */
+    private function attachInferredTasksToGeneralLogs(Collection $logs, int $userId): void
+    {
+        $generalLogs = $logs->filter(fn (JournalLog $log) => ! $log->task_id && $log->team_id && $log->log_date);
+
+        if ($generalLogs->isEmpty()) {
+            return;
+        }
+
+        $candidateTasks = Task::with(['project', 'team'])
+            ->whereIn('team_id', $generalLogs->pluck('team_id')->unique())
+            ->where(fn ($query) => $query
+                ->where('assigned_to', $userId)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+            ->get();
+
+        foreach ($generalLogs as $log) {
+            $logDay = $log->log_date->copy()->startOfDay();
+            $matches = $candidateTasks->filter(fn (Task $task) => (int) $task->team_id === (int) $log->team_id
+                && (! $task->start_date || $task->start_date->copy()->startOfDay()->lte($logDay))
+                && (! $task->due_date || $task->due_date->copy()->startOfDay()->gte($logDay)))
+                ->values();
+
+            if ($matches->count() === 1) {
+                $log->setRelation('task', $matches->first());
+            }
+        }
     }
 }
 

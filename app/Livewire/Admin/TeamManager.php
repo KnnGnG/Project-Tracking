@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\Project;
 use App\Models\Team;
 use App\Models\Task;
 use App\Models\User;
@@ -24,16 +23,11 @@ class TeamManager extends Component
 
     // Team form fields
     public string $name      = '';
-    public ?int   $projectId = null;
     public ?int   $leadId    = null;
     public array  $memberIds = [];
     public array $memberNotes = [];
-    public array $projectTeamIds = [];
-    public array $previousProjectTeamIds = [];
-    public string $teamSearch = '';
 
     public bool $showForm  = false;
-    public bool $premadeMode = false;
     public ?int $editingId = null;
 
     public bool $confirmingDelete = false;
@@ -46,14 +40,11 @@ class TeamManager extends Component
     {
         return [
             'name'      => 'required|string|max:255',
-            'projectId' => [$this->premadeMode ? 'nullable' : 'required', 'exists:projects,id'],
             'leadId'    => ['nullable', Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', self::ALLOWED_TEAM_ROLES))],
             'memberIds' => 'nullable|array',
             'memberIds.*' => ['integer', Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', self::ALLOWED_TEAM_ROLES))],
             'memberNotes' => 'nullable|array',
             'memberNotes.*' => 'nullable|string|max:500',
-            'projectTeamIds' => 'nullable|array',
-            'projectTeamIds.*' => 'integer|exists:teams,id',
         ];
     }
 
@@ -61,15 +52,6 @@ class TeamManager extends Component
     {
         $this->resetForm();
         $this->showForm  = true;
-        $this->premadeMode = false;
-        $this->editingId = null;
-    }
-
-    public function openPremadeCreate(): void
-    {
-        $this->resetForm();
-        $this->showForm = true;
-        $this->premadeMode = true;
         $this->editingId = null;
     }
 
@@ -79,66 +61,13 @@ class TeamManager extends Component
 
         $this->editingId = $id;
         $this->name      = $team->name;
-        $this->projectId = $team->project_id;
         $this->leadId    = $team->lead_id;
         $this->memberIds = $team->regularMembers()->pluck('users.id')->map(fn ($id) => (int) $id)->all();
         $this->memberNotes = $team->regularMembers()
             ->get()
             ->mapWithKeys(fn ($member) => [$member->id => $member->pivot?->notes ?? ''])
             ->all();
-        $this->loadProjectTeamSelection();
         $this->showForm  = true;
-        $this->premadeMode = ! $team->project_id;
-    }
-
-    public function updatedProjectId(): void
-    {
-        $this->loadProjectTeamSelection();
-    }
-
-    public function updatedTeamSearch(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatedProjectTeamIds(): void
-    {
-        $currentIds = collect($this->projectTeamIds)
-            ->map(fn ($id) => (int) $id)
-            ->filter()
-            ->unique()
-            ->values();
-        $previousIds = collect($this->previousProjectTeamIds)
-            ->map(fn ($id) => (int) $id)
-            ->filter()
-            ->unique()
-            ->values();
-        $addedIds = $currentIds->diff($previousIds)->values();
-
-        $this->previousProjectTeamIds = $currentIds->all();
-
-        if ($addedIds->count() === 1) {
-            $this->autofillFromTeam((int) $addedIds->first());
-        }
-    }
-
-    public function autofillFromTeam(int $teamId): void
-    {
-        $team = Team::with('regularMembers')->find($teamId);
-
-        if (! $team) {
-            return;
-        }
-
-        $this->name = $team->name;
-        $this->leadId = $team->lead_id;
-        $this->memberIds = $team->regularMembers
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-        $this->memberNotes = $team->regularMembers
-            ->mapWithKeys(fn ($member) => [$member->id => $member->pivot?->notes ?? ''])
-            ->all();
     }
 
     public function save(): void
@@ -148,7 +77,6 @@ class TeamManager extends Component
         DB::transaction(function () use ($data): void {
             $payload = [
                 'name'       => $data['name'],
-                'project_id' => $this->premadeMode ? null : $data['projectId'],
                 'lead_id'    => $data['leadId'] ?: null,
             ];
 
@@ -157,24 +85,15 @@ class TeamManager extends Component
                 $team->update($payload);
                 session()->flash('success', 'Team updated successfully.');
             } else {
-                $team = Team::create($payload);
-                session()->flash('success', 'Team created successfully.');
-            }
+                $team = $this->findMatchingTeam($data['name'], $data['leadId'] ? (int) $data['leadId'] : null, $data['memberIds'] ?? []);
 
-            if (! $this->premadeMode && $team->project_id) {
-                $projectTeamIds = collect($data['projectTeamIds'] ?? [])
-                    ->map(fn ($id) => (int) $id)
-                    ->push($team->id)
-                    ->unique()
-                    ->values();
-
-                Project::findOrFail((int) $data['projectId'])
-                    ->teams()
-                    ->syncWithoutDetaching($projectTeamIds->all());
-
-                Team::whereIn('id', $projectTeamIds->all())
-                    ->whereNull('project_id')
-                    ->update(['project_id' => $team->project_id]);
+                if ($team) {
+                    $team->update($payload);
+                    session()->flash('success', 'Existing team updated successfully.');
+                } else {
+                    $team = Team::create($payload);
+                    session()->flash('success', 'Team created successfully.');
+                }
             }
 
             $this->syncTeamPeople($team, $data['leadId'] ? (int) $data['leadId'] : null, $data['memberIds'] ?? [], $data['memberNotes'] ?? []);
@@ -223,66 +142,14 @@ class TeamManager extends Component
         $this->detailsTeamId = $this->detailsTeamId === $teamId ? null : $teamId;
     }
 
-    public function selectAllProjectTeams(): void
-    {
-        if (! $this->projectId) {
-            return;
-        }
-
-        $this->projectTeamIds = $this->projectTeamOptions()
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-        $this->previousProjectTeamIds = $this->projectTeamIds;
-    }
-
-    public function clearProjectTeams(): void
-    {
-        $this->projectTeamIds = [];
-        $this->previousProjectTeamIds = [];
-    }
-
     private function resetForm(): void
     {
         $this->name           = '';
-        $this->projectId      = null;
         $this->leadId         = null;
         $this->memberIds      = [];
         $this->memberNotes    = [];
-        $this->projectTeamIds = [];
-        $this->previousProjectTeamIds = [];
-        $this->teamSearch     = '';
         $this->editingId      = null;
-        $this->premadeMode    = false;
         $this->resetValidation();
-    }
-
-    private function loadProjectTeamSelection(): void
-    {
-        if (! $this->projectId) {
-            $this->projectTeamIds = [];
-            $this->previousProjectTeamIds = [];
-            return;
-        }
-
-        $this->projectTeamIds = Project::find($this->projectId)
-            ?->teams()
-            ->pluck('teams.id')
-            ->when($this->editingId, fn ($ids) => $ids->push($this->editingId))
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values()
-            ->all() ?? [];
-        $this->previousProjectTeamIds = $this->projectTeamIds;
-    }
-
-    private function projectTeamOptions()
-    {
-        // Intentionally global: selected teams are attached to the chosen project on save.
-        return Team::with(['project', 'projects', 'lead'])
-            ->when($this->teamSearch, fn ($q) => $q->where('name', 'like', "%{$this->teamSearch}%"))
-            ->orderBy('name')
-            ->get();
     }
 
     private function syncTeamPeople(Team $team, ?int $leadId, array $memberIds, array $memberNotes): void
@@ -327,18 +194,57 @@ class TeamManager extends Component
 
         $team->members()->sync($sync);
     }
+
+    private function findMatchingTeam(string $name, ?int $leadId, array $memberIds): ?Team
+    {
+        $teams = Team::with('regularMembers')->get();
+
+        return $teams->first(fn (Team $team) => $this->teamMatchesSignature($team, $name, $leadId, $memberIds))
+            ?? $teams->first(fn (Team $team) => $this->teamNameMatches($team, $name));
+    }
+
+    private function teamMatchesSignature(Team $team, string $name, ?int $leadId, array $memberIds): bool
+    {
+        if (! $this->teamNameMatches($team, $name)) {
+            return false;
+        }
+
+        if (($team->lead_id ? (int) $team->lead_id : null) !== $leadId) {
+            return false;
+        }
+
+        $existingMembers = $team->regularMembers
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+        $incomingMembers = collect($memberIds)
+            ->map(fn ($id) => (int) $id)
+            ->reject(fn ($id) => $leadId && $id === $leadId)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        return $existingMembers === $incomingMembers;
+    }
+
+    private function teamNameMatches(Team $team, string $name): bool
+    {
+        return mb_strtolower(trim($team->name)) === mb_strtolower(trim($name));
+    }
+
     public function render()
     {
         $teams    = Team::with(['project', 'projects', 'lead', 'members'])->withCount('tasks')->latest()->paginate($this->perPage);
-        $projects = Project::orderBy('name')->get();
-        $people   = User::whereIn('role', ['team_lead', 'member'])->orderBy('name')->get();
-        $leads    = $people;
-        $members  = $people;
-        $projectTeamOptions = $this->projectTeamOptions();
-        $selectedProjectTeams = Team::with(['project', 'projects', 'lead'])
-            ->whereIn('id', array_map('intval', $this->projectTeamIds))
+        $people   = User::with(['teams.project', 'teams.projects'])
+            ->whereIn('role', ['team_lead', 'member'])
             ->orderBy('name')
             ->get();
+        $leads    = $people;
+        $members  = $people;
         $detailsTeam = $this->detailsTeamId
             ? Team::with(['project', 'projects', 'lead', 'members'])
                 ->withCount('tasks')
@@ -354,6 +260,6 @@ class TeamManager extends Component
         }
 
         return view('livewire.admin.team-manager',
-            compact('teams', 'projects', 'leads', 'members', 'projectTeamOptions', 'selectedProjectTeams', 'detailsTeam'));
+            compact('teams', 'leads', 'members', 'detailsTeam'));
     }
 }

@@ -14,9 +14,11 @@
         default => 'bg-gray-400 border-gray-500',
     };
     $segments = collect($row['segments'] ?? []);
+    $activityRows = collect($row['activityRows'] ?? []);
     $segmentCount = $segments->count();
     $hasOverflow = ($row['segmentOverflowCount'] ?? 0) > 0;
-    $rowHeightRem = 3.5 + max(0, $segmentCount - 1) * 1.45 + ($hasOverflow ? 1.35 : 0);
+    $stackedRowCount = max($segmentCount, $activityRows->count());
+    $rowHeightRem = 3.5 + max(0, $stackedRowCount - 1) * 1.35 + ($hasOverflow ? 1.35 : 0);
 @endphp
 
 <div class="py-2">
@@ -73,6 +75,54 @@
                 </template>
             </div>
         @endunless
+
+        @if($row['kind'] === 'task' && $activityRows->isNotEmpty() && !($row['hideActivity'] ?? false))
+            @foreach($activityRows as $activityRow)
+                @php $activityDays = collect($activityRow['days']); @endphp
+                <div class="relative z-30 grid h-5 self-end overflow-hidden rounded-md border border-gray-500 shadow-sm"
+                     style="grid-column: {{ $activityDays->first()['day'] }} / span {{ $activityDays->count() }}; grid-row: 1; grid-template-columns: repeat({{ $activityDays->count() }}, minmax(0, 1fr)); margin-bottom: {{ 0.25 + ($loop->index * 1.35) }}rem;">
+                    @foreach($activityDays as $activityDay)
+                        <div x-data="{
+                                open: false,
+                                x: 0,
+                                y: 0,
+                                place(event) {
+                                    const tipWidth = this.$refs.tip?.offsetWidth || 280;
+                                    const tipHeight = this.$refs.tip?.offsetHeight || 180;
+                                    this.x = Math.min(event.clientX + 14, window.innerWidth - tipWidth - 12);
+                                    this.y = Math.min(event.clientY + 14, window.innerHeight - tipHeight - 12);
+                                }
+                            }"
+                             @mouseenter="open = true; $nextTick(() => place($event))"
+                             @mousemove="place($event)"
+                             @mouseleave="open = false"
+                             @focus="open = true; $nextTick(() => { const rect = $el.getBoundingClientRect(); place({ clientX: rect.left, clientY: rect.bottom }) })"
+                             @blur="open = false"
+                             class="h-full outline-none {{ $activityDay['state'] === 'logged' ? 'bg-emerald-500' : 'bg-gray-300' }}"
+                             tabindex="0"
+                             aria-label="{{ $activityDay['tooltip'] }}">
+                            <template x-teleport="body">
+                                <div x-ref="tip"
+                                     x-cloak
+                                     x-show="open"
+                                     x-transition.opacity.duration.100ms
+                                     class="pointer-events-none fixed z-[99999] w-max max-w-xs rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-[11px] font-medium leading-5 text-gray-600 shadow-xl ring-1 ring-black/5"
+                                     :style="`left: ${x}px; top: ${y}px;`">
+                                    @foreach(($activityDay['tooltipLines'] ?? [$activityDay['tooltip']]) as $line)
+                                        <p class="{{ $loop->first ? 'font-semibold text-gray-900' : '' }}">{{ $line }}</p>
+                                    @endforeach
+                                </div>
+                            </template>
+                        </div>
+                    @endforeach
+                </div>
+                <div class="pointer-events-none relative z-40 flex h-5 items-center self-end overflow-hidden px-2 text-[10px] font-semibold text-white drop-shadow-sm"
+                     style="grid-column: {{ $activityDays->first()['day'] }} / span {{ $activityDays->count() }}; grid-row: 1; margin-bottom: {{ 0.25 + ($loop->index * 1.35) }}rem;">
+                    <span class="mr-1.5 rounded bg-white/20 px-1.5 py-0.5 text-[8px] uppercase leading-none">Daily</span>
+                    <span class="truncate">{{ $activityRow['memberName'] }}</span>
+                </div>
+            @endforeach
+        @endif
 
         @foreach($segments as $segment)
             @php
