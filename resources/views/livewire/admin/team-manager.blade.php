@@ -54,7 +54,7 @@
                 </div>
 
                 {{-- Members --}}
-                <div class="md:col-span-3">
+                <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Team Members</label>
                     <div @class([
                         'rounded-lg border bg-white px-3 py-2',

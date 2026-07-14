@@ -51,6 +51,9 @@
                                 </option>
                             @endforeach
                         </select>
+                        @if($tasks->isEmpty())
+                            <p class="mt-1 text-xs text-amber-600">No open tasks are currently available. A log cannot be submitted until a task is assigned.</p>
+                        @endif
                         @error('selectedTaskId') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
 
@@ -342,13 +345,20 @@
                     this.$wire.addTimerMinutes(this.elapsed);
                     this.reset();
                 },
-                saveSession() {
+                async saveSession() {
                     if (this.elapsed < 1) {
                         return;
                     }
 
-                    this.$wire.saveTimerSession(this.elapsed);
-                    this.reset();
+                    try {
+                        const saved = await this.$wire.saveTimerSession(this.elapsed);
+
+                        if (saved) {
+                            this.reset();
+                        }
+                    } catch (error) {
+                        // Livewire renders validation errors; keep timer and break state intact.
+                    }
                 },
                 complete() {
                     this.pause();

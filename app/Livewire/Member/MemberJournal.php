@@ -73,7 +73,7 @@ class MemberJournal extends Component
         $this->normalizeDuration();
     }
 
-    public function saveTimerSession($seconds): void
+    public function saveTimerSession($seconds): bool
     {
         $seconds = $this->clampTimerSeconds($seconds);
         $this->normalizeLogDate();
@@ -86,7 +86,7 @@ class MemberJournal extends Component
 
         if (! blank($validated['selectedTaskId'] ?? null) && ! $this->memberTaskExists((int) $validated['selectedTaskId'])) {
             $this->addError('selectedTaskId', 'Choose one of your assigned tasks.');
-            return;
+            return false;
         }
 
         $totalMinutes = (int) ceil($seconds / 60);
@@ -95,7 +95,7 @@ class MemberJournal extends Component
 
         if (! $teamId || ! $this->memberCanLogToTeam($teamId)) {
             $this->addError('selectedTaskId', 'Choose a team before logging general work.');
-            return;
+            return false;
         }
 
         DB::transaction(function () use ($taskId, $teamId, $validated, $totalMinutes): void {
@@ -114,6 +114,8 @@ class MemberJournal extends Component
         $this->dispatch('journal-log-changed');
         $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
         $this->flash = 'Timer session added to your journal.';
+
+        return true;
     }
 
     public function save(): void
@@ -443,6 +445,7 @@ class MemberJournal extends Component
      */
     private function attachInferredTasksToGeneralLogs(Collection $logs, int $userId): void
     {
+        $activeProjectId = (int) session('active_project_id', 0);
         $generalLogs = $logs->filter(fn (JournalLog $log) => ! $log->task_id && $log->team_id && $log->log_date);
 
         if ($generalLogs->isEmpty()) {
@@ -454,6 +457,7 @@ class MemberJournal extends Component
             ->where(fn ($query) => $query
                 ->where('assigned_to', $userId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+            ->when($activeProjectId > 0, fn ($query) => $query->where('project_id', $activeProjectId))
             ->get();
 
         foreach ($generalLogs as $log) {

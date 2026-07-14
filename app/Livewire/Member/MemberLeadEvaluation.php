@@ -124,9 +124,7 @@ class MemberLeadEvaluation extends Component
 
         return Team::query()
             ->with(['project', 'projects', 'lead', 'leads'])
-            ->whereHas('members', fn ($members) => $members
-                ->whereKey(auth()->id())
-                ->where('team_members.role', 'member'))
+            ->whereHas('regularMembers', fn ($members) => $members->whereKey(auth()->id()))
             ->orderBy('name')
             ->get()
             ->filter(fn (Team $team) => $activeProjectId > 0
@@ -152,7 +150,7 @@ class MemberLeadEvaluation extends Component
             $this->organizationScore,
             $this->fairnessScore,
         ])->avg(), 1);
-        $evaluations = TeamLeadEvaluation::with(['team.project', 'team.projects', 'lead'])
+        $evaluations = TeamLeadEvaluation::with(['team', 'lead'])
             ->where('evaluator_id', auth()->id())
             ->whereIn('team_id', $teams->pluck('id'))
             ->latest()

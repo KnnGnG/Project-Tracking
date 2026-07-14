@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Livewire\Concerns\MatchesExistingTeams;
 use App\Models\Team;
 use App\Models\Task;
 use App\Models\User;
@@ -17,7 +18,7 @@ use Livewire\WithPagination;
 #[Title('Teams')]
 class TeamManager extends Component
 {
-    use WithPagination;
+    use MatchesExistingTeams, WithPagination;
 
     private const ALLOWED_TEAM_ROLES = ['team_lead', 'member'];
 
@@ -57,14 +58,13 @@ class TeamManager extends Component
 
     public function openEdit(int $id): void
     {
-        $team = Team::findOrFail($id);
+        $team = Team::with('regularMembers')->findOrFail($id);
 
         $this->editingId = $id;
         $this->name      = $team->name;
         $this->leadId    = $team->lead_id;
-        $this->memberIds = $team->regularMembers()->pluck('users.id')->map(fn ($id) => (int) $id)->all();
-        $this->memberNotes = $team->regularMembers()
-            ->get()
+        $this->memberIds = $team->regularMembers->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $this->memberNotes = $team->regularMembers
             ->mapWithKeys(fn ($member) => [$member->id => $member->pivot?->notes ?? ''])
             ->all();
         $this->showForm  = true;
@@ -193,47 +193,6 @@ class TeamManager extends Component
             });
 
         $team->members()->sync($sync);
-    }
-
-    private function findMatchingTeam(string $name, ?int $leadId, array $memberIds): ?Team
-    {
-        $teams = Team::with('regularMembers')->get();
-
-        return $teams->first(fn (Team $team) => $this->teamMatchesSignature($team, $name, $leadId, $memberIds))
-            ?? $teams->first(fn (Team $team) => $this->teamNameMatches($team, $name));
-    }
-
-    private function teamMatchesSignature(Team $team, string $name, ?int $leadId, array $memberIds): bool
-    {
-        if (! $this->teamNameMatches($team, $name)) {
-            return false;
-        }
-
-        if (($team->lead_id ? (int) $team->lead_id : null) !== $leadId) {
-            return false;
-        }
-
-        $existingMembers = $team->regularMembers
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->sort()
-            ->values()
-            ->all();
-        $incomingMembers = collect($memberIds)
-            ->map(fn ($id) => (int) $id)
-            ->reject(fn ($id) => $leadId && $id === $leadId)
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
-
-        return $existingMembers === $incomingMembers;
-    }
-
-    private function teamNameMatches(Team $team, string $name): bool
-    {
-        return mb_strtolower(trim($team->name)) === mb_strtolower(trim($name));
     }
 
     public function render()
