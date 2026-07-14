@@ -333,12 +333,12 @@
                                 $overdueTasks = $tasks->filter(fn ($task) => $task->due_date && $task->isExceededDeadline())->count();
                                 $completion = $totalTasks > 0 ? (int) round(($doneTasks / $totalTasks) * 100) : 0;
                                 $statusClass = fn ($status) => match($status) {
-                                    'active' => 'bg-green-100 text-green-700',
+                                    'active' => 'bg-emerald-100 text-emerald-700',
                                     'overdue' => 'bg-red-100 text-red-700',
                                     'near_due' => 'bg-amber-100 text-amber-700',
                                     'upcoming' => 'bg-sky-100 text-sky-700',
-                                    'on_hold' => 'bg-yellow-100 text-yellow-700',
-                                    'completed' => 'bg-blue-100 text-blue-700',
+                                    'on_hold' => 'bg-slate-200 text-slate-700',
+                                    'completed' => 'bg-indigo-100 text-indigo-700',
                                     'done' => 'bg-green-100 text-green-700',
                                     'in_progress' => 'bg-blue-100 text-blue-700',
                                     'review' => 'bg-amber-100 text-amber-800',

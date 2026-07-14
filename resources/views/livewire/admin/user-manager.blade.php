@@ -242,7 +242,12 @@
         </x-slot>
 
         <x-slot name="content">
-            Delete {{ $deleteName ?: 'this user' }}? This cannot be undone.
+            <p>Delete {{ $deleteName ?: 'this user' }}? This cannot be undone.</p>
+            @if($deleteError)
+                <p class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {{ $deleteError }}
+                </p>
+            @endif
         </x-slot>
 
         <x-slot name="footer">

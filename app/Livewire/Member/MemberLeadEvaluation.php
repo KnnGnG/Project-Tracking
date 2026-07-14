@@ -65,8 +65,8 @@ class MemberLeadEvaluation extends Component
     {
         $data = $this->validate([
             'selectedTeamId' => ['required', 'integer'],
-            'periodStart' => ['nullable', 'date'],
-            'periodEnd' => ['nullable', 'date', 'after_or_equal:periodStart'],
+            'periodStart' => ['required', 'date'],
+            'periodEnd' => ['required', 'date', 'after_or_equal:periodStart'],
             'leadershipScore' => ['required', 'integer', 'min:1', 'max:5'],
             'communicationScore' => ['required', 'integer', 'min:1', 'max:5'],
             'supportScore' => ['required', 'integer', 'min:1', 'max:5'],
@@ -85,12 +85,13 @@ class MemberLeadEvaluation extends Component
             return;
         }
 
-        TeamLeadEvaluation::create([
+        TeamLeadEvaluation::updateOrCreate([
             'team_id' => $team->id,
             'evaluator_id' => auth()->id(),
             'lead_id' => $leadId,
-            'period_start' => $data['periodStart'] ?: null,
-            'period_end' => $data['periodEnd'] ?: null,
+            'period_start' => $data['periodStart'],
+            'period_end' => $data['periodEnd'],
+        ], [
             'leadership_score' => (int) $data['leadershipScore'],
             'communication_score' => (int) $data['communicationScore'],
             'support_score' => (int) $data['supportScore'],
@@ -102,7 +103,7 @@ class MemberLeadEvaluation extends Component
         ]);
 
         $this->resetForm();
-        $this->flash = 'Team lead evaluation saved.';
+        $this->flash = 'Team lead evaluation saved for this period.';
     }
 
     private function resetForm(): void

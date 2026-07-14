@@ -198,6 +198,13 @@ class User extends Authenticatable
     {
         return $this->hasMany(TaskMemberProgress::class);
     }
+
+    public function hasProtectedWorkOwnership(): bool
+    {
+        return $this->createdProjects()->exists()
+            || $this->createdTasks()->exists()
+            || $this->assignedTasks()->exists();
+    }
 }
 
 

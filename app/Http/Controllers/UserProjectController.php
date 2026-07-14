@@ -144,7 +144,6 @@ class UserProjectController extends Controller
             ->where('type', 'task_assigned')
             ->whereNull('read_at')
             ->latest()
-            ->limit(25)
             ->get();
 
         if ($notifications->isEmpty()) {
@@ -208,7 +207,6 @@ class UserProjectController extends Controller
                 },
                 $item['task']->due_date?->timestamp ?? PHP_INT_MAX,
             ])
-            ->take(25)
             ->values();
     }
 }

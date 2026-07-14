@@ -100,7 +100,7 @@ class MemberJournal extends Component
         $this->normalizeLogDate();
 
         $validated = $this->validate([
-            'logDate' => ['required', 'date'],
+            'logDate' => ['required', 'date', 'before_or_equal:today'],
             'selectedTaskId' => ['required', 'integer'],
             'progress' => ['required', 'integer', 'min:1', 'max:100'],
             'notes' => ['nullable', 'string', 'max:5000'],
@@ -131,8 +131,7 @@ class MemberJournal extends Component
                 'notes' => $validated['notes'] ?: null,
             ]);
 
-            $this->persistTaskProgress($taskId, $validated['progress'], $validated['logDate']);
-            $this->recomputeActualStartFromLogs($taskId);
+            $this->recomputeTaskProgressFromLogs($taskId);
         });
 
         $this->dispatch('journal-log-changed');
@@ -148,7 +147,7 @@ class MemberJournal extends Component
         $this->normalizeDuration();
 
         $validated = $this->validate([
-            'logDate' => ['required', 'date'],
+            'logDate' => ['required', 'date', 'before_or_equal:today'],
             'selectedTaskId' => ['required', 'integer'],
             'hours' => ['required', 'integer', 'min:0', 'max:24'],
             'minutes' => ['required', 'integer', 'min:0', 'max:59'],
@@ -187,8 +186,7 @@ class MemberJournal extends Component
                 'notes' => $validated['notes'] ?: null,
             ]);
 
-            $this->persistTaskProgress($taskId, $validated['progress'], $validated['logDate']);
-            $this->recomputeActualStartFromLogs($taskId);
+            $this->recomputeTaskProgressFromLogs($taskId);
         });
 
         $this->dispatch('journal-log-changed');
@@ -210,7 +208,7 @@ class MemberJournal extends Component
             $taskId = $log->task_id;
             $log->delete();
 
-            $this->recomputeActualStartFromLogs($taskId);
+            $this->recomputeTaskProgressFromLogs($taskId);
 
             return true;
         });
@@ -328,18 +326,24 @@ class MemberJournal extends Component
             ->exists();
     }
 
-    private function recomputeActualStartFromLogs(?int $taskId): void
+    private function recomputeTaskProgressFromLogs(?int $taskId): void
     {
         if (! $taskId) {
             return;
         }
 
-        $earliestLog = JournalLog::query()
+        $logs = JournalLog::query()
             ->where('task_id', $taskId)
-            ->where('user_id', auth()->id())
+            ->where('user_id', auth()->id());
+        $earliestLog = (clone $logs)
             ->orderBy('log_date')
             ->orderBy('created_at')
             ->orderBy('id')
+            ->first();
+        $latestLog = (clone $logs)
+            ->orderByDesc('log_date')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->first();
 
         $progress = TaskMemberProgress::firstOrCreate(
@@ -347,34 +351,24 @@ class MemberJournal extends Component
             ['status' => 'pending', 'progress' => 0]
         );
 
-        if ($earliestLog) {
+        if ($latestLog) {
+            $percentage = max(1, min(100, (int) ($latestLog->progress ?? 1)));
+            $progress->progress = $percentage;
+            $progress->status = $percentage === 100 ? 'done' : 'in_progress';
             $progress->started_at = Carbon::parse($earliestLog->log_date)->startOfDay();
-
-            if ($progress->status === 'pending') {
-                $progress->status = 'in_progress';
-                $progress->progress = max((int) $progress->progress, 1);
-            }
+            $progress->completed_at = $percentage === 100
+                ? ($latestLog->created_at ?? Carbon::parse($latestLog->log_date)->endOfDay())
+                : null;
         } else {
+            $progress->status = 'pending';
+            $progress->progress = 0;
             $progress->started_at = null;
+            $progress->completed_at = null;
         }
 
         $progress->save();
 
         $this->syncParentTaskStatus($taskId);
-    }
-
-    private function persistTaskProgress(int $taskId, int $percentage, string $logDate): void
-    {
-        $progress = TaskMemberProgress::firstOrCreate(
-            ['task_id' => $taskId, 'user_id' => auth()->id()],
-            ['status' => 'pending', 'progress' => 0]
-        );
-
-        $progress->progress = $percentage;
-        $progress->status = $percentage === 100 ? 'done' : 'in_progress';
-        $progress->started_at ??= Carbon::parse($logDate)->startOfDay();
-        $progress->completed_at = $percentage === 100 ? now() : null;
-        $progress->save();
     }
 
     private function syncParentTaskStatus(int $taskId): void

@@ -20,8 +20,7 @@ trait MatchesExistingTeams
                 && ($team->lead_id ? (int) $team->lead_id : null) === $leadId);
         }
 
-        return $teams->first(fn (Team $team) => $this->teamMatchesSignature($team, $name, $leadId, $memberIds))
-            ?? $teams->first(fn (Team $team) => $this->teamNameMatches($team, $name));
+        return $teams->first(fn (Team $team) => $this->teamMatchesSignature($team, $name, $leadId, $memberIds));
     }
 
     private function teamMatchesSignature(Team $team, string $name, ?int $leadId, array $memberIds): bool
