@@ -283,9 +283,9 @@
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6h8M8 10h8M8 14h5M5 4h14a1 1 0 011 1v14l-4-2-4 2-4-2-4 2V5a1 1 0 011-1z"/></svg>
                         Logs and Journal
                     </a>
-                    <a href="<?= e(route('member.evaluations', $activeMemberRouteParams)) ?>" class="<?= e($navClass) ?> <?= e(request()->routeIs('member.evaluations') ? $navActive : $navIdle) ?>">
+                    <a href="<?= e(route('member.evaluations', $activeMemberRouteParams)) ?>" class="<?= e($navClass) ?> <?= e(request()->routeIs('member.evaluations', 'member.lead-evaluation') ? $navActive : $navIdle) ?>">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.161c.969 0 1.371 1.24.588 1.81l-3.366 2.445a1 1 0 00-.364 1.118l1.286 3.957c.3.921-.755 1.688-1.539 1.118l-3.366-2.445a1 1 0 00-1.176 0l-3.366 2.445c-.784.57-1.838-.197-1.539-1.118l1.286-3.957a1 1 0 00-.364-1.118L4.062 9.384c-.783-.57-.38-1.81.588-1.81h4.161a1 1 0 00.95-.69l1.288-3.957z"/></svg>
-                        My Evaluations
+                        Evaluation
                     </a>
                     <?php } ?>
                 <?php } ?>

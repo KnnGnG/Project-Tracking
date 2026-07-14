@@ -44,7 +44,103 @@
                 ? $selectedTeam->assignedProjects()->firstWhere('id', $activeProjectId)
                 : $selectedTeam->assignedProjects()->first();
             $selectedProjectNames = $selectedProject?->name;
+            $latestLeadFeedback = $leadFeedback->first();
+            $leadFeedbackAverage = $leadFeedback->isNotEmpty()
+                ? round($leadFeedback->avg(fn ($evaluation) => $evaluation->averageScore()), 1)
+                : null;
         @endphp
+
+        <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 px-6 py-4">
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-900">Feedback About You</h2>
+                    <p class="mt-0.5 text-xs text-gray-400">Member evaluations of your leadership for {{ $selectedTeam->name }}.</p>
+                </div>
+                @if($leadFeedbackAverage)
+                    <span class="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700">
+                        Average {{ $leadFeedbackAverage }}/5
+                    </span>
+                @endif
+            </div>
+
+            @if($leadFeedback->isEmpty())
+                <div class="ui-empty-state rounded-none border-0 shadow-none">
+                    Member feedback about your team lead support will appear here.
+                </div>
+            @else
+                <div class="grid grid-cols-1 gap-4 p-6 lg:grid-cols-3">
+                    <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Responses</p>
+                        <p class="mt-2 text-2xl font-extrabold text-gray-900">{{ $leadFeedback->count() }}</p>
+                        <p class="mt-1 text-sm text-gray-500">{{ $latestLeadFeedback?->created_at?->format('M d, Y') }} latest</p>
+                    </div>
+                    <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">Overall Average</p>
+                        <p class="mt-2 text-2xl font-extrabold text-indigo-700">{{ $leadFeedbackAverage }}/5</p>
+                        <p class="mt-1 text-sm text-gray-600">Across visible feedback</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Latest Team</p>
+                        <p class="mt-2 text-sm font-bold text-gray-900">{{ $latestLeadFeedback?->team?->name ?? $selectedTeam->name }}</p>
+                        <p class="mt-1 text-sm text-gray-500">
+                            {{ $latestLeadFeedback?->period_start?->format('M d, Y') ?? 'No start' }} - {{ $latestLeadFeedback?->period_end?->format('M d, Y') ?? 'No end' }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="divide-y divide-gray-100">
+                    @foreach($leadFeedback as $feedback)
+                        @php
+                            $scores = collect([
+                                'Leadership' => $feedback->leadership_score,
+                                'Communication' => $feedback->communication_score,
+                                'Support' => $feedback->support_score,
+                                'Organization' => $feedback->organization_score,
+                                'Fairness' => $feedback->fairness_score,
+                            ]);
+                        @endphp
+                        <article class="px-6 py-5">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h3 class="text-base font-bold text-gray-900">{{ $feedback->evaluator?->name ?? 'Member' }}</h3>
+                                    <p class="mt-1 text-xs text-gray-400">
+                                        {{ $feedback->period_start?->format('M d, Y') ?? 'No start' }} - {{ $feedback->period_end?->format('M d, Y') ?? 'No end' }}
+                                        / Saved {{ $feedback->created_at->format('M d, Y h:i A') }}
+                                    </p>
+                                </div>
+                                <span class="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+                                    {{ $feedback->averageScore() }}/5
+                                </span>
+                            </div>
+
+                            <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                                @foreach($scores as $label => $score)
+                                    <div class="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <p class="text-xs font-semibold text-gray-500">{{ $label }}</p>
+                                        <p class="mt-1 text-sm font-extrabold text-gray-900">{{ $score }}/5</p>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                                <section class="rounded-xl border border-gray-100 p-4">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Summary</p>
+                                    <p class="mt-2 text-sm leading-6 text-gray-700">{{ $feedback->summary ?: 'No summary provided.' }}</p>
+                                </section>
+                                <section class="rounded-xl border border-green-100 bg-green-50/40 p-4">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-green-600">Strengths</p>
+                                    <p class="mt-2 text-sm leading-6 text-gray-700">{{ $feedback->strengths ?: 'No strengths noted.' }}</p>
+                                </section>
+                                <section class="rounded-xl border border-amber-100 bg-amber-50/40 p-4">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Areas to Improve</p>
+                                    <p class="mt-2 text-sm leading-6 text-gray-700">{{ $feedback->improvements ?: 'No improvement notes provided.' }}</p>
+                                </section>
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+            @endif
+        </div>
 
         <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
             <section class="space-y-4 xl:col-span-1">

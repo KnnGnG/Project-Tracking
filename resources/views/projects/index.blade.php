@@ -86,7 +86,6 @@
                                 'completed' => 'bg-blue-100 text-blue-700',
                                 default => 'bg-slate-100 text-slate-600',
                             };
-                            $teamOverflow = max(0, $item['teams']->count() - 4);
                         @endphp
 
                         <article class="project-picker-card group">
@@ -98,9 +97,6 @@
                                         </h3>
                                         <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                                             <span>{{ $item['teams']->count() }} team{{ $item['teams']->count() !== 1 ? 's' : '' }}</span>
-                                            @if($teamOverflow > 0)
-                                                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">+{{ $teamOverflow }} more</span>
-                                            @endif
                                         </p>
                                     </div>
                                     <span class="project-status-pill {{ $statusClass }}">

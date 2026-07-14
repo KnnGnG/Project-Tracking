@@ -501,7 +501,6 @@ class TeamLeadDashboard extends Component
         Collection $tasks,
         Carbon $monthStart,
         Carbon $monthEnd,
-        Collection $generalLogs,
     ): array {
         $totalDays = max(1, (int) $monthStart->diffInDays($monthEnd) + 1);
 
@@ -554,7 +553,7 @@ class TeamLeadDashboard extends Component
         $tasks
             ->filter(fn ($task) => $task->start_date || $task->due_date)
             ->sortBy(fn ($task) => optional($task->start_date ?? $task->due_date)->timestamp ?? PHP_INT_MAX)
-            ->each(function ($task) use ($rows, $makeRow) {
+            ->each(function ($task) use ($rows, $makeRow, $monthStart, $monthEnd) {
                 $start = $task->start_date ?? $task->due_date;
                 $end = $task->due_date ?? $task->start_date;
                 $assigneeNames = $task->assignees->pluck('name');
@@ -563,7 +562,26 @@ class TeamLeadDashboard extends Component
                     $assigneeNames = collect([$task->assignee->name]);
                 }
 
+                $journalLogs = $task->journalLogs ?? collect();
                 $taskRow = $makeRow('task', 'Task', $task->title, $start, $end);
+
+                if (! $taskRow) {
+                    $visibleLogs = $journalLogs
+                        ->filter(fn (JournalLog $log) => $log->log_date
+                            && Carbon::parse($log->log_date)->betweenIncluded($monthStart, $monthEnd))
+                        ->sortBy('log_date')
+                        ->values();
+
+                    if ($visibleLogs->isNotEmpty()) {
+                        $taskRow = $makeRow(
+                            'task',
+                            'Task',
+                            $task->title,
+                            Carbon::parse($visibleLogs->first()->log_date)->startOfDay(),
+                            Carbon::parse($visibleLogs->last()->log_date)->startOfDay(),
+                        );
+                    }
+                }
 
                 if ($taskRow) {
                     $scheduledStart = $task->start_date
@@ -584,201 +602,15 @@ class TeamLeadDashboard extends Component
                     $taskRow['tooltip'] = implode("\n", $taskRow['tooltipLines']);
                 }
 
-                $actualSegments = collect();
-                $journalLogs = $task->journalLogs ?? collect();
-                $progressRows = $task->memberProgress
-                    ->filter(fn ($progress) => $progress->user)
-                    ->each(fn ($progress) => $progress->hasProgressRecord = true)
-                    ->values();
-                $progressUserIds = $progressRows->pluck('user.id')->filter()->all();
-
-                $fallbackUsers = $task->assignees;
-
-                if ($fallbackUsers->isEmpty() && $task->assignee) {
-                    $fallbackUsers = collect([$task->assignee]);
-                }
-
-                $fallbackUsers
-                    ->reject(fn ($user) => in_array($user->id, $progressUserIds, true))
-                    ->each(function ($user) use ($progressRows, $task, &$progressUserIds) {
-                        $progressRows->push((object) [
-                            'user' => $user,
-                            'started_at' => null,
-                            'completed_at' => null,
-                            'status' => $task->status,
-                            'updated_at' => $task->updated_at,
-                            'hasProgressRecord' => false,
-                        ]);
-                        $progressUserIds[] = $user->id;
-                    });
-
-                $journalLogs
-                    ->filter(fn ($log) => $log->user && ! in_array($log->user_id, $progressUserIds, true))
-                    ->unique('user_id')
-                    ->each(function ($log) use ($progressRows, $task, &$progressUserIds) {
-                        $progressRows->push((object) [
-                            'user' => $log->user,
-                            'started_at' => null,
-                            'completed_at' => null,
-                            'status' => $task->status,
-                            'updated_at' => $task->updated_at,
-                            'hasProgressRecord' => false,
-                        ]);
-                        $progressUserIds[] = $log->user_id;
-                    });
-
-                $progressRows->each(function ($progress) use ($actualSegments, $makeRow, $task, $journalLogs) {
-                    $userLogs = $journalLogs
-                        ->where('user_id', $progress->user->id)
-                        ->sortBy('log_date');
-                    $startCandidates = collect([
-                        optional($userLogs->first())->log_date ? [
-                            'timestamp' => Carbon::parse(optional($userLogs->first())->log_date)->startOfDay(),
-                            'hasTime' => false,
-                        ] : null,
-                        $progress->started_at ? [
-                            'timestamp' => Carbon::parse($progress->started_at),
-                            'hasTime' => true,
-                        ] : null,
-                    ])->filter(fn ($candidate) => $candidate && $candidate['timestamp']);
-
-                    if ($startCandidates->isEmpty()) {
-                        return;
-                    }
-
-                    $actualStartCandidate = $startCandidates
-                        ->sortBy(fn (array $candidate) => $candidate['timestamp']->timestamp)
-                        ->first();
-                    $actualStartTimestamp = $actualStartCandidate['timestamp'];
-                    $memberStart = $actualStartTimestamp->copy();
-                    $endCandidates = collect([
-                        $progress->completed_at,
-                        optional($userLogs->last())->log_date,
-                        $memberStart,
-                    ])->filter()->map(fn ($date) => Carbon::parse($date));
-                    $memberEnd = $endCandidates->sortByDesc(fn (Carbon $date) => $date->timestamp)->first();
-                    $dueLabel = $task->due_date ? $task->due_date->format('M d') : 'No due date';
-                    $startedLabel = $memberStart->format('M d');
-                    $endLabel = $memberEnd->format('M d');
-                    $scheduledStartLabel = $task->start_date
-                        ? $task->start_date->format('M d, Y').($task->start_time ? ' '.Carbon::parse($task->start_time)->format('h:i A') : '')
-                        : 'Not scheduled';
-                    $actualStartedLabel = $actualStartTimestamp->format('M d, Y')
-                        .($actualStartCandidate['hasTime'] ? ' '.$actualStartTimestamp->format('h:i A') : '');
-                    $loggedMinutes = $userLogs->sum('minutes');
-                    $scheduledStartDay = $task->start_date?->copy()->startOfDay();
-                    $memberStartDay = $memberStart->copy()->startOfDay();
-                    $dueDay = $task->due_date?->copy()->startOfDay();
-                    $timing = match (true) {
-                        $scheduledStartDay && $memberStartDay->lt($scheduledStartDay) => 'Started ahead of schedule',
-                        $scheduledStartDay && $memberStartDay->isSameDay($scheduledStartDay) => 'Started on schedule',
-                        $scheduledStartDay && $memberStartDay->gt($scheduledStartDay) => 'Started after schedule',
-                        $task->due_date && $progress->completed_at && $progress->completed_at->gt($task->due_date->copy()->endOfDay()) => 'Completed late',
-                        $task->due_date && $progress->completed_at && $progress->completed_at->lte($task->due_date->copy()->endOfDay()) => 'Completed on time',
-                        $progress->status === 'done' => 'Done',
-                        $task->due_date && ! $progress->completed_at && now()->startOfDay()->gt($task->due_date) => 'Overdue',
-                        $dueDay && $memberStartDay->lt($dueDay) => 'Started before due date',
-                        $dueDay && $memberStartDay->isSameDay($dueDay) => 'Started on due date',
-                        $dueDay && $memberStartDay->gt($dueDay) => 'Started late',
-                        default => 'Started',
-                    };
-
-                    $actualStartRow = $makeRow(
-                        'actual',
-                        'Start to End',
-                        $progress->user->name.' - '.$startedLabel.' to '.$endLabel.' / Due '.$dueLabel.' / '.$timing,
-                        $memberStart,
-                        $memberEnd,
-                    );
-
-                    if ($actualStartRow) {
-                        $actualStartRow['displayTitle'] = $progress->user->name.' - '.$timing;
-                        // expose the precise started timestamp for the UI hover
-                        $actualStartRow['startedAt'] = $actualStartTimestamp->format($actualStartCandidate['hasTime'] ? 'M d, Y h:i A' : 'M d, Y');
-                        $actualStartRow['memberName'] = $progress->user->name;
-                        $actualStartRow['loggedMinutes'] = $loggedMinutes;
-                        $actualStartRow['tooltipLines'] = [
-                            $progress->user->name,
-                            'Project: '.($task->project?->name ?? 'No project'),
-                            'Task: '.$task->title,
-                            'Scheduled start: '.$scheduledStartLabel,
-                            'Actual started: '.$actualStartedLabel,
-                            'End: '.$memberEnd->format('M d, Y'),
-                            'Logged: '.intdiv($loggedMinutes, 60).'h '.($loggedMinutes % 60).'m',
-                            'Due: '.($task->due_date ? $task->due_date->format('M d, Y') : 'No due date'),
-                            $timing,
-                        ];
-                        $actualStartRow['tooltip'] = implode("\n", $actualStartRow['tooltipLines']);
-
-                        $actualSegments->push($actualStartRow);
-                    }
-                });
-
                 if ($taskRow) {
-                    $actualSegments = $actualSegments
-                        ->sortBy(fn (array $segment) => [
-                            $segment['rawStart']?->timestamp ?? PHP_INT_MAX,
-                            $segment['memberName'] ?? $segment['title'] ?? '',
-                        ])
-                        ->values();
-                    $taskRow['segments'] = $actualSegments->take(3);
-                    $taskRow['segmentOverflowCount'] = max(0, $actualSegments->count() - 3);
+                    $activityRows = $this->taskMemberActivityRows($task, $journalLogs, $monthStart, $monthEnd);
+                    $taskRow['activityRows'] = $activityRows->take(3)->values();
+                    $taskRow['activityOverflowCount'] = max(0, $activityRows->count() - 3);
+                    $taskRow['segments'] = collect();
+                    $taskRow['segmentOverflowCount'] = 0;
 
                     $rows->push($taskRow);
                 }
-            });
-
-        $generalLogs
-            ->filter(fn (JournalLog $log) => $log->user && $log->log_date)
-            ->groupBy('user_id')
-            ->each(function (Collection $logs) use ($rows, $makeRow) {
-                $logs = $logs->sortBy('log_date');
-                $firstLog = $logs->first();
-                $lastLog = $logs->last();
-
-                if (! $firstLog || ! $lastLog) {
-                    return;
-                }
-
-                $start = Carbon::parse($firstLog->log_date);
-                $end = Carbon::parse($lastLog->log_date);
-                $minutes = $logs->sum('minutes');
-                $userName = $firstLog->user->name;
-
-                $row = $makeRow('general', 'General Work', $userName, $start, $end);
-
-                if (! $row) {
-                    return;
-                }
-
-                $segment = $makeRow(
-                    'actual',
-                    'Start to End',
-                    $userName.' - '.$start->format('M d').' to '.$end->format('M d').' / General work',
-                    $start,
-                    $end,
-                );
-
-                if (! $segment) {
-                    return;
-                }
-
-                $segment['displayTitle'] = $userName.' - General work';
-                $segment['tooltipLines'] = [
-                    $userName,
-                    'Type: General work',
-                    'Start: '.$start->format('M d, Y'),
-                    'End: '.$end->format('M d, Y'),
-                    'Logged: '.intdiv($minutes, 60).'h '.($minutes % 60).'m',
-                ];
-                $segment['tooltip'] = implode("\n", $segment['tooltipLines']);
-
-                $row['hidePrimary'] = true;
-                $row['segments'] = collect([$segment]);
-                $row['tooltipLines'] = $segment['tooltipLines'];
-                $row['tooltip'] = $segment['tooltip'];
-
-                $rows->push($row);
             });
 
         $today = now();
@@ -805,6 +637,171 @@ class TeamLeadDashboard extends Component
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
+
+    private function taskMemberActivityRows(Task $task, Collection $logs, Carbon $monthStart, Carbon $monthEnd): Collection
+    {
+        $users = $task->assignees
+            ->concat($task->memberProgress->pluck('user'))
+            ->concat($logs->pluck('user'))
+            ->filter()
+            ->whenEmpty(fn (Collection $users) => $task->assignee ? $users->push($task->assignee) : $users)
+            ->unique('id')
+            ->sortBy('name')
+            ->values();
+
+        return $users->map(function ($user) use ($task, $logs, $monthStart, $monthEnd) {
+            $userLogs = $logs->where('user_id', $user->id)->values();
+            $progress = $task->memberProgress->first(fn ($progress) => (int) $progress->user_id === (int) $user->id);
+            $days = $this->taskActivityDays($task, $userLogs, $monthStart, $monthEnd, $progress, $user->name);
+
+            return $days->isEmpty() ? null : [
+                'memberId' => $user->id,
+                'memberName' => $user->name,
+                'days' => $days,
+            ];
+        })->filter()->values();
+    }
+
+    /** Build one member's green/gray elapsed-day activity line for a task. */
+    private function taskActivityDays(
+        Task $task,
+        Collection $logs,
+        Carbon $monthStart,
+        Carbon $monthEnd,
+        ?object $progress,
+        string $memberName,
+    ): Collection
+    {
+        $logs = $logs
+            ->filter(fn (JournalLog $log) => $log->log_date)
+            ->sortBy('log_date')
+            ->values();
+        $window = $this->resolveActivityWindow($task, $logs, $progress);
+
+        if (! $window) {
+            return collect();
+        }
+
+        $startedAt = $window['startedAt'];
+        $endedAt = $window['endedAt'];
+        $effectiveStatus = $window['effectiveStatus'];
+
+        $visibleStart = $startedAt->copy()->max($monthStart);
+        $visibleEnd = $endedAt->copy()->min($monthEnd)->min(now()->startOfDay());
+
+        if ($visibleEnd->lt($visibleStart)) {
+            return collect();
+        }
+
+        $logsByDate = $logs->groupBy(fn (JournalLog $log) => Carbon::parse($log->log_date)->toDateString());
+        $totalMinutes = $logs->sum('minutes');
+        $scheduledStart = $task->start_date
+            ? $task->start_date->format('M d, Y').($task->start_time ? ' '.Carbon::parse($task->start_time)->format('h:i A') : '')
+            : 'Not scheduled';
+        $actualStarted = $startedAt->format('M d, Y');
+        $dueDate = $task->due_date?->format('M d, Y') ?? 'No due date';
+        $days = collect();
+
+        for ($day = $visibleStart->copy(); $day->lte($visibleEnd); $day->addDay()) {
+            $date = $day->toDateString();
+            $dayLogs = $logsByDate->get($date, collect());
+            $hasLog = $dayLogs->isNotEmpty();
+            $minutes = $dayLogs->sum('minutes');
+            $stateLabel = $hasLog ? 'Journal/log added' : 'No journal/log entry';
+            $tooltipLines = [
+                $stateLabel.' - '.$day->format('M d, Y'),
+                'Project: '.($task->project?->name ?? 'No project'),
+                'Task: '.$task->title,
+                'Member: '.$memberName,
+                'Scheduled start: '.$scheduledStart,
+                'Actual started: '.$actualStarted,
+                'Time for this day: '.intdiv($minutes, 60).'h '.($minutes % 60).'m',
+                'Total logged: '.intdiv($totalMinutes, 60).'h '.($totalMinutes % 60).'m',
+                'Due: '.$dueDate,
+                'Status: '.ucwords(str_replace('_', ' ', $effectiveStatus)),
+            ];
+
+            $days->push([
+                'day' => $day->day,
+                'date' => $date,
+                'state' => $hasLog ? 'logged' : 'no_activity',
+                'tooltip' => implode("\n", $tooltipLines),
+                'tooltipLines' => $tooltipLines,
+            ]);
+        }
+
+        return $days;
+    }
+
+    /** @return array{startedAt: Carbon, completedAt: ?Carbon, latestLogAt: ?Carbon, effectiveStatus: string, endedAt: Carbon}|null */
+    private function resolveActivityWindow(Task $task, Collection $logs, ?object $progress): ?array
+    {
+        $effectiveStatus = $progress?->status ?? $task->status;
+        $startedAt = collect([
+            $logs->first()?->log_date ? Carbon::parse($logs->first()->log_date)->startOfDay() : null,
+            $progress?->started_at ? Carbon::parse($progress->started_at)->startOfDay() : null,
+            in_array($effectiveStatus, ['in_progress', 'review', 'done'], true)
+                ? $task->start_date?->copy()->startOfDay()
+                : null,
+        ])->filter()->sortBy(fn (Carbon $date) => $date->timestamp)->first();
+
+        if (! $startedAt) {
+            return null;
+        }
+
+        $completedAt = $progress?->completed_at
+            ? Carbon::parse($progress->completed_at)->startOfDay()
+            : null;
+        $latestLogAt = $logs->last()?->log_date
+            ? Carbon::parse($logs->last()->log_date)->startOfDay()
+            : null;
+        $endedAt = $effectiveStatus === 'done'
+            ? collect([$completedAt, $latestLogAt])
+                ->filter()
+                ->sortByDesc(fn (Carbon $date) => $date->timestamp)
+                ->first()
+                ?? $task->updated_at?->copy()->startOfDay()
+                ?? now()->startOfDay()
+            : now()->startOfDay();
+
+        return compact('startedAt', 'completedAt', 'latestLogAt', 'effectiveStatus', 'endedAt');
+    }
+
+    /**
+     * Older journal entries allowed an empty task. Use them on the timeline only
+     * when the member and log date identify exactly one assigned task.
+     */
+    private function attachUnambiguousGeneralLogsToTasks(Collection $tasks, Collection $generalLogs): void
+    {
+        foreach ($generalLogs as $log) {
+            if (! $log->log_date) {
+                continue;
+            }
+
+            $logDay = Carbon::parse($log->log_date)->startOfDay();
+            $matches = $tasks->filter(function (Task $task) use ($log, $logDay): bool {
+                $assignedUserIds = $task->assignees->pluck('id');
+
+                if ($assignedUserIds->isEmpty() && $task->assigned_to) {
+                    $assignedUserIds = collect([(int) $task->assigned_to]);
+                }
+
+                $startsByLogDay = ! $task->start_date || $task->start_date->copy()->startOfDay()->lte($logDay);
+                $endsAfterLogDay = ! $task->due_date || $task->due_date->copy()->startOfDay()->gte($logDay);
+
+                return $assignedUserIds->contains((int) $log->user_id)
+                    && $startsByLogDay
+                    && $endsAfterLogDay;
+            })->values();
+
+            if ($matches->count() !== 1) {
+                continue;
+            }
+
+            $task = $matches->first();
+            $task->setRelation('journalLogs', $task->journalLogs->push($log));
+        }
+    }
 
     public function render()
     {
@@ -864,19 +861,20 @@ class TeamLeadDashboard extends Component
                         ->where('team_id', $selectedTeam->id)
                         ->whereNull('task_id')
                         ->whereBetween('log_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-                        ->orderBy('log_date')
                         ->get();
+                    $this->attachUnambiguousGeneralLogsToTasks($tasks, $generalLogs);
                     $calendarGrid = $this->buildCalendarGrid(
                         $this->calendarItemsByDay($timelineProjects, $tasks, $monthStart, $monthEnd)
                     );
                     $calendarWeekBars = $this->buildCalendarWeekBars($timelineProjects, $tasks, $calendarGrid);
-                    $timelineGraph = $this->buildTimelineGraph($timelineProjects, $tasks, $monthStart, $monthEnd, $generalLogs);
+                    $timelineGraph = $this->buildTimelineGraph($timelineProjects, $tasks, $monthStart, $monthEnd);
                     $showTaskTimeline = in_array('task', $this->timelineKinds, true);
                     $showActualTimeline = in_array('actual', $this->timelineKinds, true);
                     $timelineGraph['rows'] = $timelineGraph['rows']
                         ->map(function ($row) use ($showActualTimeline, $showTaskTimeline) {
                             if (($row['kind'] ?? null) === 'task') {
                                 $row['hidePrimary'] = ! $showTaskTimeline;
+                                $row['hideActivity'] = ! $showActualTimeline;
                             }
 
                             if (! $showActualTimeline) {
@@ -889,7 +887,7 @@ class TeamLeadDashboard extends Component
                         ->filter(function ($row) use ($showActualTimeline) {
                             if (($row['kind'] ?? null) === 'task') {
                                 return in_array('task', $this->timelineKinds, true)
-                                    || ($showActualTimeline && collect($row['segments'] ?? [])->isNotEmpty());
+                                    || ($showActualTimeline && collect($row['activityRows'] ?? [])->isNotEmpty());
                             }
 
                             if (($row['kind'] ?? null) === 'general') {

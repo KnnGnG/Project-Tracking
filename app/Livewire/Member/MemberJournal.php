@@ -7,6 +7,7 @@ use App\Models\Task;
 use App\Models\TaskMemberProgress;
 use App\Models\Team;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -46,6 +47,9 @@ class MemberJournal extends Component
         $this->filterTeam = request()->has('team')
             ? request()->integer('team')
             : (int) session('active_team_id', 0);
+        $this->logDate = request()->has('date')
+            ? (string) request()->query('date')
+            : (string) session('member_journal_log_date', $this->logDate);
         $this->normalizeLogDate();
         $this->normalizeAccessibleTeamFilter();
     }
@@ -69,29 +73,29 @@ class MemberJournal extends Component
         $this->normalizeDuration();
     }
 
-    public function saveTimerSession($seconds): void
+    public function saveTimerSession($seconds): bool
     {
         $seconds = $this->clampTimerSeconds($seconds);
         $this->normalizeLogDate();
 
         $validated = $this->validate([
             'logDate' => ['required', 'date'],
-            'selectedTaskId' => ['nullable', 'integer'],
+            'selectedTaskId' => ['required', 'integer'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
         if (! blank($validated['selectedTaskId'] ?? null) && ! $this->memberTaskExists((int) $validated['selectedTaskId'])) {
             $this->addError('selectedTaskId', 'Choose one of your assigned tasks.');
-            return;
+            return false;
         }
 
         $totalMinutes = (int) ceil($seconds / 60);
-        $taskId = ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null;
+        $taskId = (int) $validated['selectedTaskId'];
         $teamId = $this->teamIdForLog($taskId);
 
         if (! $teamId || ! $this->memberCanLogToTeam($teamId)) {
             $this->addError('selectedTaskId', 'Choose a team before logging general work.');
-            return;
+            return false;
         }
 
         DB::transaction(function () use ($taskId, $teamId, $validated, $totalMinutes): void {
@@ -110,6 +114,8 @@ class MemberJournal extends Component
         $this->dispatch('journal-log-changed');
         $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
         $this->flash = 'Timer session added to your journal.';
+
+        return true;
     }
 
     public function save(): void
@@ -119,7 +125,7 @@ class MemberJournal extends Component
 
         $validated = $this->validate([
             'logDate' => ['required', 'date'],
-            'selectedTaskId' => ['nullable', 'integer'],
+            'selectedTaskId' => ['required', 'integer'],
             'hours' => ['required', 'integer', 'min:0', 'max:24'],
             'minutes' => ['required', 'integer', 'min:0', 'max:59'],
             'notes' => ['nullable', 'string', 'max:5000'],
@@ -137,7 +143,7 @@ class MemberJournal extends Component
             return;
         }
 
-        $taskId = ! blank($validated['selectedTaskId'] ?? null) ? (int) $validated['selectedTaskId'] : null;
+        $taskId = (int) $validated['selectedTaskId'];
         $teamId = $this->teamIdForLog($taskId);
 
         if (! $teamId || ! $this->memberCanLogToTeam($teamId)) {
@@ -234,6 +240,7 @@ class MemberJournal extends Component
     {
         if ($this->logDate === '') {
             $this->logDate = now()->toDateString();
+            session(['member_journal_log_date' => $this->logDate]);
             return;
         }
 
@@ -249,11 +256,13 @@ class MemberJournal extends Component
                 $date = Carbon::parse($this->logDate);
             } catch (\Throwable) {
                 $this->logDate = now()->toDateString();
+                session(['member_journal_log_date' => $this->logDate]);
                 return;
             }
         }
 
         $this->logDate = $date->toDateString();
+        session(['member_journal_log_date' => $this->logDate]);
     }
 
     private function normalizeAccessibleTeamFilter(): void
@@ -425,7 +434,43 @@ class MemberJournal extends Component
             ->limit(8)
             ->get();
 
+        $this->attachInferredTasksToGeneralLogs($logs->concat($recentLogs), $userId);
+
         return view('livewire.member.member-journal', compact('tasks', 'logs', 'dailyMinutes', 'recentLogs', 'teams'));
+    }
+
+    /**
+     * Older entries could be saved as general work. Display a task for those
+     * logs only when the member, team, and date identify exactly one task.
+     */
+    private function attachInferredTasksToGeneralLogs(Collection $logs, int $userId): void
+    {
+        $activeProjectId = (int) session('active_project_id', 0);
+        $generalLogs = $logs->filter(fn (JournalLog $log) => ! $log->task_id && $log->team_id && $log->log_date);
+
+        if ($generalLogs->isEmpty()) {
+            return;
+        }
+
+        $candidateTasks = Task::with(['project', 'team'])
+            ->whereIn('team_id', $generalLogs->pluck('team_id')->unique())
+            ->where(fn ($query) => $query
+                ->where('assigned_to', $userId)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+            ->when($activeProjectId > 0, fn ($query) => $query->where('project_id', $activeProjectId))
+            ->get();
+
+        foreach ($generalLogs as $log) {
+            $logDay = $log->log_date->copy()->startOfDay();
+            $matches = $candidateTasks->filter(fn (Task $task) => (int) $task->team_id === (int) $log->team_id
+                && (! $task->start_date || $task->start_date->copy()->startOfDay()->lte($logDay))
+                && (! $task->due_date || $task->due_date->copy()->startOfDay()->gte($logDay)))
+                ->values();
+
+            if ($matches->count() === 1) {
+                $log->setRelation('task', $matches->first());
+            }
+        }
     }
 }
 

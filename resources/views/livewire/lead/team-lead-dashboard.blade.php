@@ -233,7 +233,7 @@
                     @foreach([
                         'project' => ['label' => 'Project', 'class' => 'bg-indigo-600'],
                         'task' => ['label' => 'Tasks', 'class' => 'bg-amber-500'],
-                        'actual' => ['label' => 'Start to End', 'class' => 'bg-emerald-500'],
+                        'actual' => ['label' => 'Daily Activity', 'class' => 'bg-emerald-500'],
                     ] as $kind => $meta)
                         @php $activeKind = in_array($kind, $timelineKinds, true); @endphp
                         <button type="button"
@@ -292,7 +292,10 @@
                     <span class="w-4 h-3 rounded bg-amber-500"></span> Task
                 </span>
                 <span class="flex items-center gap-1.5">
-                    <span class="w-4 h-3 rounded bg-emerald-500"></span> Start to End
+                    <span class="w-4 h-3 rounded bg-emerald-500"></span> Journal/log added
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="w-4 h-3 rounded bg-gray-300"></span> No journal/log
                 </span>
             </div>
         </div>
@@ -847,6 +850,5 @@
 
     @endif
 </div>
-
 
 

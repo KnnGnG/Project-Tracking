@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Livewire\Concerns\MatchesExistingTeams;
 use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
@@ -16,6 +17,8 @@ use Livewire\Component;
 #[Title('Assign Teams')]
 class AssignTeams extends Component
 {
+    use MatchesExistingTeams;
+
     private const ALLOWED_TEAM_ROLES = ['team_lead', 'member'];
 
     public bool $showForm = false;
@@ -77,26 +80,39 @@ class AssignTeams extends Component
     {
         $data = $this->validate();
         $leadId = $data['leadId'] ? (int) $data['leadId'] : null;
+        $matchedExistingTeam = false;
 
-        DB::transaction(function () use ($data, $leadId): void {
+        DB::transaction(function () use ($data, $leadId, &$matchedExistingTeam): void {
             $payload = [
                 'name' => $data['name'],
                 'project_id' => $data['projectId'] ?: null,
                 'lead_id' => $leadId,
             ];
 
-            $team = $this->editingId
-                ? Team::findOrFail($this->editingId)
-                : Team::create($payload);
-
             if ($this->editingId) {
+                $team = Team::findOrFail($this->editingId);
                 $team->update($payload);
+            } else {
+                $team = $this->findMatchingTeam(
+                    $data['name'],
+                    $leadId,
+                    $data['memberIds'] ?? [],
+                    $data['projectId'] ? (int) $data['projectId'] : null,
+                    true,
+                );
+
+                if ($team) {
+                    $team->update($payload);
+                    $matchedExistingTeam = true;
+                } else {
+                    $team = Team::create($payload);
+                }
             }
 
             $this->syncPeople($team, $leadId, $data['memberIds'] ?? [], $data['memberNotes'] ?? []);
         });
 
-        session()->flash('success', $this->editingId ? 'Team updated.' : 'Premade team created.');
+        session()->flash('success', $this->editingId || $matchedExistingTeam ? 'Team updated.' : 'Premade team created.');
 
         $this->resetForm();
         $this->showForm = false;
@@ -185,6 +201,7 @@ class AssignTeams extends Component
 
         $team->members()->sync($sync);
     }
+
     public function render()
     {
         $teams = Team::with(['project', 'lead', 'regularMembers'])

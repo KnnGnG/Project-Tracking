@@ -316,8 +316,8 @@ span.rounded-full { display: inline-flex; align-items: center; gap: 0.25rem; whi
     display: grid;
     gap: 0.5rem;
     margin-top: 1rem;
-    max-height: calc((3.55rem * 4) + (0.5rem * 3));
-    overflow-y: auto;
+    max-height: calc((3.55rem * 3) + (0.5rem * 2));
+    overflow-y: scroll;
     padding-right: 0.35rem;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
