@@ -425,6 +425,23 @@
                                             @endif
                                         </div>
 
+                                        @if($task->attachments->isNotEmpty())
+                                            <div>
+                                                <h4 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Attachments</h4>
+                                                <div class="flex flex-wrap gap-2">
+                                                    @foreach($task->attachments as $attachment)
+                                                        <button type="button" wire:click="downloadAttachment({{ $attachment->id }})" class="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+                                                            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828L18 9.828a4 4 0 00-5.657-5.657L5.757 10.757a6 6 0 108.486 8.486L20.5 13"/>
+                                                            </svg>
+                                                            <span class="truncate">{{ $attachment->original_name }}</span>
+                                                            <span class="shrink-0 text-xs font-normal text-gray-400">{{ $attachment->formattedSize() }}</span>
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endif
+
                                         {{-- Full status actions --}}
                                         <div>
                                             <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Update Status</h4>

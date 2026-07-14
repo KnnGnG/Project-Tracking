@@ -23,19 +23,21 @@ class LeadJournalReview extends Component
 
     use WithPagination;
 
-    public string $logDate = '';
+    public string $dateFrom = '';
+    public string $dateTo = '';
     public string $teamId = '';
     public string $memberId = '';
     public string $taskId = '';
 
     public function mount(): void
     {
-        $this->logDate = now()->toDateString();
+        $this->dateFrom = now()->toDateString();
+        $this->dateTo = now()->toDateString();
     }
 
     public function updated($property): void
     {
-        if (in_array($property, ['logDate', 'teamId', 'memberId', 'taskId'], true)) {
+        if (in_array($property, ['dateFrom', 'dateTo', 'teamId', 'memberId', 'taskId'], true)) {
             $this->resetPage();
         }
     }
@@ -85,6 +87,13 @@ class LeadJournalReview extends Component
             ->orderBy('title')
             ->get();
 
+        $dateFrom = $this->dateFrom ?: null;
+        $dateTo = $this->dateTo ?: null;
+
+        if ($dateFrom && $dateTo && $dateFrom > $dateTo) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
+
         $query = JournalLog::with(['user', 'task.project', 'task.team', 'team.project', 'team.projects'])
             ->where(function ($q) use ($teamIds, $activeProjectId) {
                 $q->where(function ($general) use ($teamIds) {
@@ -95,7 +104,8 @@ class LeadJournalReview extends Component
                         ->when($activeProjectId > 0, fn ($projectQuery) => $projectQuery->where('project_id', $activeProjectId));
                 });
             })
-            ->when($this->logDate, fn ($q) => $q->whereDate('log_date', $this->logDate))
+            ->when($dateFrom, fn ($q) => $q->whereDate('log_date', '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate('log_date', '<=', $dateTo))
             ->when($this->teamId !== '', function ($q) {
                 $q->where(function ($teamQuery) {
                     $teamQuery->where('team_id', $this->teamId)

@@ -2,36 +2,57 @@
     <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="min-w-0">
             <p class="text-sm font-semibold text-gray-900">Journal Review</p>
-            <p class="mt-0.5 text-xs text-gray-400">Filter logs by day, team, member, and task.</p>
+            <p class="mt-0.5 text-xs text-gray-400">Filter logs by date range, team, member, and task.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
-            <label for="logDate" class="sr-only">Log date</label>
-            <input id="logDate" type="date" wire:model.live="logDate" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <div>
+                <label for="dateFrom" class="mb-1 block text-[11px] font-medium text-gray-500">From</label>
+                <input id="dateFrom"
+                       type="date"
+                       wire:model.live="dateFrom"
+                       @if($dateTo) max="{{ $dateTo }}" @endif
+                       class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            </div>
 
-            <label for="teamId" class="sr-only">Team</label>
-            <select id="teamId" wire:model.live="teamId" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                <option value="">All teams</option>
-                @foreach($leadTeams as $team)
-                    @php($teamProject = $team->activeProject((int) session('active_project_id', 0)))
-                    <option value="{{ $team->id }}">{{ $team->name }}@if($teamProject) / {{ $teamProject->name }}@endif</option>
-                @endforeach
-            </select>
+            <div>
+                <label for="dateTo" class="mb-1 block text-[11px] font-medium text-gray-500">To</label>
+                <input id="dateTo"
+                       type="date"
+                       wire:model.live="dateTo"
+                       @if($dateFrom) min="{{ $dateFrom }}" @endif
+                       class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            </div>
 
-            <label for="memberId" class="sr-only">Member</label>
-            <select id="memberId" wire:model.live="memberId" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                <option value="">All members</option>
-                @foreach($members as $member)
-                    <option value="{{ $member->id }}">{{ $member->name }}</option>
-                @endforeach
-            </select>
+            <div>
+                <label for="teamId" class="mb-1 block text-[11px] font-medium text-gray-500">Team</label>
+                <select id="teamId" wire:model.live="teamId" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                    <option value="">All teams</option>
+                    @foreach($leadTeams as $team)
+                        @php($teamProject = $team->activeProject((int) session('active_project_id', 0)))
+                        <option value="{{ $team->id }}">{{ $team->name }}@if($teamProject) / {{ $teamProject->name }}@endif</option>
+                    @endforeach
+                </select>
+            </div>
 
-            <label for="taskId" class="sr-only">Task</label>
-            <select id="taskId" wire:model.live="taskId" class="min-w-[14rem] rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                <option value="">All tasks</option>
-                @foreach($tasks as $task)
-                    <option value="{{ $task->id }}">{{ $task->title }}</option>
-                @endforeach
-            </select>
+            <div>
+                <label for="memberId" class="mb-1 block text-[11px] font-medium text-gray-500">Member</label>
+                <select id="memberId" wire:model.live="memberId" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                    <option value="">All members</option>
+                    @foreach($members as $member)
+                        <option value="{{ $member->id }}">{{ $member->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label for="taskId" class="mb-1 block text-[11px] font-medium text-gray-500">Task</label>
+                <select id="taskId" wire:model.live="taskId" class="min-w-[14rem] rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                    <option value="">All tasks</option>
+                    @foreach($tasks as $task)
+                        <option value="{{ $task->id }}">{{ $task->title }}</option>
+                    @endforeach
+                </select>
+            </div>
         </div>
     </div>
 

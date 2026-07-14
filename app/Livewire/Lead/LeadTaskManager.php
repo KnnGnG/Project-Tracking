@@ -4,21 +4,24 @@ namespace App\Livewire\Lead;
 
 use App\Models\Task;
 use App\Models\TaskActivity;
+use App\Models\TaskAttachment;
 use App\Models\TaskMemberProgress;
 use App\Models\Team;
 use App\Livewire\Concerns\ResolvesLeadProjectContext;
 use App\Models\InAppNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 #[Layout('components.layouts.app')]
 #[Title('Manage Tasks')]
 class LeadTaskManager extends Component
 {
-    use ResolvesLeadProjectContext;
+    use ResolvesLeadProjectContext, WithFileUploads;
 
     // ── Filter state ─────────────────────────────────────────────────────────
     public ?int $filterTeamId = null;
@@ -49,6 +52,10 @@ class LeadTaskManager extends Component
     public string $priority = 'medium';
 
     public string $memberSearch = '';
+
+    public array $newAttachments = [];
+
+    public int $uploadIteration = 0;
 
     public bool $confirmingDelete = false;
 
@@ -135,6 +142,8 @@ class LeadTaskManager extends Component
             'startTime' => 'nullable|date_format:H:i',
             'dueDate' => 'required|date',
             'priority' => 'required|in:low,medium,high',
+            'newAttachments' => 'array|max:5',
+            'newAttachments.*' => 'file|max:10240|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,jpg,jpeg,png,webp,zip',
         ]);
 
         if ($data['startTime'] && ! $data['startDate']) {
@@ -194,7 +203,7 @@ class LeadTaskManager extends Component
                 ->filter()
                 ->unique();
 
-            DB::transaction(function () use ($payload, $assigneeIds, $oldDueDate, $oldStatus, $previousAssigneeIds) {
+            $task = DB::transaction(function () use ($payload, $assigneeIds, $oldDueDate, $oldStatus, $previousAssigneeIds) {
                 $task = $this->ownedTask($this->editingId);
                 $task->update($payload);
                 $task->assignees()->sync($assigneeIds->all());
@@ -210,17 +219,23 @@ class LeadTaskManager extends Component
                 }
 
                 $this->notifyAssignedMembers($task, $assigneeIds->diff($previousAssigneeIds));
+
+                return $task;
             });
+            $this->storeAttachments($task);
             session()->flash('success', 'Task updated.');
         } else {
-            DB::transaction(function () use ($payload, $assigneeIds) {
+            $task = DB::transaction(function () use ($payload, $assigneeIds) {
                 $task = Task::create(array_merge($payload, ['created_by' => auth()->id(), 'status' => 'pending']));
                 $task->assignees()->sync($assigneeIds->all());
                 $this->syncMemberProgressRows($task, $assigneeIds);
                 $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
                 $this->recordActivity($task, 'created', auth()->user()->name . ' assigned this task.');
                 $this->notifyAssignedMembers($task, $assigneeIds);
+
+                return $task;
             });
+            $this->storeAttachments($task);
 
             session()->flash('success', 'Task created and assigned.');
         }
@@ -295,6 +310,36 @@ class LeadTaskManager extends Component
         $this->expandedTaskId = $this->expandedTaskId === $id ? null : $id;
     }
 
+    public function removePendingAttachment(int $index): void
+    {
+        if (! array_key_exists($index, $this->newAttachments)) {
+            return;
+        }
+
+        unset($this->newAttachments[$index]);
+        $this->newAttachments = array_values($this->newAttachments);
+        $this->resetValidation('newAttachments');
+    }
+
+    public function removeAttachment(int $id): void
+    {
+        $attachment = TaskAttachment::findOrFail($id);
+        $this->ownedTask($attachment->task_id);
+        $attachment->delete();
+
+        session()->flash('success', 'Attachment removed.');
+    }
+
+    public function downloadAttachment(int $id)
+    {
+        $attachment = TaskAttachment::findOrFail($id);
+        $this->ownedTask($attachment->task_id);
+
+        abort_unless(Storage::disk('local')->exists($attachment->path), 404);
+
+        return Storage::disk('local')->download($attachment->path, $attachment->original_name);
+    }
+
     public function selectAllMembers(): void
     {
         if (! $this->teamId) {
@@ -343,7 +388,29 @@ class LeadTaskManager extends Component
         $this->dueDate = '';
         $this->status = 'pending';
         $this->priority = 'medium';
+        $this->newAttachments = [];
+        $this->uploadIteration++;
         $this->resetValidation();
+    }
+
+    private function storeAttachments(Task $task): void
+    {
+        foreach ($this->newAttachments as $file) {
+            $path = $file->store("task-attachments/{$task->id}", 'local');
+
+            try {
+                $task->attachments()->create([
+                    'uploaded_by' => auth()->id(),
+                    'original_name' => $file->getClientOriginalName(),
+                    'path' => $path,
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                ]);
+            } catch (\Throwable $exception) {
+                Storage::disk('local')->delete($path);
+                throw $exception;
+            }
+        }
     }
 
     private function notifyAssignedMembers(Task $task, $assigneeIds): void
@@ -471,7 +538,7 @@ class LeadTaskManager extends Component
         }
 
         // Tasks visible to this lead are read-only in render; status is synced when progress changes.
-        $tasks = Task::with(['assignee', 'assignees', 'team', 'project', 'memberProgress.user'])
+        $tasks = Task::with(['assignee', 'assignees', 'team', 'project', 'memberProgress.user', 'attachments'])
             ->whereIn('team_id', $leadTeams->pluck('id'))
             ->when($this->filterTeamId, fn ($q) => $q->where('team_id', $this->filterTeamId))
             ->when((int) session('active_project_id', 0) > 0, fn ($q) => $q->where('project_id', (int) session('active_project_id')))
@@ -483,8 +550,12 @@ class LeadTaskManager extends Component
         // Members for the team selected in the form
         $membersForForm = $this->membersForSelectedTeam();
 
+        $existingAttachments = $this->editingId
+            ? $this->ownedTask($this->editingId)->attachments()->latest()->get()
+            : collect();
+
         return view('livewire.lead.lead-task-manager',
-            compact('leadTeams', 'tasks', 'membersForForm'));
+            compact('leadTeams', 'tasks', 'membersForForm', 'existingAttachments'));
     }
 
     private function membersForSelectedTeam()

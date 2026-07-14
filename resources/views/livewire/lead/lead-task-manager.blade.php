@@ -190,6 +190,53 @@
                         @error('dueDate') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                     </div>
                 </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Attachments</label>
+                    <label class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm font-medium text-gray-600 transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828L18 9.828a4 4 0 00-5.657-5.657L5.757 10.757a6 6 0 108.486 8.486L20.5 13"/>
+                        </svg>
+                        <span>Choose files</span>
+                        <input wire:model="newAttachments"
+                               wire:key="task-attachments-{{ $uploadIteration }}"
+                               type="file"
+                               multiple
+                               accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.webp,.zip"
+                               class="sr-only">
+                    </label>
+                    <p class="mt-1 text-xs text-gray-400">Up to 5 files, 10 MB each.</p>
+                    <div wire:loading wire:target="newAttachments" class="mt-2 text-xs font-medium text-indigo-600">Uploading files...</div>
+                    @error('newAttachments') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                    @error('newAttachments.*') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+
+                    @if(!empty($newAttachments))
+                        <div class="mt-3 space-y-2">
+                            @foreach($newAttachments as $index => $file)
+                                <div class="flex items-center justify-between gap-3 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm">
+                                    <span class="min-w-0 truncate text-indigo-900">{{ $file->getClientOriginalName() }}</span>
+                                    <button type="button" wire:click="removePendingAttachment({{ $index }})" class="shrink-0 text-xs font-semibold text-red-600 hover:text-red-700">Remove</button>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if($existingAttachments->isNotEmpty())
+                        <div class="mt-3 space-y-2">
+                            @foreach($existingAttachments as $attachment)
+                                <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                                    <button type="button" wire:click="downloadAttachment({{ $attachment->id }})" class="min-w-0 truncate font-medium text-indigo-700 hover:underline">
+                                        {{ $attachment->original_name }}
+                                    </button>
+                                    <div class="flex shrink-0 items-center gap-3">
+                                        <span class="text-xs text-gray-400">{{ $attachment->formattedSize() }}</span>
+                                        <button type="button" wire:click="removeAttachment({{ $attachment->id }})" wire:confirm="Remove this attachment?" class="text-xs font-semibold text-red-600 hover:text-red-700">Remove</button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
             </div>
 
             <div class="flex items-center gap-3 mt-6">
@@ -402,6 +449,25 @@
                                                     <p class="text-xs font-medium text-green-700">Done</p>
                                                 </div>
                                             </div>
+                                        </div>
+
+                                        <div>
+                                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Attachments</p>
+                                            @if($task->attachments->isEmpty())
+                                                <p class="rounded-lg bg-gray-50 p-3 text-sm text-gray-400">No files attached.</p>
+                                            @else
+                                                <div class="flex flex-wrap gap-2">
+                                                    @foreach($task->attachments as $attachment)
+                                                        <button type="button" wire:click="downloadAttachment({{ $attachment->id }})" class="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+                                                            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828L18 9.828a4 4 0 00-5.657-5.657L5.757 10.757a6 6 0 108.486 8.486L20.5 13"/>
+                                                            </svg>
+                                                            <span class="truncate">{{ $attachment->original_name }}</span>
+                                                            <span class="shrink-0 text-xs font-normal text-gray-400">{{ $attachment->formattedSize() }}</span>
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                            @endif
                                         </div>
 
                                         <div>

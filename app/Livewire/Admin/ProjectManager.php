@@ -2,10 +2,14 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\InAppNotification;
 use App\Models\Project;
+use App\Models\ProjectStatusChangeRequest;
+use App\Models\ProjectStatusHistory;
 use App\Models\Team;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\ProjectStatusService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -24,6 +28,8 @@ class ProjectManager extends Component
     public string $startDate   = '';
     public string $endDate     = '';
     public string $status      = 'active';
+    public string $originalStatus = 'active';
+    public string $statusChangeReason = '';
     public ?int   $clientId    = null;
     public array $projectTeamIds = [];
     public string $teamSearch = '';
@@ -39,6 +45,7 @@ class ProjectManager extends Component
     public ?int $progressProjectId = null;
     public ?int $detailsProjectId = null;
     public $detailsProjectTasks = null;
+    public array $requestReviewReasons = [];
 
     protected function rules(): array
     {
@@ -48,6 +55,13 @@ class ProjectManager extends Component
             'startDate'   => 'required|date',
             'endDate'     => 'required|date|after_or_equal:startDate',
             'status'      => 'required|in:active,on_hold,completed',
+            'statusChangeReason' => [
+                Rule::requiredIf(fn () => $this->editingId && $this->status !== $this->originalStatus),
+                'nullable',
+                'string',
+                'min:5',
+                'max:500',
+            ],
             'clientId'    => ['nullable', Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'client'))],
             'projectTeamIds' => 'nullable|array',
             'projectTeamIds.*' => 'integer|exists:teams,id',
@@ -89,12 +103,14 @@ class ProjectManager extends Component
         $this->startDate   = $project->start_date->toDateString();
         $this->endDate     = $project->end_date->toDateString();
         $this->status      = $project->status;
+        $this->originalStatus = $project->status;
+        $this->statusChangeReason = '';
         $this->clientId    = $project->client_id;
         $this->projectTeamIds = $project->teams->pluck('id')->map(fn ($id) => (int) $id)->all();
         $this->showForm    = true;
     }
 
-    public function save(): void
+    public function save(ProjectStatusService $statusService): void
     {
         $data = $this->validate();
 
@@ -113,10 +129,22 @@ class ProjectManager extends Component
             ->unique()
             ->values();
 
-        DB::transaction(function () use ($payload, $selectedTeamIds) {
+        DB::transaction(function () use ($payload, $selectedTeamIds, $statusService) {
             if ($this->editingId) {
                 $project = Project::findOrFail($this->editingId);
+                $requestedStatus = $payload['status'];
+                unset($payload['status']);
                 $project->update($payload);
+
+                if ($project->status !== $requestedStatus) {
+                    $statusService->change(
+                        $project,
+                        $requestedStatus,
+                        auth()->user(),
+                        $this->statusChangeReason,
+                        'admin',
+                    );
+                }
 
                 $previousTeamIds = $project->teams()->pluck('teams.id');
                 $project->teams()->sync($selectedTeamIds->all());
@@ -137,6 +165,14 @@ class ProjectManager extends Component
                 session()->flash('success', 'Project updated successfully.');
             } else {
                 $project = Project::create(array_merge($payload, ['created_by' => auth()->id()]));
+                ProjectStatusHistory::create([
+                    'project_id' => $project->id,
+                    'changed_by' => auth()->id(),
+                    'from_status' => null,
+                    'to_status' => $project->status,
+                    'source' => 'creation',
+                    'reason' => 'Project created.',
+                ]);
 
                 if ($selectedTeamIds->isNotEmpty()) {
                     $project->teams()->sync($selectedTeamIds->all());
@@ -187,6 +223,115 @@ class ProjectManager extends Component
         $this->showForm = false;
     }
 
+    public function approveStatusRequest(int $requestId, ProjectStatusService $statusService): void
+    {
+        $this->reviewStatusRequest($requestId, true, $statusService);
+    }
+
+    public function rejectStatusRequest(int $requestId, ProjectStatusService $statusService): void
+    {
+        $this->validate([
+            "requestReviewReasons.{$requestId}" => 'required|string|min:5|max:500',
+        ], [
+            "requestReviewReasons.{$requestId}.required" => 'Add a reason before declining this request.',
+        ]);
+        $this->reviewStatusRequest($requestId, false, $statusService);
+    }
+
+    private function reviewStatusRequest(int $requestId, bool $approve, ProjectStatusService $statusService): void
+    {
+        $reviewReason = trim($this->requestReviewReasons[$requestId] ?? '');
+        $outcome = DB::transaction(function () use ($requestId, $approve, $reviewReason, $statusService) {
+            $statusRequest = ProjectStatusChangeRequest::with('project')
+                ->lockForUpdate()
+                ->findOrFail($requestId);
+            $this->authorizeProjectStatusManager($statusRequest->project);
+
+            if ($statusRequest->status !== 'pending') {
+                return 'already_reviewed';
+            }
+
+            $project = Project::query()->lockForUpdate()->findOrFail($statusRequest->project_id);
+            $isStale = $project->status !== $statusRequest->requested_from_status
+                || $project->status === $statusRequest->requested_status;
+
+            if ($approve && $isStale) {
+                $statusRequest->update([
+                    'status' => 'superseded',
+                    'pending_project_id' => null,
+                    'review_reason' => 'The project status changed after this request was submitted.',
+                    'reviewed_by' => auth()->id(),
+                    'reviewed_at' => now(),
+                ]);
+                $statusService->closeRequestNotifications($statusRequest);
+                $this->notifyStatusRequester($statusRequest, false, 'The project changed before review, so this request was closed.');
+
+                return 'stale';
+            }
+
+            if ($approve) {
+                $statusService->change(
+                    $project,
+                    $statusRequest->requested_status,
+                    auth()->user(),
+                    $statusRequest->reason,
+                    'request',
+                    $statusRequest,
+                );
+            }
+
+            $statusRequest->update([
+                'status' => $approve ? 'approved' : 'rejected',
+                'pending_project_id' => null,
+                'review_reason' => $reviewReason ?: null,
+                'reviewed_by' => auth()->id(),
+                'reviewed_at' => now(),
+            ]);
+            $statusService->closeRequestNotifications($statusRequest);
+            $this->notifyStatusRequester($statusRequest, $approve, $reviewReason);
+
+            return $approve ? 'approved' : 'rejected';
+        });
+
+        unset($this->requestReviewReasons[$requestId]);
+
+        match ($outcome) {
+            'approved' => session()->flash('success', 'Project status request approved.'),
+            'rejected' => session()->flash('success', 'Project status request declined.'),
+            'stale' => session()->flash('error', 'The project changed after this request was submitted. The stale request was closed.'),
+            default => null,
+        };
+    }
+
+    private function notifyStatusRequester(ProjectStatusChangeRequest $statusRequest, bool $approved, string $reviewReason): void
+    {
+        $statusLabel = ucwords(str_replace('_', ' ', $statusRequest->requested_status));
+        $body = $approved
+            ? $statusRequest->project->name.' is now '.$statusLabel.'.'
+            : 'Your '.$statusLabel.' request for '.$statusRequest->project->name.' was not applied.';
+
+        if ($reviewReason !== '') {
+            $body .= ' '.$reviewReason;
+        }
+
+        InAppNotification::create([
+            'user_id' => $statusRequest->requested_by,
+            'type' => 'project_status_request_reviewed',
+            'title' => $approved ? 'Project status approved' : 'Project status request closed',
+            'body' => $body,
+            'url' => route('projects.index'),
+            'data' => ['project_id' => $statusRequest->project_id, 'request_id' => $statusRequest->id],
+        ]);
+    }
+
+    private function authorizeProjectStatusManager(Project $project): void
+    {
+        abort_unless(
+            auth()->user()->isAdmin() || (int) $project->created_by === (int) auth()->id(),
+            403
+        );
+    }
+
     public function toggleProgressDetails(int $projectId): void
     {
         $this->progressProjectId = $this->progressProjectId === $projectId ? null : $projectId;
@@ -205,6 +350,8 @@ class ProjectManager extends Component
         $this->startDate   = '';
         $this->endDate     = '';
         $this->status      = 'active';
+        $this->originalStatus = 'active';
+        $this->statusChangeReason = '';
         $this->clientId    = null;
         $this->projectTeamIds = [];
         $this->teamSearch = '';
@@ -242,11 +389,18 @@ class ProjectManager extends Component
             ->whereIn('id', array_map('intval', $this->projectTeamIds))
             ->orderBy('name')
             ->get();
+        $pendingStatusRequestCount = ProjectStatusChangeRequest::where('status', 'pending')->count();
+        $pendingStatusRequests = ProjectStatusChangeRequest::with(['project:id,name,created_by,status', 'requester:id,name'])
+            ->where('status', 'pending')
+            ->oldest()
+            ->limit(10)
+            ->get();
         if ($this->detailsProjectId) {
             $detailsProject = Project::with([
                 'client',
                 'teams.lead',
                 'teams.members',
+                'statusHistories' => fn ($query) => $query->with('actor:id,name')->limit(10),
             ])->find($this->detailsProjectId);
 
             $this->detailsProjectTasks = Task::where('project_id', $this->detailsProjectId)
@@ -262,7 +416,16 @@ class ProjectManager extends Component
         // expose the property as a local variable for compact() and the view
         $detailsProjectTasks = $this->detailsProjectTasks;
 
-        return view('livewire.admin.project-manager', compact('projects', 'clients', 'detailsProject', 'detailsProjectTasks', 'projectTeamOptions', 'selectedProjectTeams'));
+        return view('livewire.admin.project-manager', compact(
+            'projects',
+            'clients',
+            'detailsProject',
+            'detailsProjectTasks',
+            'projectTeamOptions',
+            'selectedProjectTeams',
+            'pendingStatusRequests',
+            'pendingStatusRequestCount',
+        ));
     }
 }
 

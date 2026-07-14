@@ -45,6 +45,7 @@ Route::middleware(['auth', 'throttle:300,1'])->group(function () {
     // Role-based dashboard redirect
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/my-projects', [UserProjectController::class, 'index'])->name('projects.index');
+    Route::post('/my-projects/new-tasks/{notification}/open', [UserProjectController::class, 'openTaskNotification'])->name('projects.new-tasks.open');
     Route::get('/my-projects/{project}', [UserProjectController::class, 'open'])->name('projects.open');
 
     /*
@@ -107,4 +108,3 @@ Route::middleware(['auth', 'throttle:300,1'])->group(function () {
             Route::get('/lead-evaluation', MemberLeadEvaluation::class)->name('lead-evaluation');
         });
 });
-

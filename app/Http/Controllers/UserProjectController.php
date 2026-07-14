@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\InAppNotification;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\Team;
@@ -44,7 +45,35 @@ class UserProjectController extends Controller
             ];
         })->sortBy(fn (array $item) => $item['project']->name)->values();
 
-        return view('projects.index', compact('projects'));
+        $newTaskNotifications = $this->newTaskNotifications($request);
+        $projectTaskOverview = $this->projectTaskOverview($request, $newTaskNotifications);
+
+        return view('projects.index', compact('projects', 'newTaskNotifications', 'projectTaskOverview'));
+    }
+
+    public function openTaskNotification(Request $request, InAppNotification $notification): RedirectResponse
+    {
+        abort_unless(
+            (int) $notification->user_id === (int) $request->user()->id
+                && $notification->type === 'task_assigned',
+            404
+        );
+
+        $taskId = (int) data_get($notification->data, 'task_id');
+        $taskIsAccessible = Task::query()
+            ->whereKey($taskId)
+            ->where(fn ($query) => $query
+                ->where('assigned_to', $request->user()->id)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($request->user()->id)))
+            ->exists();
+
+        abort_unless($taskIsAccessible, 404);
+
+        if (! $notification->read_at) {
+            $notification->markAsRead();
+        }
+
+        return redirect()->to($notification->url ?: route('projects.index'));
     }
 
     public function open(Request $request, Project $project): RedirectResponse
@@ -106,6 +135,81 @@ class UserProjectController extends Controller
                 ->where('assigned_to', $userId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
             ->exists();
+    }
+
+    private function newTaskNotifications(Request $request): Collection
+    {
+        $notifications = InAppNotification::query()
+            ->where('user_id', $request->user()->id)
+            ->where('type', 'task_assigned')
+            ->whereNull('read_at')
+            ->latest()
+            ->limit(25)
+            ->get();
+
+        if ($notifications->isEmpty()) {
+            return collect();
+        }
+
+        $tasks = Task::query()
+            ->with(['project', 'team'])
+            ->whereIn('id', $notifications->pluck('data')->map(fn ($data) => (int) data_get($data, 'task_id'))->filter())
+            ->where(fn ($query) => $query
+                ->where('assigned_to', $request->user()->id)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($request->user()->id)))
+            ->get()
+            ->keyBy('id');
+
+        return $notifications
+            ->map(fn (InAppNotification $notification) => [
+                'notification' => $notification,
+                'task' => $tasks->get((int) data_get($notification->data, 'task_id')),
+            ])
+            ->filter(fn (array $item) => $item['task'])
+            ->values();
+    }
+
+    private function projectTaskOverview(Request $request, Collection $newTaskNotifications): Collection
+    {
+        $userId = $request->user()->id;
+        $notificationsByTask = $newTaskNotifications
+            ->keyBy(fn (array $item) => $item['task']->id);
+
+        return Task::query()
+            ->with([
+                'project',
+                'team',
+                'memberProgress' => fn ($query) => $query->where('user_id', $userId),
+            ])
+            ->where(fn ($query) => $query
+                ->where('assigned_to', $userId)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+            ->whereIn('status', ['pending', 'in_progress', 'review'])
+            ->get()
+            ->map(function (Task $task) use ($notificationsByTask): array {
+                $personalStatus = $task->memberProgress->first()?->status ?? $task->status;
+                $isOverdue = $personalStatus !== 'done'
+                    && $task->due_date
+                    && $task->due_date->toDateString() < now()->toDateString();
+
+                return [
+                    'task' => $task,
+                    'notification' => $notificationsByTask->get($task->id)['notification'] ?? null,
+                    'status' => $isOverdue ? 'overdue' : $personalStatus,
+                ];
+            })
+            ->filter(fn (array $item) => $item['status'] !== 'done')
+            ->sortBy(fn (array $item) => [
+                match ($item['status']) {
+                    'overdue' => 0,
+                    'review' => 1,
+                    'in_progress' => 2,
+                    default => 3,
+                },
+                $item['task']->due_date?->timestamp ?? PHP_INT_MAX,
+            ])
+            ->take(25)
+            ->values();
     }
 }
 

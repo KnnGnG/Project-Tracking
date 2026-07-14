@@ -34,6 +34,8 @@ class MemberJournal extends Component
 
     public int $minutes = 0;
 
+    public int $progress = 1;
+
     public string $notes = '';
 
     public ?string $flash = null;
@@ -64,6 +66,25 @@ class MemberJournal extends Component
         $this->filterTeam = max(0, (int) $this->filterTeam);
         $this->normalizeAccessibleTeamFilter();
         $this->selectedTaskId = '';
+        $this->progress = 1;
+    }
+
+    public function updatedSelectedTaskId(): void
+    {
+        $taskId = (int) $this->selectedTaskId;
+
+        if ($taskId < 1 || ! $this->memberTaskExists($taskId)) {
+            $this->progress = 1;
+            return;
+        }
+
+        $savedProgress = TaskMemberProgress::query()
+            ->where('task_id', $taskId)
+            ->where('user_id', auth()->id())
+            ->value('progress');
+
+        $this->progress = min(100, max(1, (int) ($savedProgress ?: 1)));
+        $this->resetValidation('progress');
     }
 
     public function addTimerMinutes($seconds): void
@@ -81,6 +102,7 @@ class MemberJournal extends Component
         $validated = $this->validate([
             'logDate' => ['required', 'date'],
             'selectedTaskId' => ['required', 'integer'],
+            'progress' => ['required', 'integer', 'min:1', 'max:100'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
@@ -105,14 +127,16 @@ class MemberJournal extends Component
                 'team_id' => $teamId,
                 'log_date' => $validated['logDate'],
                 'minutes' => $totalMinutes,
+                'progress' => $validated['progress'],
                 'notes' => $validated['notes'] ?: null,
             ]);
 
+            $this->persistTaskProgress($taskId, $validated['progress'], $validated['logDate']);
             $this->recomputeActualStartFromLogs($taskId);
         });
 
         $this->dispatch('journal-log-changed');
-        $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
+        $this->resetAfterSave($validated['progress']);
         $this->flash = 'Timer session added to your journal.';
 
         return true;
@@ -128,6 +152,7 @@ class MemberJournal extends Component
             'selectedTaskId' => ['required', 'integer'],
             'hours' => ['required', 'integer', 'min:0', 'max:24'],
             'minutes' => ['required', 'integer', 'min:0', 'max:59'],
+            'progress' => ['required', 'integer', 'min:1', 'max:100'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
@@ -158,14 +183,16 @@ class MemberJournal extends Component
                 'team_id' => $teamId,
                 'log_date' => $validated['logDate'],
                 'minutes' => $totalMinutes,
+                'progress' => $validated['progress'],
                 'notes' => $validated['notes'] ?: null,
             ]);
 
+            $this->persistTaskProgress($taskId, $validated['progress'], $validated['logDate']);
             $this->recomputeActualStartFromLogs($taskId);
         });
 
         $this->dispatch('journal-log-changed');
-        $this->reset(['selectedTaskId', 'hours', 'minutes', 'notes']);
+        $this->resetAfterSave($validated['progress']);
         $this->flash = 'Journal log added.';
     }
 
@@ -228,6 +255,16 @@ class MemberJournal extends Component
         if ($this->minutes >= 60) {
             $this->hours += intdiv($this->minutes, 60);
             $this->minutes %= 60;
+        }
+    }
+
+    private function resetAfterSave(int $savedProgress): void
+    {
+        $this->reset(['hours', 'minutes', 'notes']);
+
+        if ($savedProgress >= 100) {
+            $this->selectedTaskId = '';
+            $this->progress = 1;
         }
     }
 
@@ -315,7 +352,7 @@ class MemberJournal extends Component
 
             if ($progress->status === 'pending') {
                 $progress->status = 'in_progress';
-                $progress->progress = max((int) $progress->progress, 50);
+                $progress->progress = max((int) $progress->progress, 1);
             }
         } else {
             $progress->started_at = null;
@@ -324,6 +361,20 @@ class MemberJournal extends Component
         $progress->save();
 
         $this->syncParentTaskStatus($taskId);
+    }
+
+    private function persistTaskProgress(int $taskId, int $percentage, string $logDate): void
+    {
+        $progress = TaskMemberProgress::firstOrCreate(
+            ['task_id' => $taskId, 'user_id' => auth()->id()],
+            ['status' => 'pending', 'progress' => 0]
+        );
+
+        $progress->progress = $percentage;
+        $progress->status = $percentage === 100 ? 'done' : 'in_progress';
+        $progress->started_at ??= Carbon::parse($logDate)->startOfDay();
+        $progress->completed_at = $percentage === 100 ? now() : null;
+        $progress->save();
     }
 
     private function syncParentTaskStatus(int $taskId): void

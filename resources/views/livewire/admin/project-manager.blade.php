@@ -3,6 +3,9 @@
     @if(session('success'))
         <x-floating-notification :message="session('success')" />
     @endif
+    @if(session('error'))
+        <x-floating-notification :message="session('error')" type="error" />
+    @endif
 
     <div class="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="min-w-0">
@@ -28,6 +31,71 @@
             @endif
         </div>
     </div>
+
+    @if($pendingStatusRequests->isNotEmpty())
+        <section class="mb-5 overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
+            <div class="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-4 py-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-900">Project status requests</h2>
+                    <p class="mt-0.5 text-xs text-gray-500">Review lifecycle changes submitted by team leads.</p>
+                </div>
+                <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-amber-200 px-2 py-1 text-xs font-bold text-amber-800">
+                    {{ $pendingStatusRequestCount }}
+                </span>
+            </div>
+            <div class="divide-y divide-gray-100">
+                @foreach($pendingStatusRequests as $statusRequest)
+                    <div class="flex flex-wrap items-center gap-3 px-4 py-3">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-semibold text-gray-900">{{ $statusRequest->project?->name ?? 'Deleted project' }}</p>
+                                <span class="text-xs font-medium text-gray-400">
+                                    {{ ucwords(str_replace('_', ' ', $statusRequest->requested_from_status ?? $statusRequest->project?->status ?? 'unknown')) }}
+                                    &rarr;
+                                </span>
+                                <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                                    {{ ucwords(str_replace('_', ' ', $statusRequest->requested_status)) }}
+                                </span>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">
+                                {{ $statusRequest->requester?->name ?? 'Unknown user' }}: {{ $statusRequest->reason }}
+                            </p>
+                            <p class="mt-1 text-[11px] text-gray-400">Submitted {{ $statusRequest->created_at->diffForHumans() }}</p>
+                        </div>
+                        <div class="w-full sm:w-72">
+                            <input type="text"
+                                   wire:model="requestReviewReasons.{{ $statusRequest->id }}"
+                                   maxlength="500"
+                                   placeholder="Review note (required to decline)"
+                                   class="w-full rounded-lg border-gray-300 px-3 py-1.5 text-xs focus:border-indigo-500 focus:ring-indigo-500">
+                            @error('requestReviewReasons.'.$statusRequest->id)
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                            <button type="button"
+                                    wire:click="approveStatusRequest({{ $statusRequest->id }})"
+                                    wire:loading.attr="disabled"
+                                    class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60">
+                                Approve
+                            </button>
+                            <button type="button"
+                                    wire:click="rejectStatusRequest({{ $statusRequest->id }})"
+                                    wire:loading.attr="disabled"
+                                    class="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60">
+                                Decline
+                            </button>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+            @if($pendingStatusRequestCount > $pendingStatusRequests->count())
+                <p class="border-t border-amber-100 bg-amber-50/60 px-4 py-2 text-xs text-amber-700">
+                    Showing the oldest {{ $pendingStatusRequests->count() }} of {{ $pendingStatusRequestCount }} pending requests.
+                </p>
+            @endif
+        </section>
+    @endif
 
     {{-- Create / Edit form --}}
     @if($showForm)
@@ -79,8 +147,20 @@
                     </select>
                 </div>
 
+                @if($editingId)
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Status change reason</label>
+                        <input wire:model="statusChangeReason"
+                               type="text"
+                               maxlength="500"
+                               placeholder="Required when changing the lifecycle status"
+                               class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 @error('statusChangeReason') border-red-400 @enderror">
+                        @error('statusChangeReason') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                    </div>
+                @endif
+
                 {{-- Client --}}
-                <div>
+                <div class="{{ $editingId ? 'md:col-span-2' : '' }}">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Client (optional)</label>
                     <select wire:model="clientId"
                             class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -193,15 +273,19 @@
                             </td>
                             <td class="px-6 py-4">
                                 @php
-                                    $badge = match($project->status) {
-                                        'active'    => 'bg-green-100 text-green-700',
-                                        'on_hold'   => 'bg-yellow-100 text-yellow-700',
-                                        'completed' => 'bg-blue-100 text-blue-700',
-                                        default     => 'bg-gray-100 text-gray-600',
+                                    $effectiveProjectStatus = $project->effectiveStatus();
+                                    $badge = match($effectiveProjectStatus) {
+                                        'active' => 'bg-emerald-100 text-emerald-700',
+                                        'overdue' => 'bg-red-100 text-red-700',
+                                        'near_due' => 'bg-amber-100 text-amber-700',
+                                        'upcoming' => 'bg-sky-100 text-sky-700',
+                                        'on_hold' => 'bg-slate-200 text-slate-700',
+                                        'completed' => 'bg-indigo-100 text-indigo-700',
+                                        default => 'bg-gray-100 text-gray-600',
                                     };
                                 @endphp
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $badge }}">
-                                    {{ ucfirst(str_replace('_', ' ', $project->status)) }}
+                                    {{ $project->effectiveStatusLabel() }}
                                 </span>
                             </td>
                             <td class="px-6 py-4">
@@ -250,6 +334,9 @@
                                 $completion = $totalTasks > 0 ? (int) round(($doneTasks / $totalTasks) * 100) : 0;
                                 $statusClass = fn ($status) => match($status) {
                                     'active' => 'bg-green-100 text-green-700',
+                                    'overdue' => 'bg-red-100 text-red-700',
+                                    'near_due' => 'bg-amber-100 text-amber-700',
+                                    'upcoming' => 'bg-sky-100 text-sky-700',
                                     'on_hold' => 'bg-yellow-100 text-yellow-700',
                                     'completed' => 'bg-blue-100 text-blue-700',
                                     'done' => 'bg-green-100 text-green-700',
@@ -267,8 +354,8 @@
                                                 <div>
                                                     <div class="flex flex-wrap items-center gap-2">
                                                         <h3 class="text-lg font-semibold text-gray-900">{{ $detailsProject->name }}</h3>
-                                                        <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass($detailsProject->status) }}">
-                                                            {{ ucfirst(str_replace('_', ' ', $detailsProject->status)) }}
+                                                        <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass($detailsProject->effectiveStatus()) }}">
+                                                            {{ $detailsProject->effectiveStatusLabel() }}
                                                         </span>
                                                     </div>
                                                     <p class="mt-1 text-sm text-gray-500">
@@ -300,6 +387,30 @@
                                                 <p class="mt-1 text-sm font-semibold text-red-700">{{ $overdueTasks }}</p>
                                             </div>
                                         </div>
+
+                                        @if($detailsProject->statusHistories->isNotEmpty())
+                                            <div class="border-y border-gray-100 py-3">
+                                                <h4 class="text-xs font-semibold uppercase text-gray-500">Status history</h4>
+                                                <div class="mt-2 divide-y divide-gray-100">
+                                                    @foreach($detailsProject->statusHistories as $history)
+                                                        <div class="flex flex-wrap items-start justify-between gap-2 py-2 text-xs">
+                                                            <div>
+                                                                <p class="font-semibold text-gray-700">
+                                                                    {{ $history->from_status ? ucwords(str_replace('_', ' ', $history->from_status)) : 'Created' }}
+                                                                    &rarr;
+                                                                    {{ ucwords(str_replace('_', ' ', $history->to_status)) }}
+                                                                </p>
+                                                                <p class="mt-0.5 text-gray-500">{{ $history->reason }}</p>
+                                                            </div>
+                                                            <div class="text-right text-gray-400">
+                                                                <p>{{ $history->actor?->name ?? 'System' }} &middot; {{ ucfirst($history->source) }}</p>
+                                                                <p>{{ $history->created_at->format('M d, Y h:i A') }}</p>
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endif
 
                                         <div class="grid grid-cols-2 gap-3 md:grid-cols-6">
                                             <div class="rounded-lg bg-gray-50 p-3 text-center">

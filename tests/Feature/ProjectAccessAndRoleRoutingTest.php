@@ -119,6 +119,15 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
             'notes' => 'Connected from member journal.',
         ]);
 
+        JournalLog::create([
+            'user_id' => $member->id,
+            'task_id' => $task->id,
+            'team_id' => $team->id,
+            'log_date' => now()->subDay()->toDateString(),
+            'minutes' => 15,
+            'notes' => 'Earlier journal entry.',
+        ]);
+
         $this->actingAs($lead)
             ->withSession([
                 'active_project_id' => $project->id,
@@ -129,7 +138,11 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
         Livewire::test(LeadJournalReview::class)
             ->assertSee('Write integration notes')
             ->assertSee('Connected from member journal.')
-            ->assertSee('0h 45m');
+            ->assertDontSee('Earlier journal entry.')
+            ->assertSee('0h 45m')
+            ->set('dateFrom', now()->subDay()->toDateString())
+            ->assertSee('Earlier journal entry.')
+            ->assertSee('1h 0m');
     }
     public function test_team_lead_can_open_member_dashboard_for_same_project_member_role(): void
     {
