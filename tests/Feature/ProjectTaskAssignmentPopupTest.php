@@ -17,6 +17,8 @@ class ProjectTaskAssignmentPopupTest extends TestCase
 
     public function test_my_projects_scopes_task_notification_counts_to_each_project_card(): void
     {
+        $this->travelTo('2026-07-14 10:00:00');
+
         [$member, $task] = $this->assignmentContext();
         $this->taskNotification($member, $task);
         Task::create([
@@ -89,16 +91,108 @@ class ProjectTaskAssignmentPopupTest extends TestCase
     {
         [$member, $task] = $this->assignmentContext();
         $notification = $this->taskNotification($member, $task);
+        $notification->update(['url' => 'https://example.invalid/unsafe']);
 
         $this->actingAs($member)
             ->post(route('projects.new-tasks.open', $notification))
-            ->assertRedirect($notification->url);
+            ->assertRedirect(route('member.dashboard', [
+                'team' => $task->team_id,
+                'project' => $task->project_id,
+                'task' => $task->id,
+            ]));
 
         $this->assertNotNull($notification->fresh()->read_at);
 
         $otherMember = User::factory()->create(['role' => 'member']);
         $this->actingAs($otherMember)
             ->post(route('projects.new-tasks.open', $notification))
+            ->assertNotFound();
+    }
+
+    public function test_mark_all_read_clears_only_notifications_for_the_selected_project(): void
+    {
+        [$member, $firstTask] = $this->assignmentContext();
+        $firstNotification = $this->taskNotification($member, $firstTask);
+        $secondTask = Task::create([
+            'title' => 'Second project assignment',
+            'project_id' => $firstTask->project_id,
+            'team_id' => $firstTask->team_id,
+            'assigned_to' => $member->id,
+            'created_by' => $firstTask->created_by,
+            'start_date' => '2026-07-14',
+            'due_date' => '2026-07-25',
+            'status' => 'pending',
+            'priority' => 'medium',
+        ]);
+        $secondNotification = $this->taskNotification($member, $secondTask);
+
+        $otherProject = Project::create([
+            'name' => 'Unread Other Project',
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-07-31',
+            'status' => 'active',
+            'created_by' => $firstTask->created_by,
+        ]);
+        $otherTeam = Team::create([
+            'name' => 'Unread Other Team',
+            'project_id' => $otherProject->id,
+            'lead_id' => $firstTask->created_by,
+        ]);
+        $otherTeam->members()->attach($member->id, ['role' => 'member']);
+        $otherTask = Task::create([
+            'title' => 'Keep this notification unread',
+            'project_id' => $otherProject->id,
+            'team_id' => $otherTeam->id,
+            'assigned_to' => $member->id,
+            'created_by' => $firstTask->created_by,
+            'start_date' => '2026-07-14',
+            'due_date' => '2026-07-25',
+            'status' => 'pending',
+            'priority' => 'medium',
+        ]);
+        $otherNotification = $this->taskNotification($member, $otherTask);
+
+        $outsider = User::factory()->create(['role' => 'member']);
+        $this->actingAs($outsider)
+            ->post(route('projects.new-tasks.read-all', $firstTask->project_id))
+            ->assertNotFound();
+
+        $this->actingAs($member)
+            ->post(route('projects.new-tasks.read-all', $firstTask->project_id))
+            ->assertRedirect(route('projects.index'));
+
+        $this->assertNotNull($firstNotification->fresh()->read_at);
+        $this->assertNotNull($secondNotification->fresh()->read_at);
+        $this->assertNull($otherNotification->fresh()->read_at);
+    }
+
+    public function test_member_can_dismiss_one_owned_task_notification_without_clearing_the_rest(): void
+    {
+        [$member, $firstTask] = $this->assignmentContext();
+        $firstNotification = $this->taskNotification($member, $firstTask);
+        $secondTask = Task::create([
+            'title' => 'Keep this assignment visible',
+            'project_id' => $firstTask->project_id,
+            'team_id' => $firstTask->team_id,
+            'assigned_to' => $member->id,
+            'created_by' => $firstTask->created_by,
+            'start_date' => '2026-07-14',
+            'due_date' => '2026-07-25',
+            'status' => 'pending',
+            'priority' => 'medium',
+        ]);
+        $secondNotification = $this->taskNotification($member, $secondTask);
+
+        $this->actingAs($member)
+            ->post(route('projects.new-tasks.dismiss', $firstNotification))
+            ->assertRedirect(route('projects.index'));
+
+        $this->assertNotNull($firstNotification->fresh()->read_at);
+        $this->assertNull($secondNotification->fresh()->read_at);
+
+        $outsider = User::factory()->create(['role' => 'member']);
+        $this->actingAs($outsider)
+            ->post(route('projects.new-tasks.dismiss', $secondNotification))
             ->assertNotFound();
     }
 
@@ -143,6 +237,33 @@ class ProjectTaskAssignmentPopupTest extends TestCase
         } finally {
             Carbon::setTestNow();
         }
+    }
+
+    public function test_project_card_counts_are_not_truncated_after_twenty_five_tasks(): void
+    {
+        [$member, $firstTask] = $this->assignmentContext();
+        $this->taskNotification($member, $firstTask);
+
+        foreach (range(2, 26) as $number) {
+            $task = Task::create([
+                'title' => "Scale task {$number}",
+                'project_id' => $firstTask->project_id,
+                'team_id' => $firstTask->team_id,
+                'assigned_to' => $member->id,
+                'created_by' => $firstTask->created_by,
+                'start_date' => '2026-07-14',
+                'due_date' => '2026-07-30',
+                'status' => 'pending',
+                'priority' => 'medium',
+            ]);
+            $this->taskNotification($member, $task);
+        }
+
+        $response = $this->actingAs($member)->get(route('projects.index'))->assertOk();
+        $card = $this->projectCardHtml($response->getContent(), $firstTask->project_id);
+
+        $this->assertStringContainsString('26 unread', $card);
+        $this->assertStringContainsString('<strong>26</strong>', $card);
     }
 
     private function assignmentContext(): array

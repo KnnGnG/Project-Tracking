@@ -228,7 +228,7 @@
                                         <span class="text-gray-300">/</span> {{ $log->task?->project?->name ?? $log->team?->project?->name }}
                                     @endif
                                 </p>
-                                @if($log->progress)
+                                @if(! is_null($log->progress))
                                     <p class="mt-1 text-xs font-semibold text-indigo-600">{{ $log->progress }}% progress</p>
                                 @endif
                             </div>
@@ -274,7 +274,7 @@
                         @if($log->notes)
                             <p class="mt-1 text-sm text-gray-600 line-clamp-2">{{ $log->notes }}</p>
                         @endif
-                        @if($log->progress)
+                        @if(! is_null($log->progress))
                             <p class="mt-1 text-xs font-semibold text-indigo-600">{{ $log->progress }}% progress</p>
                         @endif
                     </div>

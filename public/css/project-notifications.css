@@ -140,7 +140,6 @@
     right: 0;
     display: none;
     width: min(21rem, calc(100vw - 2rem));
-    overflow: hidden;
     border: 1px solid #dbe3ef;
     border-radius: 0.5rem;
     background: #fff;
@@ -190,17 +189,103 @@
     font-size: 0.68rem;
 }
 
+.project-task-preview-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.project-task-preview-actions button {
+    border: 0;
+    background: transparent;
+    color: #4f46e5;
+    cursor: pointer;
+    font-size: 0.68rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.project-task-preview-actions button:hover,
+.project-task-preview-actions button:focus-visible {
+    color: #312e81;
+    text-decoration: underline;
+}
+
 .project-task-preview-list {
     display: grid;
 }
 
 .project-task-preview-item {
+    position: relative;
     padding: 0.72rem 0.9rem;
     border-bottom: 1px solid #f1f5f9;
 }
 
+.project-task-preview-open-form {
+    min-width: 0;
+}
+
+.project-task-preview-open {
+    display: block;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    padding: 0 1.7rem 0 0;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+.project-task-preview-item:hover,
+.project-task-preview-item:focus-within {
+    background: #f8fafc;
+}
+
+.project-task-preview-open:focus-visible {
+    border-radius: 0.35rem;
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+}
+
+.project-task-preview-dismiss-form {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+}
+
+.project-task-preview-dismiss {
+    display: inline-flex;
+    width: 1.45rem;
+    height: 1.45rem;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0.35rem;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+}
+
+.project-task-preview-dismiss:hover,
+.project-task-preview-dismiss:focus-visible {
+    background: #fee2e2;
+    color: #b91c1c;
+    outline: none;
+}
+
+.project-task-preview-dismiss svg {
+    width: 0.85rem;
+    height: 0.85rem;
+}
+
 .project-task-preview-item:last-child {
     border-bottom: 0;
+}
+
+.project-task-preview > :last-child,
+.project-task-preview-list:last-child > :last-child {
+    border-bottom-right-radius: 0.45rem;
+    border-bottom-left-radius: 0.45rem;
 }
 
 .project-task-preview-title-row,
@@ -220,7 +305,7 @@
     white-space: nowrap;
 }
 
-.project-task-preview-item > p {
+.project-task-preview-team {
     display: flex;
     align-items: center;
     gap: 0.35rem;
@@ -232,7 +317,7 @@
     white-space: nowrap;
 }
 
-.project-task-preview-item > p span {
+.project-task-preview-team > span {
     color: #94a3b8;
     font-size: 0.62rem;
     font-weight: 800;

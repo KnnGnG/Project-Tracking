@@ -4,6 +4,7 @@ namespace App\Livewire\Member;
 
 use App\Models\Team;
 use App\Models\TeamLeadEvaluation;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -85,13 +86,14 @@ class MemberLeadEvaluation extends Component
             return;
         }
 
-        TeamLeadEvaluation::updateOrCreate([
+        $identity = [
             'team_id' => $team->id,
             'evaluator_id' => auth()->id(),
             'lead_id' => $leadId,
             'period_start' => $data['periodStart'],
             'period_end' => $data['periodEnd'],
-        ], [
+        ];
+        $scores = [
             'leadership_score' => (int) $data['leadershipScore'],
             'communication_score' => (int) $data['communicationScore'],
             'support_score' => (int) $data['supportScore'],
@@ -100,7 +102,30 @@ class MemberLeadEvaluation extends Component
             'summary' => trim($data['summary'] ?? '') ?: null,
             'strengths' => trim($data['strengths'] ?? '') ?: null,
             'improvements' => trim($data['improvements'] ?? '') ?: null,
-        ]);
+        ];
+
+        $evaluation = TeamLeadEvaluation::query()
+            ->where('team_id', $identity['team_id'])
+            ->where('evaluator_id', $identity['evaluator_id'])
+            ->where('lead_id', $identity['lead_id'])
+            ->whereDate('period_start', $identity['period_start'])
+            ->whereDate('period_end', $identity['period_end'])
+            ->first();
+
+        try {
+            $evaluation
+                ? $evaluation->update($scores)
+                : TeamLeadEvaluation::create([...$identity, ...$scores]);
+        } catch (UniqueConstraintViolationException) {
+            TeamLeadEvaluation::query()
+                ->where('team_id', $identity['team_id'])
+                ->where('evaluator_id', $identity['evaluator_id'])
+                ->where('lead_id', $identity['lead_id'])
+                ->whereDate('period_start', $identity['period_start'])
+                ->whereDate('period_end', $identity['period_end'])
+                ->firstOrFail()
+                ->update($scores);
+        }
 
         $this->resetForm();
         $this->flash = 'Team lead evaluation saved for this period.';

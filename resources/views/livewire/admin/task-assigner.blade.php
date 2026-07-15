@@ -1,6 +1,6 @@
 <div class="space-y-4" wire:poll.visible.60s>
     {{-- Filters --}}
-    <div class="sticky z-30 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm" style="top: 0.75rem;" role="group" aria-label="Filter tasks">
+    <div class="ui-toolbar sticky z-30" style="top: 0.75rem;" role="group" aria-label="Filter tasks">
         <div class="min-w-0">
             <p class="text-sm font-semibold text-gray-900">Task Oversight</p>
             <p class="mt-0.5 text-xs text-gray-400">Filter tasks by status, project, and page size.</p>
@@ -39,7 +39,8 @@
         </div>
     </div>
     {{-- Tasks table (read-only) --}}
-    <div class="ui-soft-panel overflow-hidden">
+    <div class="ui-soft-panel relative overflow-hidden">
+        <x-loading-skeleton wire:loading.delay class="ui-loading-overlay" wire:target="filterStatus,filterProject,perPage" />
         @if($tasks->isEmpty())
             <div class="ui-empty-state">
                 <p class="text-sm font-semibold text-gray-700">No tasks match your filters.</p>
@@ -55,7 +56,7 @@
                 <span class="font-medium text-gray-700">{{ $tasks->total() }}</span>
                 tasks
             </p>
-            <div class="overflow-x-auto">
+            <div class="ui-table-scroll">
                 <table class="w-full min-w-[1120px] text-sm" style="table-layout: fixed;">
                     <thead class="block border-b border-gray-200 bg-gray-50">
                         <tr style="display: table; width: 100%; table-layout: fixed;">

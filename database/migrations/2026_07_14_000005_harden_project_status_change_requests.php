@@ -20,9 +20,12 @@ return new class extends Migration
             ->orderByDesc('id')
             ->get()
             ->groupBy('project_id');
+        $projectStatuses = DB::table('projects')
+            ->whereIn('id', $pendingGroups->keys())
+            ->pluck('status', 'id');
 
         foreach ($pendingGroups as $projectId => $requests) {
-            $currentStatus = DB::table('projects')->where('id', $projectId)->value('status');
+            $currentStatus = $projectStatuses->get($projectId);
             $latest = $requests->first();
 
             DB::table('project_status_change_requests')

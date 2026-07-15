@@ -155,6 +155,13 @@ class TeamLeadDashboard extends Component
         } else {
             [$request, $isNewRequest] = DB::transaction(function () use ($project, $requestedStatus, $data) {
                 $lockedProject = Project::query()->lockForUpdate()->findOrFail($project->id);
+
+                if ($lockedProject->status === $requestedStatus) {
+                    throw ValidationException::withMessages([
+                        'requestedProjectStatus' => 'The project already has this status.',
+                    ]);
+                }
+
                 $request = ProjectStatusChangeRequest::query()
                     ->where('pending_project_id', $lockedProject->id)
                     ->lockForUpdate()

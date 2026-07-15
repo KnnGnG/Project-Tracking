@@ -11,6 +11,7 @@ use App\Models\TaskMemberProgress;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
@@ -99,7 +100,7 @@ class MemberDashboard extends Component
         $this->expandedTaskId = ($this->expandedTaskId === $id) ? null : $id;
     }
 
-    public function downloadAttachment(int $id)
+    public function downloadAttachment(int $id): StreamedResponse
     {
         $attachment = TaskAttachment::findOrFail($id);
         abort_unless($this->ownedTask($attachment->task_id), 404);

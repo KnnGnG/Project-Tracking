@@ -7,7 +7,7 @@
         <x-floating-notification :message="session('error')" type="error" />
     @endif
 
-    <div class="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+    <div class="ui-toolbar">
         <div class="min-w-0">
             <p class="text-sm font-semibold text-gray-900">Projects</p>
             <p class="mt-0.5 text-xs text-gray-400">Search and manage project records.</p>
@@ -63,7 +63,9 @@
                             <p class="mt-1 text-[11px] text-gray-400">Submitted {{ $statusRequest->created_at->diffForHumans() }}</p>
                         </div>
                         <div class="w-full sm:w-72">
-                            <input type="text"
+                            <label for="request-review-reason-{{ $statusRequest->id }}" class="sr-only">Review note for {{ $statusRequest->project?->name ?? 'project status request' }}</label>
+                            <input id="request-review-reason-{{ $statusRequest->id }}"
+                                   type="text"
                                    wire:model="requestReviewReasons.{{ $statusRequest->id }}"
                                    maxlength="500"
                                    placeholder="Review note (required to decline)"
@@ -99,12 +101,16 @@
 
     {{-- Create / Edit form --}}
     @if($showForm)
-        <div class="ui-soft-panel p-6 mb-6">
+        <div x-data="unsavedFormGuard()" @input="markDirty" @change="markDirty" @beforeunload.window="warn($event)" class="ui-soft-panel p-6 mb-6">
             <h2 class="text-base font-semibold text-gray-800 mb-5">
                 {{ $editingId ? 'Edit Project' : 'New Project' }}
             </h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2 border-b border-slate-100 pb-2">
+                    <h3 class="text-sm font-bold text-slate-800">Project details</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Name, schedule, lifecycle status, and client ownership.</p>
+                </div>
                 {{-- Name --}}
                 <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Project Name <span class="text-red-500">*</span></label>
@@ -149,8 +155,9 @@
 
                 @if($editingId)
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Status change reason</label>
-                        <input wire:model="statusChangeReason"
+                        <label for="status-change-reason" class="block text-sm font-medium text-gray-700 mb-1">Status change reason</label>
+                        <input id="status-change-reason"
+                               wire:model="statusChangeReason"
                                type="text"
                                maxlength="500"
                                placeholder="Required when changing the lifecycle status"
@@ -169,6 +176,11 @@
                             <option value="{{ $client->id }}">{{ $client->name }}</option>
                         @endforeach
                     </select>
+                </div>
+
+                <div class="md:col-span-2 mt-2 border-b border-slate-100 pb-2">
+                    <h3 class="text-sm font-bold text-slate-800">Team assignment</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Attach existing teams that will work in this project.</p>
                 </div>
 
                 <div class="md:col-span-2">
@@ -222,7 +234,7 @@
                     <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Project' : 'Create Project' }}</span>
                     <span wire:loading wire:target="save">Saving...</span>
                 </button>
-                <button wire:click="cancelForm"
+                <button wire:click="cancelForm" @click="if (!confirmLeave()) $event.stopImmediatePropagation()"
                         wire:loading.attr="disabled"
                         wire:target="cancelForm,save"
                         class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-60 disabled:cursor-not-allowed">
@@ -233,14 +245,15 @@
     @endif
 
     {{-- Projects table --}}
-    <div class="ui-soft-panel overflow-hidden" @if(!$showForm) wire:poll.visible.60s @endif>
+    <div class="ui-soft-panel relative overflow-hidden" @if(!$showForm) wire:poll.visible.60s @endif>
+        <x-loading-skeleton wire:loading.delay class="ui-loading-overlay" wire:target="search,openCreate,openEdit,save,confirmDelete" />
         @if($projects->isEmpty())
             <div class="ui-empty-state">
                 <svg class="w-10 h-10 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                           d="M3 7h18M3 12h18M3 17h18"/>
                 </svg>
-                <p class="text-sm">No projects found.</p>
+                <p class="text-sm">{{ filled($search) ? 'No projects match your search.' : 'No projects have been created yet.' }}</p>
             </div>
         @else
             <table class="w-full text-sm">
@@ -257,7 +270,11 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @foreach($projects as $project)
-                        <tr class="hover:bg-gray-50 transition">
+                        <tr wire:click="showDetails({{ $project->id }})"
+                            wire:keydown.enter="showDetails({{ $project->id }})"
+                            tabindex="0"
+                            aria-label="View details for {{ $project->name }}"
+                            class="ui-clickable-row hover:bg-gray-50 transition">
                             <td class="px-6 py-4">
                                 <p class="font-medium text-gray-900">{{ $project->name }}</p>
                                 @if($project->description)
@@ -284,14 +301,12 @@
                                         default => 'bg-gray-100 text-gray-600',
                                     };
                                 @endphp
-                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $badge }}">
-                                    {{ $project->effectiveStatusLabel() }}
-                                </span>
+                                <x-status-badge :status="$effectiveProjectStatus" :label="$project->effectiveStatusLabel()" />
                             </td>
                             <td class="px-6 py-4">
                                 @php $pct = $project->completionPercentage() @endphp
                                 <button type="button"
-                                        wire:click="toggleProgressDetails({{ $project->id }})"
+                                        wire:click.stop="toggleProgressDetails({{ $project->id }})"
                                         class="flex items-center gap-2 rounded-lg px-2 py-1 -mx-2 text-left transition hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         aria-expanded="{{ $progressProjectId === $project->id ? 'true' : 'false' }}">
                                     <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -305,18 +320,20 @@
                             </td>
                             <td class="w-56 px-4 py-4 whitespace-nowrap">
                                 <div class="flex flex-wrap items-center justify-start gap-2">
-                                    <button wire:click="showDetails({{ $project->id }})"
+                                    <button wire:click.stop="showDetails({{ $project->id }})"
                                             class="ui-action-button ui-action-primary">
                                         Details
                                     </button>
-                                    <button wire:click="openEdit({{ $project->id }})"
+                                    <button wire:click.stop="openEdit({{ $project->id }})"
                                             class="ui-action-button ui-action-primary">
                                         Edit
                                     </button>
-                                    <button wire:click="confirmDelete({{ $project->id }})"
-                                            class="ui-action-button ui-action-danger">
-                                        Delete
-                                    </button>
+                                    <span class="ml-1 border-l border-slate-200 pl-3">
+                                        <button wire:click.stop="confirmDelete({{ $project->id }})"
+                                                class="ui-action-button ui-action-danger">
+                                            Delete
+                                        </button>
+                                    </span>
                                 </div>
                             </td>
                         </tr>

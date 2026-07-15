@@ -52,25 +52,15 @@
                 </div>
                 @php
                     $effectiveProjectStatus = $project->effectiveStatus();
-                    $statusBadge = match($effectiveProjectStatus) {
-                        'active' => 'bg-emerald-100 text-emerald-700',
-                        'overdue' => 'bg-red-100 text-red-700',
-                        'near_due' => 'bg-amber-100 text-amber-700',
-                        'upcoming' => 'bg-sky-100 text-sky-700',
-                        'on_hold' => 'bg-slate-200 text-slate-700',
-                        'completed' => 'bg-indigo-100 text-indigo-700',
-                        default => 'bg-gray-100 text-gray-500',
-                    };
+                    $isCreator = (int) $project->created_by === (int) auth()->id();
                 @endphp
                 <div class="flex flex-shrink-0 items-center gap-2">
-                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold {{ $statusBadge }}">
-                        {{ $project->effectiveStatusLabel() }}
-                    </span>
+                    <x-status-badge :status="$effectiveProjectStatus" :label="$project->effectiveStatusLabel()" class="px-3 py-1" />
                     <button type="button"
                             wire:click="openProjectStatusForm"
                             class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
-                            title="{{ (int) $project->created_by === (int) auth()->id() ? 'Change project status' : 'Request a project status change' }}"
-                            aria-label="{{ (int) $project->created_by === (int) auth()->id() ? 'Change project status' : 'Request a project status change' }}">
+                            title="{{ $isCreator ? 'Change project status' : 'Request a project status change' }}"
+                            aria-label="{{ $isCreator ? 'Change project status' : 'Request a project status change' }}">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h10m0 0l-3-3m3 3l-3 3m9 7H10m0 0l3-3m-3 3l3 3"/>
                         </svg>
@@ -91,27 +81,31 @@
             @if($showProjectStatusForm)
                 <div class="mb-4 rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
                     <div class="grid gap-3 sm:grid-cols-[12rem_1fr_auto] sm:items-end">
-                        <div>
-                            <label class="mb-1 block text-xs font-semibold text-gray-700">Requested status</label>
-                            <select wire:model="requestedProjectStatus" class="w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <label class="block text-xs font-semibold text-gray-700">
+                            <span class="mb-1 block">Requested status</span>
+                            <select wire:model="requestedProjectStatus" class="w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-sm font-normal focus:border-indigo-500 focus:ring-indigo-500">
                                 <option value="active">Active</option>
                                 <option value="on_hold">On Hold</option>
                                 <option value="completed">Completed</option>
                             </select>
                             @error('requestedProjectStatus') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-semibold text-gray-700">Reason</label>
-                            <input type="text"
-                                   wire:model="projectStatusReason"
-                                   maxlength="500"
-                                   placeholder="Briefly explain why this status should change"
-                                   class="w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </label>
+                        <label class="block text-xs font-semibold text-gray-700">
+                            <span class="mb-1 block">Reason</span>
+                            <textarea wire:model="projectStatusReason"
+                                      rows="2"
+                                      maxlength="500"
+                                      placeholder="Briefly explain why this status should change"
+                                      class="w-full resize-y rounded-lg border-gray-300 bg-white px-3 py-2 text-sm font-normal focus:border-indigo-500 focus:ring-indigo-500"></textarea>
                             @error('projectStatusReason') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                        </div>
+                        </label>
                         <div class="flex gap-2">
-                            <button type="button" wire:click="submitProjectStatusChange" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700">
-                                {{ (int) $project->created_by === (int) auth()->id() ? 'Apply' : 'Send request' }}
+                            <button type="button"
+                                    wire:click="submitProjectStatusChange"
+                                    wire:loading.attr="disabled"
+                                    wire:target="submitProjectStatusChange"
+                                    class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-75">
+                                {{ $isCreator ? 'Apply' : 'Send request' }}
                             </button>
                             <button type="button" wire:click="cancelProjectStatusForm" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition hover:bg-gray-50">
                                 Cancel

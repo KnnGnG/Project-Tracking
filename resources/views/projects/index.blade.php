@@ -10,7 +10,11 @@
     @else
         <link rel="stylesheet" href="{{ asset('css/fallback.css') }}">
     @endif
-    <link rel="stylesheet" href="{{ asset('css/project-notifications.css') }}?v={{ filemtime(public_path('css/project-notifications.css')) }}">
+    @php
+        $projectNotificationsPath = public_path('css/project-notifications.css');
+        $projectNotificationsVersion = file_exists($projectNotificationsPath) ? filemtime($projectNotificationsPath) : '1';
+    @endphp
+    <link rel="stylesheet" href="{{ asset('css/project-notifications.css') }}?v={{ $projectNotificationsVersion }}">
 </head>
 <body class="project-picker-shell min-h-screen font-sans antialiased text-slate-900">
     <div class="min-h-screen">
@@ -48,6 +52,11 @@
             @if(session('error'))
                 <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
                     {{ session('error') }}
+                </div>
+            @endif
+            @if(session('success'))
+                <div class="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+                    {{ session('success') }}
                 </div>
             @endif
 
@@ -95,7 +104,7 @@
                             $projectTaskItems = $projectTaskOverview
                                 ->filter(fn (array $taskItem) => (int) $taskItem['task']->project_id === (int) $project->id);
                             $projectNewTaskCount = $projectTaskItems->whereNotNull('notification')->count();
-                            $projectNewTaskItem = $projectTaskItems->first(fn (array $taskItem) => $taskItem['notification']);
+                            $projectNewTaskItem = $projectTaskItems->first(fn (array $taskItem) => ! is_null($taskItem['notification']));
                         @endphp
 
                         <article class="project-picker-card project-card-state-{{ str_replace('_', '-', $displayStatus) }} group" data-project-id="{{ $project->id }}">
@@ -112,7 +121,13 @@
                                     <div class="project-card-heading-badges">
                                         @if($projectNewTaskCount > 0)
                                             @php
-                                                $newTaskItems = $projectTaskItems->whereNotNull('notification');
+                                                $newTaskItems = $projectTaskItems
+                                                    ->whereNotNull('notification')
+                                                    ->sortBy(fn (array $taskItem) => [
+                                                        $taskItem['status'] === 'overdue' ? 0 : 1,
+                                                        -$taskItem['notification']->created_at->timestamp,
+                                                    ])
+                                                    ->values();
                                             @endphp
                                             <div class="project-task-indicator">
                                                 <form method="POST" action="{{ route('projects.new-tasks.open', $projectNewTaskItem['notification']) }}">
@@ -127,7 +142,13 @@
                                                 <div class="project-task-preview" role="tooltip">
                                                     <div class="project-task-preview-heading">
                                                         <span>New assignments</span>
-                                                        <strong>{{ $projectNewTaskCount }}</strong>
+                                                        <div class="project-task-preview-actions">
+                                                            <strong>{{ $projectNewTaskCount }}</strong>
+                                                            <form method="POST" action="{{ route('projects.new-tasks.read-all', $project) }}">
+                                                                @csrf
+                                                                <button type="submit">Mark all read</button>
+                                                            </form>
+                                                        </div>
                                                     </div>
                                                     <div class="project-task-preview-list">
                                                         @foreach($newTaskItems->take(3) as $taskItem)
@@ -136,22 +157,33 @@
                                                                 $taskProgress = $task->memberProgress->first()?->progress ?? 0;
                                                             @endphp
                                                             <div class="project-task-preview-item">
-                                                                <div class="project-task-preview-title-row">
-                                                                    <strong>{{ $task->title }}</strong>
-                                                                    <span class="project-task-preview-priority project-task-preview-priority-{{ $task->priority }}">{{ ucfirst($task->priority) }}</span>
-                                                                </div>
-                                                                <p><span>Team</span>{{ $task->team?->name ?? 'No team' }}</p>
-                                                                <div class="project-task-preview-meta">
-                                                                    <span>{{ $task->start_date?->format('M d') ?? 'TBD' }} - {{ $task->due_date?->format('M d, Y') ?? 'No due date' }}</span>
-                                                                    <strong>{{ $taskProgress }}%</strong>
-                                                                </div>
+                                                                <form method="POST" action="{{ route('projects.new-tasks.open', $taskItem['notification']) }}" class="project-task-preview-open-form">
+                                                                    @csrf
+                                                                    <button type="submit" class="project-task-preview-open" aria-label="Open {{ $task->title }}">
+                                                                        <span class="project-task-preview-title-row">
+                                                                            <strong>{{ $task->title }}</strong>
+                                                                            <span class="project-task-preview-priority project-task-preview-priority-{{ $task->priority }}">{{ ucfirst($task->priority) }}</span>
+                                                                        </span>
+                                                                        <span class="project-task-preview-team"><span>Team</span>{{ $task->team?->name ?? 'No team' }}</span>
+                                                                        <span class="project-task-preview-meta">
+                                                                            <span>{{ $task->start_date?->format('M d') ?? 'TBD' }} - {{ $task->due_date?->format('M d, Y') ?? 'No due date' }}</span>
+                                                                            <strong>{{ $taskProgress }}%</strong>
+                                                                        </span>
+                                                                    </button>
+                                                                </form>
+                                                                <form method="POST" action="{{ route('projects.new-tasks.dismiss', $taskItem['notification']) }}" class="project-task-preview-dismiss-form">
+                                                                    @csrf
+                                                                    <button type="submit" class="project-task-preview-dismiss" title="Dismiss notification" aria-label="Dismiss notification for {{ $task->title }}">
+                                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                                    </button>
+                                                                </form>
                                                             </div>
                                                         @endforeach
                                                     </div>
                                                     @if($newTaskItems->count() > 3)
                                                         <p class="project-task-preview-more">+{{ $newTaskItems->count() - 3 }} more new task{{ $newTaskItems->count() - 3 === 1 ? '' : 's' }}</p>
                                                     @endif
-                                                    <p class="project-task-preview-hint">Click the bell to open the newest task.</p>
+                                                    <p class="project-task-preview-hint">Select a task to open it.</p>
                                                 </div>
                                             </div>
                                         @endif

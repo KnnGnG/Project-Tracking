@@ -235,6 +235,7 @@ class LeadTaskManager extends Component
 
                 return $task;
             });
+            $this->editingId = $task->id;
             $this->storeAttachments($task);
 
             session()->flash('success', 'Task created and assigned.');
@@ -318,7 +319,7 @@ class LeadTaskManager extends Component
 
         unset($this->newAttachments[$index]);
         $this->newAttachments = array_values($this->newAttachments);
-        $this->resetValidation('newAttachments');
+        $this->resetValidation();
     }
 
     public function removeAttachment(int $id): void

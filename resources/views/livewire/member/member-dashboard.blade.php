@@ -430,7 +430,11 @@
                                                 <h4 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Attachments</h4>
                                                 <div class="flex flex-wrap gap-2">
                                                     @foreach($task->attachments as $attachment)
-                                                        <button type="button" wire:click="downloadAttachment({{ $attachment->id }})" class="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+                                                        <button type="button"
+                                                                wire:click="downloadAttachment({{ $attachment->id }})"
+                                                                wire:loading.attr="disabled"
+                                                                wire:target="downloadAttachment({{ $attachment->id }})"
+                                                                class="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-60">
                                                             <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828L18 9.828a4 4 0 00-5.657-5.657L5.757 10.757a6 6 0 108.486 8.486L20.5 13"/>
                                                             </svg>
@@ -556,25 +560,7 @@
                                             <div class="flex justify-between gap-2">
                                                 <dt class="text-gray-400">Status</dt>
                                                 <dd>
-                                                    @php
-                                                        $statusBadge = match($task->personal_status) {
-                                                            'pending'     => 'bg-gray-100 text-gray-600',
-                                                            'in_progress' => 'bg-blue-100 text-blue-700',
-                                                            'review'      => 'bg-amber-100 text-amber-800',
-                                                            'done'        => 'bg-green-100 text-green-700',
-                                                            default       => 'bg-gray-100 text-gray-500',
-                                                        };
-                                                        $statusLabel = match($task->personal_status) {
-                                                            'pending'     => 'Pending',
-                                                            'in_progress' => 'In Progress',
-                                                            'review'      => 'Review',
-                                                            'done'        => 'Done',
-                                                            default       => ucfirst($task->personal_status),
-                                                        };
-                                                    @endphp
-                                                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $statusBadge }}">
-                                                        {{ $statusLabel }}
-                                                    </span>
+                                                    <x-status-badge :status="$task->personal_status" />
                                                 </dd>
                                             </div>
                                         </dl>

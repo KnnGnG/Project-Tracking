@@ -1,5 +1,5 @@
 <div class="space-y-6" wire:poll.visible.30s>
-    <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+    <div class="ui-toolbar">
         <div class="min-w-0">
             <p class="text-sm font-semibold text-gray-900">Journal Review</p>
             <p class="mt-0.5 text-xs text-gray-400">Filter logs by date range, team, member, and task.</p>
@@ -61,7 +61,8 @@
         <p class="mt-1 text-3xl font-extrabold text-gray-900">{{ intdiv($totalMinutes, 60) }}h {{ $totalMinutes % 60 }}m</p>
     </div>
 
-    <div class="ui-soft-panel overflow-hidden">
+    <div class="ui-soft-panel relative overflow-hidden">
+        <x-loading-skeleton wire:loading.delay class="ui-loading-overlay" wire:target="dateFrom,dateTo,teamId,memberId,taskId" />
         @forelse($logs as $log)
             <article class="border-b border-gray-100 px-5 py-4 last:border-b-0">
                 <div class="flex flex-wrap items-start justify-between gap-3">

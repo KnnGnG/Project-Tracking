@@ -9,6 +9,12 @@ return new class extends Migration
 {
     private const INDEX = 'team_lead_evaluations_unique_period';
 
+    private const PERIOD_START_KEY = 'period_start_key';
+
+    private const PERIOD_END_KEY = 'period_end_key';
+
+    private const ACTIVE_KEY = 'active_unique_key';
+
     public function up(): void
     {
         DB::table('team_lead_evaluations')
@@ -37,9 +43,13 @@ return new class extends Migration
                 DB::table('team_lead_evaluations')->whereIn('id', $ids->skip(1))->delete();
             });
 
+        DB::statement("ALTER TABLE team_lead_evaluations ADD ".self::PERIOD_START_KEY." DATE GENERATED ALWAYS AS (COALESCE(period_start, DATE('1000-01-01'))) STORED");
+        DB::statement("ALTER TABLE team_lead_evaluations ADD ".self::PERIOD_END_KEY." DATE GENERATED ALWAYS AS (COALESCE(period_end, DATE('1000-01-01'))) STORED");
+        DB::statement('ALTER TABLE team_lead_evaluations ADD '.self::ACTIVE_KEY.' TINYINT GENERATED ALWAYS AS (CASE WHEN deleted_at IS NULL THEN 1 ELSE NULL END) STORED');
+
         Schema::table('team_lead_evaluations', function (Blueprint $table) {
             $table->unique(
-                ['team_id', 'evaluator_id', 'lead_id', 'period_start', 'period_end'],
+                ['team_id', 'evaluator_id', 'lead_id', self::PERIOD_START_KEY, self::PERIOD_END_KEY, self::ACTIVE_KEY],
                 self::INDEX,
             );
         });
@@ -49,6 +59,7 @@ return new class extends Migration
     {
         Schema::table('team_lead_evaluations', function (Blueprint $table) {
             $table->dropUnique(self::INDEX);
+            $table->dropColumn([self::ACTIVE_KEY, self::PERIOD_END_KEY, self::PERIOD_START_KEY]);
         });
     }
 };

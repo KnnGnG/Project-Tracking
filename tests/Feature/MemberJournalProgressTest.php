@@ -20,6 +20,8 @@ class MemberJournalProgressTest extends TestCase
 
     public function test_progress_is_saved_per_task_and_carried_across_journal_days(): void
     {
+        $this->travelTo('2026-07-16 10:00:00');
+
         $lead = User::factory()->create(['role' => 'team_lead']);
         $member = User::factory()->create(['role' => 'member']);
         $project = Project::create([
@@ -55,6 +57,7 @@ class MemberJournalProgressTest extends TestCase
         $component = Livewire::test(MemberJournal::class)
             ->set('selectedTaskId', (string) $firstTask->id)
             ->assertSet('progress', 1)
+            ->set('logDate', '2026-07-14')
             ->set('hours', 0)
             ->set('minutes', 30)
             ->set('progress', 35)
@@ -139,6 +142,107 @@ class MemberJournalProgressTest extends TestCase
             ->assertSee('Timeline Member - 64%')
             ->assertSee('Progress: 64%')
             ->assertSee('Task progress');
+    }
+
+    public function test_deleting_latest_log_restores_progress_from_previous_log(): void
+    {
+        $lead = User::factory()->create(['role' => 'team_lead']);
+        $member = User::factory()->create(['role' => 'member']);
+        $project = Project::create([
+            'name' => 'Journal Correction Project',
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-07-31',
+            'status' => 'active',
+            'created_by' => $lead->id,
+        ]);
+        $team = Team::create([
+            'name' => 'Journal Correction Team',
+            'project_id' => $project->id,
+            'lead_id' => $lead->id,
+        ]);
+        $team->members()->attach($member->id, ['role' => 'member']);
+        $task = $this->createTask('Correctable task', $project, $team, $lead, $member);
+
+        JournalLog::create([
+            'user_id' => $member->id,
+            'task_id' => $task->id,
+            'team_id' => $team->id,
+            'log_date' => '2026-07-10',
+            'minutes' => 30,
+            'progress' => 40,
+        ]);
+        $latestLog = JournalLog::create([
+            'user_id' => $member->id,
+            'task_id' => $task->id,
+            'team_id' => $team->id,
+            'log_date' => '2026-07-11',
+            'minutes' => 30,
+            'progress' => 100,
+        ]);
+        TaskMemberProgress::create([
+            'task_id' => $task->id,
+            'user_id' => $member->id,
+            'status' => 'done',
+            'progress' => 100,
+            'started_at' => '2026-07-10 00:00:00',
+            'completed_at' => '2026-07-11 12:00:00',
+        ]);
+        $task->update(['status' => 'done']);
+
+        $this->actingAs($member)->withSession([
+            'active_project_id' => $project->id,
+            'active_team_id' => $team->id,
+            'active_project_role' => 'member',
+        ]);
+
+        Livewire::test(MemberJournal::class)->call('deleteLog', $latestLog->id);
+
+        $this->assertDatabaseMissing('journal_logs', ['id' => $latestLog->id]);
+        $this->assertDatabaseHas('task_member_progress', [
+            'task_id' => $task->id,
+            'user_id' => $member->id,
+            'status' => 'in_progress',
+            'progress' => 40,
+        ]);
+        $this->assertSame('in_progress', $task->fresh()->status);
+    }
+
+    public function test_member_cannot_log_work_for_a_future_date(): void
+    {
+        $this->travelTo(now()->startOfDay());
+
+        $lead = User::factory()->create(['role' => 'team_lead']);
+        $member = User::factory()->create(['role' => 'member']);
+        $project = Project::create([
+            'name' => 'Date Validation Project',
+            'start_date' => now()->subDay()->toDateString(),
+            'end_date' => now()->addMonth()->toDateString(),
+            'status' => 'active',
+            'created_by' => $lead->id,
+        ]);
+        $team = Team::create([
+            'name' => 'Date Validation Team',
+            'project_id' => $project->id,
+            'lead_id' => $lead->id,
+        ]);
+        $team->members()->attach($member->id, ['role' => 'member']);
+        $task = $this->createTask('Date validation task', $project, $team, $lead, $member);
+
+        $this->actingAs($member)->withSession([
+            'active_project_id' => $project->id,
+            'active_team_id' => $team->id,
+            'active_project_role' => 'member',
+        ]);
+
+        Livewire::test(MemberJournal::class)
+            ->set('selectedTaskId', (string) $task->id)
+            ->set('logDate', now()->addDay()->toDateString())
+            ->set('minutes', 15)
+            ->set('progress', 10)
+            ->call('save')
+            ->assertHasErrors(['logDate' => 'before_or_equal']);
+
+        $this->assertDatabaseCount('journal_logs', 0);
     }
 
     private function createTask(string $title, Project $project, Team $team, User $lead, User $member): Task

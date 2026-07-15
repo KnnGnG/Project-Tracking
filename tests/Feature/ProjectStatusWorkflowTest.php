@@ -57,9 +57,10 @@ class ProjectStatusWorkflowTest extends TestCase
             'to_status' => 'on_hold',
             'source' => 'request',
         ]);
-        $this->assertTrue(InAppNotification::where('user_id', $lead->id)
-            ->where('type', 'project_status_request_reviewed')
-            ->exists());
+        $this->assertDatabaseHas('in_app_notifications', [
+            'user_id' => $lead->id,
+            'type' => 'project_status_request_reviewed',
+        ]);
     }
 
     public function test_project_creator_can_change_lifecycle_status_directly(): void
@@ -166,6 +167,31 @@ class ProjectStatusWorkflowTest extends TestCase
             'from_status' => 'active',
             'to_status' => 'completed',
             'source' => 'admin',
+        ]);
+    }
+
+    public function test_stale_admin_edit_cannot_overwrite_newer_project_status(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $lead = User::factory()->create(['role' => 'team_lead']);
+        [$project] = $this->projectContext($admin, $lead);
+
+        $this->actingAs($admin);
+        $component = Livewire::test(ProjectManager::class)
+            ->call('openEdit', $project->id);
+
+        $project->update(['status' => 'on_hold']);
+
+        $component
+            ->set('status', 'completed')
+            ->set('statusChangeReason', 'Administrator confirmed final delivery.')
+            ->call('save')
+            ->assertHasErrors(['status']);
+
+        $this->assertSame('on_hold', $project->fresh()->status);
+        $this->assertDatabaseMissing('project_status_histories', [
+            'project_id' => $project->id,
+            'to_status' => 'completed',
         ]);
     }
 

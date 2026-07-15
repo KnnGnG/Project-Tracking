@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\ProjectStatusService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -131,7 +132,14 @@ class ProjectManager extends Component
 
         DB::transaction(function () use ($payload, $selectedTeamIds, $statusService) {
             if ($this->editingId) {
-                $project = Project::findOrFail($this->editingId);
+                $project = Project::query()->lockForUpdate()->findOrFail($this->editingId);
+
+                if ($project->status !== $this->originalStatus) {
+                    throw ValidationException::withMessages([
+                        'status' => 'The project status changed after you opened this form. Reopen it and try again.',
+                    ]);
+                }
+
                 $requestedStatus = $payload['status'];
                 unset($payload['status']);
                 $project->update($payload);

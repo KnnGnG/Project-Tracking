@@ -6,7 +6,7 @@
     @endif
 
     {{-- ── Role filter tabs + search + new user ─────────────────────────────── --}}
-<div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+<div class="ui-toolbar">
         {{-- Role tabs --}}
         <div class="flex border-b border-gray-200">
             @php
@@ -55,7 +55,7 @@
 
     {{-- ── Create / Edit form ───────────────────────────────────────────────── --}}
     @if($showForm)
-        <div class="ui-soft-panel p-6">
+        <div x-data="unsavedFormGuard()" @input="markDirty" @change="markDirty" @beforeunload.window="warn($event)" class="ui-soft-panel p-6">
             <h2 class="text-base font-semibold text-gray-800 mb-5">
                 {{ $editingId ? 'Edit User' : 'Create New User' }}
             </h2>
@@ -116,7 +116,7 @@
                     <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update User' : 'Create User' }}</span>
                     <span wire:loading wire:target="save">Saving...</span>
                 </button>
-                <button wire:click="cancelForm"
+                <button wire:click="cancelForm" @click="if (!confirmLeave()) $event.stopImmediatePropagation()"
                         wire:loading.attr="disabled"
                         wire:target="cancelForm,save"
                         class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-60 disabled:cursor-not-allowed">
@@ -127,11 +127,12 @@
     @endif
 
     {{-- ── User table ───────────────────────────────────────────────────────── --}}
-    <div class="ui-soft-panel overflow-hidden" @if(!$showForm) wire:poll.visible.60s @endif>
+    <div class="ui-soft-panel relative overflow-hidden" @if(!$showForm) wire:poll.visible.60s @endif>
+        <x-loading-skeleton wire:loading.delay class="ui-loading-overlay" wire:target="search,filterRole,openCreate,openEdit,save,confirmDelete" />
         @if($users->isEmpty())
             <div class="ui-empty-state">
-                <p class="text-sm font-semibold text-gray-700">No users found.</p>
-                <p class="mt-1 text-sm text-gray-500">Try a different role filter or search term.</p>
+                <p class="text-sm font-semibold text-gray-700">{{ filled($search) ? 'No users match your search.' : 'No users are available in this role.' }}</p>
+                <p class="mt-1 text-sm text-gray-500">Change the role filter or clear the search to see more results.</p>
             </div>
         @else
             <table class="w-full text-sm">
@@ -218,12 +219,14 @@
                                     Edit
                                 </button>
                                 @if($user->id !== auth()->id())
-                                    <button wire:click="confirmDelete({{ $user->id }})"
-                                            wire:loading.attr="disabled"
-                                            wire:target="confirmDelete"
-                                            class="ui-action-button ui-action-danger">
-                                        Delete
-                                    </button>
+                                    <span class="ml-1 border-l border-slate-200 pl-3">
+                                        <button wire:click="confirmDelete({{ $user->id }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="confirmDelete"
+                                                class="ui-action-button ui-action-danger">
+                                            Delete
+                                        </button>
+                                    </span>
                                 @endif
                             </td>
                         </tr>

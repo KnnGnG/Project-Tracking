@@ -14,7 +14,9 @@ class Task extends Model
     protected static function booted(): void
     {
         static::deleting(function (Task $task): void {
-            $task->attachments()->get()->each->delete();
+            $task->attachments()->chunkById(100, function ($attachments): void {
+                $attachments->each->delete();
+            });
         });
     }
 
