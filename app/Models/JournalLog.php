@@ -13,6 +13,7 @@ class JournalLog extends Model
         'team_id',
         'log_date',
         'minutes',
+        'progress',
         'notes',
     ];
 
@@ -21,6 +22,7 @@ class JournalLog extends Model
         return [
             'log_date' => 'date',
             'minutes'  => 'integer',
+            'progress' => 'integer',
         ];
     }
 

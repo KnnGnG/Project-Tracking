@@ -42,7 +42,7 @@
                     <div>
                         <label for="selectedTaskId" class="block text-sm font-medium text-gray-700">Task <span class="text-red-500">*</span></label>
                         <select id="selectedTaskId"
-                                wire:model="selectedTaskId"
+                                wire:model.live="selectedTaskId"
                                 class="mt-1 w-full border border-gray-300 rounded-lg text-sm px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500">
                             <option value="">Select a task</option>
                             @foreach($tasks as $task)
@@ -79,6 +79,33 @@
                             @error('minutes') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
+                </div>
+
+                <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-4">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                            <label for="taskProgress" class="block text-sm font-medium text-gray-700">Task progress</label>
+                            <p class="text-xs text-gray-400">Saved for the selected task and carried into future journal days.</p>
+                        </div>
+                        <output for="taskProgress" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-center text-sm font-bold text-white" style="min-width: 3.5rem">
+                            {{ $progress }}%
+                        </output>
+                    </div>
+                    <input id="taskProgress"
+                           type="range"
+                           min="1"
+                           max="100"
+                           step="1"
+                           wire:model.live="progress"
+                           @disabled(!$selectedTaskId)
+                           class="h-2 w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                           style="accent-color: #4f46e5">
+                    <div class="mt-2 flex justify-between text-xs font-medium text-gray-400">
+                        <span>1%</span>
+                        <span>50%</span>
+                        <span>100%</span>
+                    </div>
+                    @error('progress') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
 
                 <div x-data="journalTimer()" x-init="init()" :class="breakMode ? 'border-sky-200 bg-sky-50' : 'border-indigo-100 bg-indigo-50'" class="rounded-lg border px-4 py-4 transition-colors">
@@ -201,6 +228,9 @@
                                         <span class="text-gray-300">/</span> {{ $log->task?->project?->name ?? $log->team?->project?->name }}
                                     @endif
                                 </p>
+                                @if(! is_null($log->progress))
+                                    <p class="mt-1 text-xs font-semibold text-indigo-600">{{ $log->progress }}% progress</p>
+                                @endif
                             </div>
                             <button type="button"
                                     wire:click="confirmDelete({{ $log->id }})"
@@ -243,6 +273,9 @@
                         </p>
                         @if($log->notes)
                             <p class="mt-1 text-sm text-gray-600 line-clamp-2">{{ $log->notes }}</p>
+                        @endif
+                        @if(! is_null($log->progress))
+                            <p class="mt-1 text-xs font-semibold text-indigo-600">{{ $log->progress }}% progress</p>
                         @endif
                     </div>
                     <span class="text-sm font-semibold text-gray-700">

@@ -6,9 +6,12 @@ use App\Models\InAppNotification;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskActivity;
+use App\Models\TaskAttachment;
 use App\Models\TaskMemberProgress;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
@@ -95,6 +98,15 @@ class MemberDashboard extends Component
     public function toggleExpand(int $id): void
     {
         $this->expandedTaskId = ($this->expandedTaskId === $id) ? null : $id;
+    }
+
+    public function downloadAttachment(int $id): StreamedResponse
+    {
+        $attachment = TaskAttachment::findOrFail($id);
+        abort_unless($this->ownedTask($attachment->task_id), 404);
+        abort_unless(Storage::disk('local')->exists($attachment->path), 404);
+
+        return Storage::disk('local')->download($attachment->path, $attachment->original_name);
     }
 
     public function openFocusTask(int $id): void
@@ -420,7 +432,7 @@ class MemberDashboard extends Component
             ->get(['id', 'name']);
 
         // ── Base query ───────────────────────────────────────────────────────────
-        $base = Task::with(['project', 'team', 'memberProgress.user'])
+        $base = Task::with(['project', 'team', 'memberProgress.user', 'attachments'])
             ->where(fn ($q) => $q
                 ->where('assigned_to', $userId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)));

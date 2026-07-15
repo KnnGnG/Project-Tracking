@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\InAppNotification;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\Team;
@@ -44,7 +45,104 @@ class UserProjectController extends Controller
             ];
         })->sortBy(fn (array $item) => $item['project']->name)->values();
 
-        return view('projects.index', compact('projects'));
+        $newTaskNotifications = $this->newTaskNotifications($request);
+        $projectTaskOverview = $this->projectTaskOverview($request, $newTaskNotifications);
+
+        return view('projects.index', compact('projects', 'newTaskNotifications', 'projectTaskOverview'));
+    }
+
+    public function openTaskNotification(Request $request, InAppNotification $notification): RedirectResponse
+    {
+        abort_unless(
+            (int) $notification->user_id === (int) $request->user()->id
+                && $notification->type === 'task_assigned',
+            404
+        );
+
+        $taskId = (int) data_get($notification->data, 'task_id');
+        $task = Task::query()
+            ->whereKey($taskId)
+            ->where(fn ($query) => $query
+                ->where('assigned_to', $request->user()->id)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($request->user()->id)))
+            ->first();
+
+        abort_unless($task, 404);
+
+        if (! $notification->read_at) {
+            $notification->markAsRead();
+        }
+
+        $destination = route('member.dashboard', [
+            'team' => $task->team_id,
+            'project' => $task->project_id,
+            'task' => $task->id,
+        ]);
+
+        return redirect()->to($destination ?: route('projects.index'));
+    }
+
+    public function markProjectTaskNotificationsRead(Request $request, Project $project): RedirectResponse
+    {
+        $hasProjectAccess = $this->involvedTeams($request)
+            ->assignedToProject($project->id)
+            ->exists();
+
+        abort_unless($hasProjectAccess, 404);
+
+        $accessibleTaskIds = Task::query()
+            ->where('project_id', $project->id)
+            ->where(fn ($query) => $query
+                ->where('assigned_to', $request->user()->id)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($request->user()->id)))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $notificationIds = InAppNotification::query()
+            ->where('user_id', $request->user()->id)
+            ->where('type', 'task_assigned')
+            ->whereNull('read_at')
+            ->get(['id', 'data'])
+            ->filter(fn (InAppNotification $notification) => in_array(
+                (int) data_get($notification->data, 'task_id'),
+                $accessibleTaskIds,
+                true,
+            ))
+            ->pluck('id');
+
+        if ($notificationIds->isNotEmpty()) {
+            InAppNotification::whereIn('id', $notificationIds)->update(['read_at' => now()]);
+        }
+
+        return redirect()
+            ->route('projects.index')
+            ->with('success', 'New task notifications for '.$project->name.' marked as read.');
+    }
+
+    public function dismissTaskNotification(Request $request, InAppNotification $notification): RedirectResponse
+    {
+        abort_unless(
+            (int) $notification->user_id === (int) $request->user()->id
+                && $notification->type === 'task_assigned',
+            404
+        );
+
+        $taskId = (int) data_get($notification->data, 'task_id');
+        $hasAssignment = Task::query()
+            ->whereKey($taskId)
+            ->where(fn ($query) => $query
+                ->where('assigned_to', $request->user()->id)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($request->user()->id)))
+            ->exists();
+
+        abort_unless($hasAssignment, 404);
+
+        if (! $notification->read_at) {
+            $notification->markAsRead();
+        }
+
+        return redirect()->route('projects.index');
     }
 
     public function open(Request $request, Project $project): RedirectResponse
@@ -80,6 +178,46 @@ class UserProjectController extends Controller
             : redirect()->route('member.dashboard', ['team' => $team->id, 'project' => $project->id]);
     }
 
+    public function switchContext(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'context' => ['required', 'string', 'regex:/^\d+:\d+:(lead|member)$/'],
+            'return_route' => ['nullable', 'string'],
+        ]);
+        [$projectId, $teamId, $role] = explode(':', $data['context']);
+        $projectId = (int) $projectId;
+        $teamId = (int) $teamId;
+
+        $team = $request->user()
+            ->teams()
+            ->withPivot('role')
+            ->with(['project', 'projects'])
+            ->whereKey($teamId)
+            ->wherePivot('role', $role)
+            ->first();
+
+        abort_unless($team && $team->isAssignedToProject($projectId), 404);
+
+        session([
+            'active_project_id' => $projectId,
+            'active_team_id' => $teamId,
+            'active_project_role' => $role,
+            'active_has_self_assigned_task' => $this->hasSelfAssignedTask($request, $projectId),
+        ]);
+
+        $sameContextRoutes = $role === 'lead'
+            ? ['lead.dashboard', 'lead.analytics', 'lead.tasks', 'lead.journals', 'lead.evaluations']
+            : ['member.dashboard', 'member.logs', 'member.evaluations', 'member.lead-evaluation'];
+        $returnRoute = in_array($data['return_route'] ?? null, $sameContextRoutes, true)
+            ? $data['return_route']
+            : ($role === 'lead' ? 'lead.dashboard' : 'member.dashboard');
+        $parameters = $role === 'lead'
+            ? ['team' => $teamId]
+            : ['team' => $teamId, 'project' => $projectId];
+
+        return redirect()->route($returnRoute, $parameters);
+    }
+
     private function involvedTeams(Request $request)
     {
         return $request->user()
@@ -106,6 +244,80 @@ class UserProjectController extends Controller
                 ->where('assigned_to', $userId)
                 ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
             ->exists();
+    }
+
+    private function newTaskNotifications(Request $request): Collection
+    {
+        $notifications = InAppNotification::query()
+            ->where('user_id', $request->user()->id)
+            ->where('type', 'task_assigned')
+            ->whereNull('read_at')
+            ->latest()
+            ->get();
+
+        if ($notifications->isEmpty()) {
+            return collect();
+        }
+
+        $tasks = Task::query()
+            ->with(['project', 'team'])
+            ->whereIn('id', $notifications->pluck('data')->map(fn ($data) => (int) data_get($data, 'task_id'))->filter())
+            ->where(fn ($query) => $query
+                ->where('assigned_to', $request->user()->id)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($request->user()->id)))
+            ->get()
+            ->keyBy('id');
+
+        return $notifications
+            ->map(fn (InAppNotification $notification) => [
+                'notification' => $notification,
+                'task' => $tasks->get((int) data_get($notification->data, 'task_id')),
+            ])
+            ->filter(fn (array $item) => $item['task'])
+            ->values();
+    }
+
+    private function projectTaskOverview(Request $request, Collection $newTaskNotifications): Collection
+    {
+        $userId = $request->user()->id;
+        $notificationsByTask = $newTaskNotifications
+            ->unique(fn (array $item) => $item['task']->id)
+            ->keyBy(fn (array $item) => $item['task']->id);
+
+        return Task::query()
+            ->with([
+                'project',
+                'team',
+                'memberProgress' => fn ($query) => $query->where('user_id', $userId),
+            ])
+            ->where(fn ($query) => $query
+                ->where('assigned_to', $userId)
+                ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($userId)))
+            ->whereIn('status', ['pending', 'in_progress', 'review'])
+            ->get()
+            ->map(function (Task $task) use ($notificationsByTask): array {
+                $personalStatus = $task->memberProgress->first()?->status ?? $task->status;
+                $isOverdue = $personalStatus !== 'done'
+                    && $task->due_date
+                    && $task->due_date->toDateString() < now()->toDateString();
+
+                return [
+                    'task' => $task,
+                    'notification' => $notificationsByTask->get($task->id)['notification'] ?? null,
+                    'status' => $isOverdue ? 'overdue' : $personalStatus,
+                ];
+            })
+            ->filter(fn (array $item) => $item['status'] !== 'done')
+            ->sortBy(fn (array $item) => [
+                match ($item['status']) {
+                    'overdue' => 0,
+                    'review' => 1,
+                    'in_progress' => 2,
+                    default => 3,
+                },
+                $item['task']->due_date?->timestamp ?? PHP_INT_MAX,
+            ])
+            ->values();
     }
 }
 

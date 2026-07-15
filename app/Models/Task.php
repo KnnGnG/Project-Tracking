@@ -11,6 +11,15 @@ use Illuminate\Support\Collection;
 
 class Task extends Model
 {
+    protected static function booted(): void
+    {
+        static::deleting(function (Task $task): void {
+            $task->attachments()->chunkById(100, function ($attachments): void {
+                $attachments->each->delete();
+            });
+        });
+    }
+
     protected $fillable = [
         'title',
         'description',
@@ -79,6 +88,11 @@ class Task extends Model
     public function memberProgress(): HasMany
     {
         return $this->hasMany(TaskMemberProgress::class);
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(TaskAttachment::class);
     }
 
     // --- Scopes ---

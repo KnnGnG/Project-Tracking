@@ -3,8 +3,11 @@
     @if(session('success'))
         <x-floating-notification :message="session('success')" />
     @endif
+    @if(session('error'))
+        <x-floating-notification :message="session('error')" type="error" />
+    @endif
 
-    <div class="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+    <div class="ui-toolbar">
         <div class="min-w-0">
             <p class="text-sm font-semibold text-gray-900">Projects</p>
             <p class="mt-0.5 text-xs text-gray-400">Search and manage project records.</p>
@@ -29,14 +32,85 @@
         </div>
     </div>
 
+    @if($pendingStatusRequests->isNotEmpty())
+        <section class="mb-5 overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
+            <div class="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-4 py-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-900">Project status requests</h2>
+                    <p class="mt-0.5 text-xs text-gray-500">Review lifecycle changes submitted by team leads.</p>
+                </div>
+                <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-amber-200 px-2 py-1 text-xs font-bold text-amber-800">
+                    {{ $pendingStatusRequestCount }}
+                </span>
+            </div>
+            <div class="divide-y divide-gray-100">
+                @foreach($pendingStatusRequests as $statusRequest)
+                    <div class="flex flex-wrap items-center gap-3 px-4 py-3">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-semibold text-gray-900">{{ $statusRequest->project?->name ?? 'Deleted project' }}</p>
+                                <span class="text-xs font-medium text-gray-400">
+                                    {{ ucwords(str_replace('_', ' ', $statusRequest->requested_from_status ?? $statusRequest->project?->status ?? 'unknown')) }}
+                                    &rarr;
+                                </span>
+                                <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                                    {{ ucwords(str_replace('_', ' ', $statusRequest->requested_status)) }}
+                                </span>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">
+                                {{ $statusRequest->requester?->name ?? 'Unknown user' }}: {{ $statusRequest->reason }}
+                            </p>
+                            <p class="mt-1 text-[11px] text-gray-400">Submitted {{ $statusRequest->created_at->diffForHumans() }}</p>
+                        </div>
+                        <div class="w-full sm:w-72">
+                            <label for="request-review-reason-{{ $statusRequest->id }}" class="sr-only">Review note for {{ $statusRequest->project?->name ?? 'project status request' }}</label>
+                            <input id="request-review-reason-{{ $statusRequest->id }}"
+                                   type="text"
+                                   wire:model="requestReviewReasons.{{ $statusRequest->id }}"
+                                   maxlength="500"
+                                   placeholder="Review note (required to decline)"
+                                   class="w-full rounded-lg border-gray-300 px-3 py-1.5 text-xs focus:border-indigo-500 focus:ring-indigo-500">
+                            @error('requestReviewReasons.'.$statusRequest->id)
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                            <button type="button"
+                                    wire:click="approveStatusRequest({{ $statusRequest->id }})"
+                                    wire:loading.attr="disabled"
+                                    class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60">
+                                Approve
+                            </button>
+                            <button type="button"
+                                    wire:click="rejectStatusRequest({{ $statusRequest->id }})"
+                                    wire:loading.attr="disabled"
+                                    class="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60">
+                                Decline
+                            </button>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+            @if($pendingStatusRequestCount > $pendingStatusRequests->count())
+                <p class="border-t border-amber-100 bg-amber-50/60 px-4 py-2 text-xs text-amber-700">
+                    Showing the oldest {{ $pendingStatusRequests->count() }} of {{ $pendingStatusRequestCount }} pending requests.
+                </p>
+            @endif
+        </section>
+    @endif
+
     {{-- Create / Edit form --}}
     @if($showForm)
-        <div class="ui-soft-panel p-6 mb-6">
+        <div x-data="unsavedFormGuard()" @input="markDirty" @change="markDirty" @beforeunload.window="warn($event)" class="ui-soft-panel p-6 mb-6">
             <h2 class="text-base font-semibold text-gray-800 mb-5">
                 {{ $editingId ? 'Edit Project' : 'New Project' }}
             </h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2 border-b border-slate-100 pb-2">
+                    <h3 class="text-sm font-bold text-slate-800">Project details</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Name, schedule, lifecycle status, and client ownership.</p>
+                </div>
                 {{-- Name --}}
                 <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Project Name <span class="text-red-500">*</span></label>
@@ -79,8 +153,21 @@
                     </select>
                 </div>
 
+                @if($editingId)
+                    <div>
+                        <label for="status-change-reason" class="block text-sm font-medium text-gray-700 mb-1">Status change reason</label>
+                        <input id="status-change-reason"
+                               wire:model="statusChangeReason"
+                               type="text"
+                               maxlength="500"
+                               placeholder="Required when changing the lifecycle status"
+                               class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 @error('statusChangeReason') border-red-400 @enderror">
+                        @error('statusChangeReason') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                    </div>
+                @endif
+
                 {{-- Client --}}
-                <div>
+                <div class="{{ $editingId ? 'md:col-span-2' : '' }}">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Client (optional)</label>
                     <select wire:model="clientId"
                             class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -89,6 +176,11 @@
                             <option value="{{ $client->id }}">{{ $client->name }}</option>
                         @endforeach
                     </select>
+                </div>
+
+                <div class="md:col-span-2 mt-2 border-b border-slate-100 pb-2">
+                    <h3 class="text-sm font-bold text-slate-800">Team assignment</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Attach existing teams that will work in this project.</p>
                 </div>
 
                 <div class="md:col-span-2">
@@ -142,7 +234,7 @@
                     <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Project' : 'Create Project' }}</span>
                     <span wire:loading wire:target="save">Saving...</span>
                 </button>
-                <button wire:click="cancelForm"
+                <button wire:click="cancelForm" @click="if (!confirmLeave()) $event.stopImmediatePropagation()"
                         wire:loading.attr="disabled"
                         wire:target="cancelForm,save"
                         class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-60 disabled:cursor-not-allowed">
@@ -153,14 +245,15 @@
     @endif
 
     {{-- Projects table --}}
-    <div class="ui-soft-panel overflow-hidden" @if(!$showForm) wire:poll.visible.60s @endif>
+    <div class="ui-soft-panel relative overflow-hidden" @if(!$showForm) wire:poll.visible.60s @endif>
+        <x-loading-skeleton wire:loading.delay class="ui-loading-overlay" wire:target="search,openCreate,openEdit,save,confirmDelete" />
         @if($projects->isEmpty())
             <div class="ui-empty-state">
                 <svg class="w-10 h-10 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                           d="M3 7h18M3 12h18M3 17h18"/>
                 </svg>
-                <p class="text-sm">No projects found.</p>
+                <p class="text-sm">{{ filled($search) ? 'No projects match your search.' : 'No projects have been created yet.' }}</p>
             </div>
         @else
             <table class="w-full text-sm">
@@ -177,7 +270,11 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @foreach($projects as $project)
-                        <tr class="hover:bg-gray-50 transition">
+                        <tr wire:click="showDetails({{ $project->id }})"
+                            wire:keydown.enter="showDetails({{ $project->id }})"
+                            tabindex="0"
+                            aria-label="View details for {{ $project->name }}"
+                            class="ui-clickable-row hover:bg-gray-50 transition">
                             <td class="px-6 py-4">
                                 <p class="font-medium text-gray-900">{{ $project->name }}</p>
                                 @if($project->description)
@@ -193,21 +290,23 @@
                             </td>
                             <td class="px-6 py-4">
                                 @php
-                                    $badge = match($project->status) {
-                                        'active'    => 'bg-green-100 text-green-700',
-                                        'on_hold'   => 'bg-yellow-100 text-yellow-700',
-                                        'completed' => 'bg-blue-100 text-blue-700',
-                                        default     => 'bg-gray-100 text-gray-600',
+                                    $effectiveProjectStatus = $project->effectiveStatus();
+                                    $badge = match($effectiveProjectStatus) {
+                                        'active' => 'bg-emerald-100 text-emerald-700',
+                                        'overdue' => 'bg-red-100 text-red-700',
+                                        'near_due' => 'bg-amber-100 text-amber-700',
+                                        'upcoming' => 'bg-sky-100 text-sky-700',
+                                        'on_hold' => 'bg-slate-200 text-slate-700',
+                                        'completed' => 'bg-indigo-100 text-indigo-700',
+                                        default => 'bg-gray-100 text-gray-600',
                                     };
                                 @endphp
-                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $badge }}">
-                                    {{ ucfirst(str_replace('_', ' ', $project->status)) }}
-                                </span>
+                                <x-status-badge :status="$effectiveProjectStatus" :label="$project->effectiveStatusLabel()" />
                             </td>
                             <td class="px-6 py-4">
                                 @php $pct = $project->completionPercentage() @endphp
                                 <button type="button"
-                                        wire:click="toggleProgressDetails({{ $project->id }})"
+                                        wire:click.stop="toggleProgressDetails({{ $project->id }})"
                                         class="flex items-center gap-2 rounded-lg px-2 py-1 -mx-2 text-left transition hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         aria-expanded="{{ $progressProjectId === $project->id ? 'true' : 'false' }}">
                                     <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -221,18 +320,20 @@
                             </td>
                             <td class="w-56 px-4 py-4 whitespace-nowrap">
                                 <div class="flex flex-wrap items-center justify-start gap-2">
-                                    <button wire:click="showDetails({{ $project->id }})"
+                                    <button wire:click.stop="showDetails({{ $project->id }})"
                                             class="ui-action-button ui-action-primary">
                                         Details
                                     </button>
-                                    <button wire:click="openEdit({{ $project->id }})"
+                                    <button wire:click.stop="openEdit({{ $project->id }})"
                                             class="ui-action-button ui-action-primary">
                                         Edit
                                     </button>
-                                    <button wire:click="confirmDelete({{ $project->id }})"
-                                            class="ui-action-button ui-action-danger">
-                                        Delete
-                                    </button>
+                                    <span class="ml-1 border-l border-slate-200 pl-3">
+                                        <button wire:click.stop="confirmDelete({{ $project->id }})"
+                                                class="ui-action-button ui-action-danger">
+                                            Delete
+                                        </button>
+                                    </span>
                                 </div>
                             </td>
                         </tr>
@@ -249,9 +350,12 @@
                                 $overdueTasks = $tasks->filter(fn ($task) => $task->due_date && $task->isExceededDeadline())->count();
                                 $completion = $totalTasks > 0 ? (int) round(($doneTasks / $totalTasks) * 100) : 0;
                                 $statusClass = fn ($status) => match($status) {
-                                    'active' => 'bg-green-100 text-green-700',
-                                    'on_hold' => 'bg-yellow-100 text-yellow-700',
-                                    'completed' => 'bg-blue-100 text-blue-700',
+                                    'active' => 'bg-emerald-100 text-emerald-700',
+                                    'overdue' => 'bg-red-100 text-red-700',
+                                    'near_due' => 'bg-amber-100 text-amber-700',
+                                    'upcoming' => 'bg-sky-100 text-sky-700',
+                                    'on_hold' => 'bg-slate-200 text-slate-700',
+                                    'completed' => 'bg-indigo-100 text-indigo-700',
                                     'done' => 'bg-green-100 text-green-700',
                                     'in_progress' => 'bg-blue-100 text-blue-700',
                                     'review' => 'bg-amber-100 text-amber-800',
@@ -267,8 +371,8 @@
                                                 <div>
                                                     <div class="flex flex-wrap items-center gap-2">
                                                         <h3 class="text-lg font-semibold text-gray-900">{{ $detailsProject->name }}</h3>
-                                                        <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass($detailsProject->status) }}">
-                                                            {{ ucfirst(str_replace('_', ' ', $detailsProject->status)) }}
+                                                        <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass($detailsProject->effectiveStatus()) }}">
+                                                            {{ $detailsProject->effectiveStatusLabel() }}
                                                         </span>
                                                     </div>
                                                     <p class="mt-1 text-sm text-gray-500">
@@ -300,6 +404,30 @@
                                                 <p class="mt-1 text-sm font-semibold text-red-700">{{ $overdueTasks }}</p>
                                             </div>
                                         </div>
+
+                                        @if($detailsProject->statusHistories->isNotEmpty())
+                                            <div class="border-y border-gray-100 py-3">
+                                                <h4 class="text-xs font-semibold uppercase text-gray-500">Status history</h4>
+                                                <div class="mt-2 divide-y divide-gray-100">
+                                                    @foreach($detailsProject->statusHistories as $history)
+                                                        <div class="flex flex-wrap items-start justify-between gap-2 py-2 text-xs">
+                                                            <div>
+                                                                <p class="font-semibold text-gray-700">
+                                                                    {{ $history->from_status ? ucwords(str_replace('_', ' ', $history->from_status)) : 'Created' }}
+                                                                    &rarr;
+                                                                    {{ ucwords(str_replace('_', ' ', $history->to_status)) }}
+                                                                </p>
+                                                                <p class="mt-0.5 text-gray-500">{{ $history->reason }}</p>
+                                                            </div>
+                                                            <div class="text-right text-gray-400">
+                                                                <p>{{ $history->actor?->name ?? 'System' }} &middot; {{ ucfirst($history->source) }}</p>
+                                                                <p>{{ $history->created_at->format('M d, Y h:i A') }}</p>
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endif
 
                                         <div class="grid grid-cols-2 gap-3 md:grid-cols-6">
                                             <div class="rounded-lg bg-gray-50 p-3 text-center">

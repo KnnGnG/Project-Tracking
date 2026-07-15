@@ -39,15 +39,19 @@
                     <div class="flex items-center gap-3 mb-1">
                         <h2 class="text-xl font-bold text-gray-900">{{ $selectedProject->name }}</h2>
                         @php
-                            $badge = match($selectedProject->status) {
-                                'active'    => 'bg-green-100 text-green-700',
-                                'on_hold'   => 'bg-yellow-100 text-yellow-700',
-                                'completed' => 'bg-blue-100 text-blue-700',
-                                default     => 'bg-gray-100 text-gray-600',
+                            $effectiveProjectStatus = $selectedProject->effectiveStatus();
+                            $badge = match($effectiveProjectStatus) {
+                                'active' => 'bg-emerald-100 text-emerald-700',
+                                'overdue' => 'bg-red-100 text-red-700',
+                                'near_due' => 'bg-amber-100 text-amber-700',
+                                'upcoming' => 'bg-sky-100 text-sky-700',
+                                'on_hold' => 'bg-slate-200 text-slate-700',
+                                'completed' => 'bg-indigo-100 text-indigo-700',
+                                default => 'bg-gray-100 text-gray-600',
                             };
                         @endphp
                         <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold {{ $badge }}">
-                            {{ ucfirst(str_replace('_', ' ', $selectedProject->status)) }}
+                            {{ $selectedProject->effectiveStatusLabel() }}
                         </span>
                     </div>
                     @if($selectedProject->description)

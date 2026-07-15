@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\Project;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Jetstream\Features;
 use Laravel\Jetstream\Http\Livewire\DeleteUserForm;
@@ -42,5 +43,29 @@ class DeleteAccountTest extends TestCase
             ->assertHasErrors(['password']);
 
         $this->assertNotNull($user->fresh());
+    }
+
+    public function test_account_with_owned_project_cannot_be_deleted_until_work_is_reassigned(): void
+    {
+        if (! Features::hasAccountDeletionFeatures()) {
+            $this->markTestSkipped('Account deletion is not enabled.');
+        }
+
+        $this->actingAs($user = User::factory()->create());
+        $project = Project::create([
+            'name' => 'Owned Project',
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-07-31',
+            'status' => 'active',
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::test(DeleteUserForm::class)
+            ->set('password', 'password')
+            ->call('deleteUser')
+            ->assertHasErrors(['password']);
+
+        $this->assertNotNull($user->fresh());
+        $this->assertNotNull($project->fresh());
     }
 }

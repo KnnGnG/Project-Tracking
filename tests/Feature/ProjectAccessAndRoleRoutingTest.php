@@ -48,6 +48,33 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
         $this->assertSame('member', session('active_project_role'));
     }
 
+    public function test_user_can_switch_to_an_assigned_workspace_context_only(): void
+    {
+        $lead = User::factory()->create(['role' => 'team_lead']);
+        $member = User::factory()->create(['role' => 'member']);
+        $project = Project::create($this->projectPayload('Switchable Project', $lead->id));
+        $team = Team::create(['name' => 'Switchable Team', 'project_id' => $project->id, 'lead_id' => $lead->id]);
+        $team->members()->attach($member->id, ['role' => 'member']);
+
+        $this->actingAs($member)
+            ->post(route('workspace.context.switch'), [
+                'context' => $project->id.':'.$team->id.':member',
+                'return_route' => 'member.logs',
+            ])
+            ->assertRedirect(route('member.logs', ['team' => $team->id, 'project' => $project->id]));
+
+        $this->assertSame($project->id, session('active_project_id'));
+        $this->assertSame($team->id, session('active_team_id'));
+        $this->assertSame('member', session('active_project_role'));
+
+        $outsider = User::factory()->create(['role' => 'member']);
+        $this->actingAs($outsider)
+            ->post(route('workspace.context.switch'), [
+                'context' => $project->id.':'.$team->id.':member',
+            ])
+            ->assertNotFound();
+    }
+
     public function test_unassigned_project_open_redirects_to_project_picker(): void
     {
         $member = User::factory()->create(['role' => 'member']);
@@ -91,6 +118,7 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
 
     public function test_team_lead_journal_review_shows_member_logs_for_selected_project(): void
     {
+        $earlierDate = now()->subDay()->toDateString();
         $lead = User::factory()->create(['role' => 'team_lead']);
         $member = User::factory()->create(['role' => 'member']);
         $project = Project::create($this->projectPayload('Journal Project', $lead->id));
@@ -119,6 +147,15 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
             'notes' => 'Connected from member journal.',
         ]);
 
+        JournalLog::create([
+            'user_id' => $member->id,
+            'task_id' => $task->id,
+            'team_id' => $team->id,
+            'log_date' => $earlierDate,
+            'minutes' => 15,
+            'notes' => 'Earlier journal entry.',
+        ]);
+
         $this->actingAs($lead)
             ->withSession([
                 'active_project_id' => $project->id,
@@ -129,7 +166,11 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
         Livewire::test(LeadJournalReview::class)
             ->assertSee('Write integration notes')
             ->assertSee('Connected from member journal.')
-            ->assertSee('0h 45m');
+            ->assertDontSee('Earlier journal entry.')
+            ->assertSee('0h 45m')
+            ->set('dateFrom', $earlierDate)
+            ->assertSee('Earlier journal entry.')
+            ->assertSee('1h 0m');
     }
     public function test_team_lead_can_open_member_dashboard_for_same_project_member_role(): void
     {

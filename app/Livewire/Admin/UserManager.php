@@ -44,6 +44,8 @@ class UserManager extends Component
 
     public string $deleteName = '';
 
+    public ?string $deleteError = null;
+
     // ── Role change confirmation ───────────────────────────────────────────────
     public function updatedSearch(): void
     {
@@ -127,11 +129,22 @@ class UserManager extends Component
         session()->flash('success', 'Role updated.');
     }
 
-    public function delete(int $id): void
+    public function delete(int $id): bool
     {
         abort_if($id === auth()->id(), 403, 'You cannot delete your own account.');
-        User::findOrFail($id)->delete();
+
+        $user = User::findOrFail($id);
+
+        if ($user->hasProtectedWorkOwnership()) {
+            $this->deleteError = 'Reassign this user\'s projects and created or assigned tasks before deleting the account.';
+
+            return false;
+        }
+
+        $user->delete();
         session()->flash('success', 'User deleted.');
+
+        return true;
     }
 
     public function confirmDelete(int $id): void
@@ -141,13 +154,16 @@ class UserManager extends Component
         $user = User::findOrFail($id);
         $this->deleteId = $user->id;
         $this->deleteName = $user->name;
+        $this->deleteError = null;
         $this->confirmingDelete = true;
     }
 
     public function deleteConfirmed(): void
     {
         if ($this->deleteId) {
-            $this->delete($this->deleteId);
+            if (! $this->delete($this->deleteId)) {
+                return;
+            }
         }
 
         $this->cancelDelete();
@@ -159,6 +175,7 @@ class UserManager extends Component
         $this->confirmingDelete = false;
         $this->deleteId = null;
         $this->deleteName = '';
+        $this->deleteError = null;
     }
 
     private function resetForm(): void

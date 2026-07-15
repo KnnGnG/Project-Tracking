@@ -3,13 +3,19 @@
 namespace App\Livewire\Lead;
 
 use App\Livewire\Concerns\ResolvesLeadProjectContext;
+use App\Models\InAppNotification;
 use App\Models\JournalLog;
 use App\Models\Project;
 use App\Models\ProjectEvent;
+use App\Models\ProjectStatusChangeRequest;
 use App\Models\Task;
 use App\Models\Team;
+use App\Models\User;
+use App\Services\ProjectStatusService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
@@ -36,6 +42,12 @@ class TeamLeadDashboard extends Component
     public int $year = 1970;
 
     public array $timelineKinds = ['project', 'task', 'actual'];
+
+    public bool $showProjectStatusForm = false;
+
+    public string $requestedProjectStatus = 'on_hold';
+
+    public string $projectStatusReason = '';
 
     // ── Event form state ──────────────────────────────────────────────────────
     public bool $showEventForm = false;
@@ -85,7 +97,144 @@ class TeamLeadDashboard extends Component
         $this->selectedTeamId = $team->id;
         $this->refreshActiveTeamContext($team);
         $this->cancelEventForm();
+        $this->cancelProjectStatusForm();
         $this->closeMemberTasksModal();
+    }
+
+    public function openProjectStatusForm(): void
+    {
+        $context = $this->selectedLeadProjectContext();
+
+        if (! $context) {
+            return;
+        }
+
+        $project = $context['project'];
+        $this->requestedProjectStatus = $project->status === 'active' ? 'on_hold' : 'active';
+        $this->projectStatusReason = '';
+        $this->resetValidation(['requestedProjectStatus', 'projectStatusReason']);
+        $this->showProjectStatusForm = true;
+    }
+
+    public function cancelProjectStatusForm(): void
+    {
+        $this->showProjectStatusForm = false;
+        $this->projectStatusReason = '';
+        $this->resetValidation(['requestedProjectStatus', 'projectStatusReason']);
+    }
+
+    public function submitProjectStatusChange(ProjectStatusService $statusService): void
+    {
+        $data = $this->validate([
+            'requestedProjectStatus' => 'required|in:active,on_hold,completed',
+            'projectStatusReason' => 'required|string|min:5|max:500',
+        ]);
+        $context = $this->selectedLeadProjectContext();
+
+        abort_unless($context, 403);
+
+        /** @var Project $project */
+        $project = $context['project'];
+        $requestedStatus = $data['requestedProjectStatus'];
+
+        if ($project->status === $requestedStatus) {
+            $this->addError('requestedProjectStatus', 'The project already has this status.');
+
+            return;
+        }
+
+        if ((int) $project->created_by === (int) auth()->id() || auth()->user()->isAdmin()) {
+            $statusService->change(
+                $project,
+                $requestedStatus,
+                auth()->user(),
+                $data['projectStatusReason'],
+                'creator',
+            );
+            session()->flash('event_success', 'Project status changed to '.ucwords(str_replace('_', ' ', $requestedStatus)).'.');
+        } else {
+            [$request, $isNewRequest] = DB::transaction(function () use ($project, $requestedStatus, $data) {
+                $lockedProject = Project::query()->lockForUpdate()->findOrFail($project->id);
+
+                if ($lockedProject->status === $requestedStatus) {
+                    throw ValidationException::withMessages([
+                        'requestedProjectStatus' => 'The project already has this status.',
+                    ]);
+                }
+
+                $request = ProjectStatusChangeRequest::query()
+                    ->where('pending_project_id', $lockedProject->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($request && (int) $request->requested_by !== (int) auth()->id()) {
+                    throw ValidationException::withMessages([
+                        'requestedProjectStatus' => 'Another team lead already has a pending request for this project.',
+                    ]);
+                }
+
+                $isNewRequest = ! $request;
+                $request ??= new ProjectStatusChangeRequest([
+                    'project_id' => $lockedProject->id,
+                    'pending_project_id' => $lockedProject->id,
+                    'requested_by' => auth()->id(),
+                    'status' => 'pending',
+                ]);
+                $request->fill([
+                    'requested_status' => $requestedStatus,
+                    'requested_from_status' => $lockedProject->status,
+                    'reason' => $data['projectStatusReason'],
+                ])->save();
+
+                return [$request, $isNewRequest];
+            });
+
+            User::query()
+                ->where('role', 'admin')
+                ->get(['id'])
+                ->each(function (User $admin) use ($project, $request, $requestedStatus, $isNewRequest) {
+                    $notification = InAppNotification::query()
+                        ->where('user_id', $admin->id)
+                        ->where('type', 'project_status_requested')
+                        ->where('data->request_id', $request->id)
+                        ->first();
+                    $payload = [
+                        'title' => 'Project status request',
+                        'body' => auth()->user()->name.' requested '.ucwords(str_replace('_', ' ', $requestedStatus)).' for '.$project->name.'.',
+                        'url' => route('admin.projects'),
+                        'data' => ['project_id' => $project->id, 'request_id' => $request->id],
+                    ];
+
+                    if ($notification) {
+                        $notification->forceFill(array_merge($payload, ['read_at' => null]))->save();
+                    } else {
+                        InAppNotification::create(array_merge($payload, [
+                            'user_id' => $admin->id,
+                            'type' => 'project_status_requested',
+                        ]));
+                    }
+                });
+
+            session()->flash(
+                'event_success',
+                $isNewRequest ? 'Project status request sent for admin review.' : 'Pending project status request updated.'
+            );
+        }
+
+        $this->cancelProjectStatusForm();
+    }
+
+    /** @return array{team: Team, project: Project}|null */
+    private function selectedLeadProjectContext(): ?array
+    {
+        if (! $this->selectedTeamId) {
+            return null;
+        }
+
+        $team = $this->leadTeams()->firstWhere('id', $this->selectedTeamId);
+        $project = $team ? $this->activeProjectForTeam($team) : null;
+
+        return $team && $project ? compact('team', 'project') : null;
     }
 
     private function refreshActiveTeamContext(Team $team): void
@@ -657,6 +806,7 @@ class TeamLeadDashboard extends Component
             return $days->isEmpty() ? null : [
                 'memberId' => $user->id,
                 'memberName' => $user->name,
+                'progress' => $this->activityProgressPercentage($userLogs, $progress),
                 'days' => $days,
             ];
         })->filter()->values();
@@ -695,6 +845,7 @@ class TeamLeadDashboard extends Component
 
         $logsByDate = $logs->groupBy(fn (JournalLog $log) => Carbon::parse($log->log_date)->toDateString());
         $totalMinutes = $logs->sum('minutes');
+        $progressPercentage = $this->activityProgressPercentage($logs, $progress);
         $scheduledStart = $task->start_date
             ? $task->start_date->format('M d, Y').($task->start_time ? ' '.Carbon::parse($task->start_time)->format('h:i A') : '')
             : 'Not scheduled';
@@ -717,6 +868,7 @@ class TeamLeadDashboard extends Component
                 'Actual started: '.$actualStarted,
                 'Time for this day: '.intdiv($minutes, 60).'h '.($minutes % 60).'m',
                 'Total logged: '.intdiv($totalMinutes, 60).'h '.($totalMinutes % 60).'m',
+                'Progress: '.$progressPercentage.'%',
                 'Due: '.$dueDate,
                 'Status: '.ucwords(str_replace('_', ' ', $effectiveStatus)),
             ];
@@ -731,6 +883,16 @@ class TeamLeadDashboard extends Component
         }
 
         return $days;
+    }
+
+    private function activityProgressPercentage(Collection $logs, ?object $progress): int
+    {
+        $latestLoggedProgress = $logs
+            ->filter(fn (JournalLog $log) => $log->progress !== null)
+            ->sortByDesc(fn (JournalLog $log) => [$log->log_date?->timestamp ?? 0, $log->id])
+            ->first()?->progress;
+
+        return min(100, max(0, (int) ($progress?->progress ?? $latestLoggedProgress ?? 0)));
     }
 
     /** @return array{startedAt: Carbon, completedAt: ?Carbon, latestLogAt: ?Carbon, effectiveStatus: string, endedAt: Carbon}|null */
@@ -819,6 +981,7 @@ class TeamLeadDashboard extends Component
         $calendarGrid = [];
         $calendarWeekBars = [];
         $atRiskTasks = collect();
+        $pendingStatusRequest = null;
         $timelineGraph = [
             'rows' => collect(),
             'ticks' => collect(),
@@ -851,6 +1014,11 @@ class TeamLeadDashboard extends Component
                 }
 
                 if ($project) {
+                    $pendingStatusRequest = ProjectStatusChangeRequest::with('requester:id,name')
+                        ->where('project_id', $project->id)
+                        ->where('status', 'pending')
+                        ->latest()
+                        ->first();
                     $timelineProjects = collect([$project])->filter();
                     $tasks = $selectedTeam->tasks
                         ->where('project_id', $project->id)
@@ -973,6 +1141,7 @@ class TeamLeadDashboard extends Component
             'teams', 'selectedTeam', 'project', 'stats',
             'tasksByPriority', 'memberTasksMap', 'memberStartActivities', 'events', 'daysRemaining', 'progressPct',
             'modalMember', 'modalMemberTasks', 'calendarGrid', 'calendarWeekBars', 'timelineGraph', 'monthLabel', 'atRiskTasks',
+            'pendingStatusRequest',
         ));
     }
 }

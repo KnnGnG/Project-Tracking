@@ -4,7 +4,7 @@
         <x-floating-notification :message="session('success')" />
     @endif
 
-    <div class="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+    <div class="ui-toolbar">
         <div class="min-w-0">
             <p class="text-sm font-semibold text-gray-900">Teams</p>
             <p class="mt-0.5 text-xs text-gray-400">Create reusable teams to assign from the Projects tab.</p>
@@ -26,7 +26,7 @@
 
     {{-- Create / Edit form --}}
     @if($showForm)
-        <div class="ui-soft-panel p-6 mb-6">
+        <div x-data="unsavedFormGuard()" @input="markDirty" @change="markDirty" @beforeunload.window="warn($event)" class="ui-soft-panel p-6 mb-6">
             <h2 class="text-base font-semibold text-gray-800 mb-5">
                 {{ $editingId ? 'Edit Team' : 'Create New Team' }}
             </h2>
@@ -116,7 +116,7 @@
                     <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Team' : 'Create Team' }}</span>
                     <span wire:loading wire:target="save">Saving...</span>
                 </button>
-                <button wire:click="cancelForm"
+                <button wire:click="cancelForm" @click="if (!confirmLeave()) $event.stopImmediatePropagation()"
                         wire:loading.attr="disabled"
                         wire:target="cancelForm,save"
                         class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-60 disabled:cursor-not-allowed">

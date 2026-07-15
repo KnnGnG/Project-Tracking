@@ -1,6 +1,6 @@
 <div class="space-y-6">
 
-    <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+    <div class="ui-toolbar">
         <div class="flex flex-wrap items-center gap-3">
             <select wire:model.live="filterTeamId"
                     aria-label="Team"
@@ -43,12 +43,16 @@
 
     {{-- ── Task form ─────────────────────────────────────────────────────────── --}}
     @if($showForm)
-        <div class="ui-soft-panel p-6">
+        <div x-data="unsavedFormGuard()" @input="markDirty" @change="markDirty" @beforeunload.window="warn($event)" class="ui-soft-panel p-6">
             <h2 class="text-base font-semibold text-gray-800 mb-5">
                 {{ $editingId ? 'Edit Task' : 'Assign New Task' }}
             </h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2 border-b border-slate-100 pb-2">
+                    <h3 class="text-sm font-bold text-slate-800">Task details</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Describe the outcome the assignees need to deliver.</p>
+                </div>
                 {{-- Title --}}
                 <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">
@@ -64,6 +68,11 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                     <textarea wire:model="description" rows="2" placeholder="Optional details…"
                               class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+                </div>
+
+                <div class="md:col-span-2 mt-2 border-b border-slate-100 pb-2">
+                    <h3 class="text-sm font-bold text-slate-800">Assignment</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Choose the team and the members responsible for this task.</p>
                 </div>
 
                 {{-- Team --}}
@@ -160,6 +169,11 @@
                     @error('assignedTo.*') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                 </div>
 
+                <div class="md:col-span-2 mt-2 border-b border-slate-100 pb-2">
+                    <h3 class="text-sm font-bold text-slate-800">Schedule and priority</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Set urgency and the expected delivery window.</p>
+                </div>
+
                 <div class="md:col-span-2 lg:col-span-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {{-- Priority --}}
                     <div>
@@ -190,6 +204,58 @@
                         @error('dueDate') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                     </div>
                 </div>
+
+                <div class="md:col-span-2 mt-2 border-b border-slate-100 pb-2">
+                    <h3 class="text-sm font-bold text-slate-800">Supporting files</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Add references the assignees need to complete the work.</p>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Attachments</label>
+                    <label class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm font-medium text-gray-600 transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828L18 9.828a4 4 0 00-5.657-5.657L5.757 10.757a6 6 0 108.486 8.486L20.5 13"/>
+                        </svg>
+                        <span>Choose files</span>
+                        <input wire:model="newAttachments"
+                               wire:key="task-attachments-{{ $uploadIteration }}"
+                               type="file"
+                               multiple
+                               accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.webp,.zip"
+                               class="sr-only">
+                    </label>
+                    <p class="mt-1 text-xs text-gray-400">Up to 5 files, 10 MB each.</p>
+                    <div wire:loading wire:target="newAttachments" class="mt-2 text-xs font-medium text-indigo-600">Uploading files...</div>
+                    @error('newAttachments') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                    @error('newAttachments.*') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+
+                    @if(!empty($newAttachments))
+                        <div class="mt-3 space-y-2">
+                            @foreach($newAttachments as $index => $file)
+                                <div wire:key="pending-{{ $index }}" class="flex items-center justify-between gap-3 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm">
+                                    <span class="min-w-0 truncate text-indigo-900">{{ $file->getClientOriginalName() }}</span>
+                                    <button type="button" wire:click="removePendingAttachment({{ $index }})" class="shrink-0 text-xs font-semibold text-red-600 hover:text-red-700">Remove</button>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if($existingAttachments->isNotEmpty())
+                        <div class="mt-3 space-y-2">
+                            @foreach($existingAttachments as $attachment)
+                                <div wire:key="existing-{{ $attachment->id }}" class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                                    <button type="button" wire:click="downloadAttachment({{ $attachment->id }})" class="min-w-0 truncate font-medium text-indigo-700 hover:underline">
+                                        {{ $attachment->original_name }}
+                                    </button>
+                                    <div class="flex shrink-0 items-center gap-3">
+                                        <span class="text-xs text-gray-400">{{ $attachment->formattedSize() }}</span>
+                                        <button type="button" wire:click="removeAttachment({{ $attachment->id }})" wire:confirm="Remove this attachment?" class="text-xs font-semibold text-red-600 hover:text-red-700">Remove</button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
             </div>
 
             <div class="flex items-center gap-3 mt-6">
@@ -200,7 +266,7 @@
                     <span wire:loading.remove wire:target="save">{{ $editingId ? 'Update Task' : 'Assign Task' }}</span>
                     <span wire:loading wire:target="save">Saving...</span>
                 </button>
-                <button wire:click="cancelForm"
+                <button wire:click="cancelForm" @click="if (!confirmLeave()) $event.stopImmediatePropagation()"
                         wire:loading.attr="disabled"
                         wire:target="cancelForm,save"
                         class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-60 disabled:cursor-not-allowed">
@@ -211,14 +277,15 @@
     @endif
 
     {{-- ── Task list ─────────────────────────────────────────────────────────── --}}
-    <div class="ui-soft-panel overflow-hidden" @if(!$showForm) wire:poll.visible.30s @endif>
+    <div class="ui-soft-panel relative overflow-hidden" @if(!$showForm) wire:poll.visible.30s @endif>
+        <x-loading-skeleton wire:loading.delay class="ui-loading-overlay" wire:target="filterTeamId,filterStatus,openCreate,edit,save,delete" />
         @if($tasks->isEmpty())
             <div class="ui-empty-state">
                 <svg class="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                           d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/>
                 </svg>
-                <p class="text-sm">No tasks found. Assign one to get started.</p>
+                <p class="text-sm">{{ $filterTeamId || $filterStatus ? 'No tasks match the selected filters.' : 'No tasks are assigned in this workspace yet.' }}</p>
             </div>
         @else
             <table class="w-full text-sm">
@@ -250,16 +317,13 @@
                                 'review'      => 'Review',
                                 'done'        => 'Done',
                             ];
-                            $statusColor = match ($task->status) {
-                                'pending'     => 'bg-gray-100 text-gray-600',
-                                'in_progress' => 'bg-blue-100 text-blue-700',
-                                'review'      => 'bg-amber-100 text-amber-800',
-                                'done'        => 'bg-green-100 text-green-700',
-                                default       => 'bg-gray-100 text-gray-500',
-                            };
                             $taskStartTime = $task->start_time ? \Illuminate\Support\Carbon::parse($task->start_time)->format('h:i A') : null;
                         @endphp
-                        <tr class="hover:bg-gray-50 transition {{ $isOverdue ? 'bg-red-50 hover:bg-red-50' : '' }}">
+                        <tr wire:click="toggleTaskDetails({{ $task->id }})"
+                            wire:keydown.enter="toggleTaskDetails({{ $task->id }})"
+                            tabindex="0"
+                            aria-label="View details for {{ $task->title }}"
+                            class="ui-clickable-row hover:bg-gray-50 transition {{ $isOverdue ? 'bg-red-50 hover:bg-red-50' : '' }}">
                             <td class="px-6 py-4">
                                 <p class="font-medium text-gray-900">{{ $task->title }}</p>
                                 @if($task->description)
@@ -299,32 +363,32 @@
                                 </span>
                             </td>
                             <td class="px-6 py-4">
-                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $statusColor }}">
-                                    {{ $statusOptions[$task->status] ?? ucfirst(str_replace('_', ' ', $task->status)) }}
-                                </span>
+                                <x-status-badge :status="$task->status" :label="$statusOptions[$task->status] ?? null" />
                                 <span class="mt-1 block text-[11px] text-gray-400">From members</span>
                             </td>
                             <td class="px-4 py-4 text-right whitespace-nowrap">
                                 @if($expandedTaskId !== $task->id)
-                                    <button wire:click="toggleTaskDetails({{ $task->id }})"
+                                    <button wire:click.stop="toggleTaskDetails({{ $task->id }})"
                                             class="ui-action-button ui-action-primary mr-2">
                                         Details
                                     </button>
                                 @else
-                                    <button wire:click="toggleTaskDetails({{ $task->id }})"
+                                    <button wire:click.stop="toggleTaskDetails({{ $task->id }})"
                                             class="ui-action-button mr-2">
                                         Hide
                                     </button>
                                 @endif
-                                <button wire:click="openEdit({{ $task->id }})"
+                                <button wire:click.stop="openEdit({{ $task->id }})"
                                         class="ui-action-button ui-action-primary mr-2">
                                     Edit
                                 </button>
 
-                                <button wire:click="confirmDelete({{ $task->id }})"
-                                        class="ui-action-button ui-action-danger">
-                                    Delete
-                                </button>
+                                <span class="ml-1 border-l border-slate-200 pl-3">
+                                    <button wire:click.stop="confirmDelete({{ $task->id }})"
+                                            class="ui-action-button ui-action-danger">
+                                        Delete
+                                    </button>
+                                </span>
                             </td>
                         </tr>
                         @if($expandedTaskId === $task->id)
@@ -358,9 +422,7 @@
                                             <div class="min-w-0 space-y-2">
                                                 <div class="flex flex-wrap items-center gap-2">
                                                     <p class="text-base font-semibold text-gray-900">Task details</p>
-                                                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $statusColor }}">
-                                                        {{ $statusOptions[$task->status] ?? ucfirst($task->status) }}
-                                                    </span>
+                                                    <x-status-badge :status="$task->status" :label="$statusOptions[$task->status] ?? null" />
                                                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $priorityBadge }}">
                                                         {{ ucfirst($task->priority) }} priority
                                                     </span>
@@ -402,6 +464,25 @@
                                                     <p class="text-xs font-medium text-green-700">Done</p>
                                                 </div>
                                             </div>
+                                        </div>
+
+                                        <div>
+                                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Attachments</p>
+                                            @if($task->attachments->isEmpty())
+                                                <p class="rounded-lg bg-gray-50 p-3 text-sm text-gray-400">No files attached.</p>
+                                            @else
+                                                <div class="flex flex-wrap gap-2">
+                                                    @foreach($task->attachments as $attachment)
+                                                        <button wire:key="task-attachment-{{ $attachment->id }}" type="button" wire:click="downloadAttachment({{ $attachment->id }})" class="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+                                                            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828L18 9.828a4 4 0 00-5.657-5.657L5.757 10.757a6 6 0 108.486 8.486L20.5 13"/>
+                                                            </svg>
+                                                            <span class="truncate">{{ $attachment->original_name }}</span>
+                                                            <span class="shrink-0 text-xs font-normal text-gray-400">{{ $attachment->formattedSize() }}</span>
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                            @endif
                                         </div>
 
                                         <div>

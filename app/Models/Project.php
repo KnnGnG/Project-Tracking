@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -52,6 +53,41 @@ class Project extends Model
     public function events(): HasMany
     {
         return $this->hasMany(ProjectEvent::class);
+    }
+
+    public function statusChangeRequests(): HasMany
+    {
+        return $this->hasMany(ProjectStatusChangeRequest::class);
+    }
+
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(ProjectStatusHistory::class)->latest();
+    }
+
+    public function effectiveStatus(?Carbon $today = null): string
+    {
+        $today ??= now()->startOfDay();
+
+        return match (true) {
+            $this->status === 'completed' => 'completed',
+            $this->status === 'on_hold' => 'on_hold',
+            $this->end_date?->copy()->startOfDay()->lt($today) => 'overdue',
+            $this->start_date?->copy()->startOfDay()->gt($today) => 'upcoming',
+            $this->end_date && $today->diffInDays($this->end_date->copy()->startOfDay(), false) <= 7 => 'near_due',
+            $this->status === 'active' => 'active',
+            default => $this->status ?: 'not_set',
+        };
+    }
+
+    public function effectiveStatusLabel(?Carbon $today = null): string
+    {
+        return match ($status = $this->effectiveStatus($today)) {
+            'on_hold' => 'On Hold',
+            'near_due' => 'Near Due',
+            'not_set' => 'Not Set',
+            default => ucfirst(str_replace('_', ' ', $status)),
+        };
     }
 
     // --- Computed helpers ---

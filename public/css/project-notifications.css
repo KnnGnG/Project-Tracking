@@ -1,0 +1,386 @@
+.project-card-heading-badges {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    max-width: 70%;
+}
+
+.project-picker-card {
+    position: relative;
+    overflow: visible;
+    box-shadow: inset 4px 0 0 var(--project-state-color, #94a3b8), 0 1px 2px rgba(15, 23, 42, 0.04), 0 18px 40px -32px rgba(15, 23, 42, 0.45);
+}
+
+.project-picker-card:hover,
+.project-picker-card:focus-within {
+    z-index: 20;
+    box-shadow: inset 4px 0 0 var(--project-state-color, #94a3b8), 0 18px 34px -24px rgba(79, 70, 229, 0.5);
+}
+
+.project-card-state-active {
+    --project-state-color: #10b981;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fffc 100%);
+}
+
+.project-card-state-overdue {
+    --project-state-color: #ef4444;
+    background: linear-gradient(180deg, #ffffff 0%, #fff8f8 100%);
+}
+
+.project-card-state-near-due {
+    --project-state-color: #f59e0b;
+    background: linear-gradient(180deg, #ffffff 0%, #fffdf5 100%);
+}
+
+.project-card-state-upcoming {
+    --project-state-color: #0ea5e9;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fcff 100%);
+}
+
+.project-card-state-on-hold {
+    --project-state-color: #64748b;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.project-card-state-completed {
+    --project-state-color: #4f46e5;
+    background: linear-gradient(180deg, #ffffff 0%, #f8f8ff 100%);
+}
+
+.project-task-indicator {
+    position: relative;
+    display: inline-flex;
+    outline: none;
+}
+
+.project-task-notification-count {
+    display: inline-flex;
+    min-width: 1.75rem;
+    height: 1.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    border-radius: 999px;
+    border: 0;
+    background: #7c3aed;
+    padding: 0 0.45rem;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.project-task-notification-count:hover {
+    background: #6d28d9;
+}
+
+.project-task-notification-count:focus-visible,
+.project-task-indicator:focus-visible .project-task-count {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+}
+
+.project-task-notification-count svg {
+    width: 0.85rem;
+    height: 0.85rem;
+}
+
+.project-task-count {
+    display: inline-flex;
+    min-width: 1.75rem;
+    height: 1.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    border-radius: 999px;
+    padding: 0 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.project-task-count strong {
+    font-size: 0.72rem;
+}
+
+.project-task-count svg {
+    width: 0.85rem;
+    height: 0.85rem;
+}
+
+.project-task-count-overdue {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.project-task-count-pending {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.project-task-count-in-progress {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.project-task-count-review {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.project-task-preview {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% + 0.65rem);
+    right: 0;
+    display: none;
+    width: min(21rem, calc(100vw - 2rem));
+    border: 1px solid #dbe3ef;
+    border-radius: 0.5rem;
+    background: #fff;
+    color: #0f172a;
+    box-shadow: 0 18px 45px -18px rgba(15, 23, 42, 0.38);
+    text-align: left;
+}
+
+.project-task-preview::before {
+    position: absolute;
+    top: -0.35rem;
+    right: 0.65rem;
+    width: 0.7rem;
+    height: 0.7rem;
+    border-top: 1px solid #dbe3ef;
+    border-left: 1px solid #dbe3ef;
+    background: #fff;
+    content: '';
+    transform: rotate(45deg);
+}
+
+.project-task-indicator:hover .project-task-preview,
+.project-task-indicator:focus-within .project-task-preview {
+    display: block;
+}
+
+.project-task-preview-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.8rem 0.9rem;
+    border-bottom: 1px solid #eef2f7;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.project-task-preview-heading strong {
+    display: inline-flex;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #4338ca;
+    font-size: 0.68rem;
+}
+
+.project-task-preview-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.project-task-preview-actions button {
+    border: 0;
+    background: transparent;
+    color: #4f46e5;
+    cursor: pointer;
+    font-size: 0.68rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.project-task-preview-actions button:hover,
+.project-task-preview-actions button:focus-visible {
+    color: #312e81;
+    text-decoration: underline;
+}
+
+.project-task-preview-list {
+    display: grid;
+}
+
+.project-task-preview-item {
+    position: relative;
+    padding: 0.72rem 0.9rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.project-task-preview-open-form {
+    min-width: 0;
+}
+
+.project-task-preview-open {
+    display: block;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    padding: 0 1.7rem 0 0;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+.project-task-preview-item:hover,
+.project-task-preview-item:focus-within {
+    background: #f8fafc;
+}
+
+.project-task-preview-open:focus-visible {
+    border-radius: 0.35rem;
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+}
+
+.project-task-preview-dismiss-form {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+}
+
+.project-task-preview-dismiss {
+    display: inline-flex;
+    width: 1.45rem;
+    height: 1.45rem;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0.35rem;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+}
+
+.project-task-preview-dismiss:hover,
+.project-task-preview-dismiss:focus-visible {
+    background: #fee2e2;
+    color: #b91c1c;
+    outline: none;
+}
+
+.project-task-preview-dismiss svg {
+    width: 0.85rem;
+    height: 0.85rem;
+}
+
+.project-task-preview-item:last-child {
+    border-bottom: 0;
+}
+
+.project-task-preview > :last-child,
+.project-task-preview-list:last-child > :last-child {
+    border-bottom-right-radius: 0.45rem;
+    border-bottom-left-radius: 0.45rem;
+}
+
+.project-task-preview-title-row,
+.project-task-preview-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.project-task-preview-title-row > strong {
+    min-width: 0;
+    overflow: hidden;
+    color: #0f172a;
+    font-size: 0.79rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-task-preview-team {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0.2rem 0 0.45rem;
+    overflow: hidden;
+    color: #64748b;
+    font-size: 0.7rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-task-preview-team > span {
+    color: #94a3b8;
+    font-size: 0.62rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.project-task-preview-meta {
+    color: #64748b;
+    font-size: 0.67rem;
+}
+
+.project-task-preview-meta strong {
+    flex: none;
+    color: #4f46e5;
+    font-size: 0.69rem;
+}
+
+.project-task-preview-priority {
+    flex: none;
+    border-radius: 999px;
+    padding: 0.17rem 0.42rem;
+    font-size: 0.62rem;
+    font-weight: 800;
+}
+
+.project-task-preview-priority-high {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.project-task-preview-priority-medium {
+    background: #fef3c7;
+    color: #a16207;
+}
+
+.project-task-preview-priority-low {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.project-task-preview-more,
+.project-task-preview-hint {
+    margin: 0;
+    padding: 0.55rem 0.9rem;
+    border-top: 1px solid #eef2f7;
+    color: #4f46e5;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.project-task-preview-hint {
+    background: #f8fafc;
+    color: #64748b;
+    font-weight: 500;
+}
+
+@media (max-width: 420px) {
+    .project-card-heading-badges {
+        align-items: flex-end;
+        max-width: 75%;
+    }
+
+    .project-task-preview {
+        right: -0.5rem;
+    }
+}

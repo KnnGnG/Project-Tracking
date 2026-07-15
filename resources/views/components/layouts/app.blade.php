@@ -85,6 +85,16 @@
         main span.rounded-full { display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; line-height: 1rem; }
         .ui-badge { display: inline-flex; align-items: center; border-radius: 9999px; padding: 0.125rem 0.625rem; font-size: 0.75rem; line-height: 1rem; font-weight: 700; white-space: nowrap; }
         .ui-form-section { border-radius: 0.875rem; border: 1px solid #e2e8f0; background: #fff; padding: 1rem; }
+        .ui-toolbar { margin-bottom: 1.25rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; background: #fff; padding: 0.75rem 1rem; box-shadow: 0 1px 2px rgb(15 23 42 / 0.04); }
+        .ui-clickable-row { cursor: pointer; }
+        .ui-clickable-row:focus-visible { outline: 2px solid #6366f1; outline-offset: -2px; }
+        .ui-skeleton { overflow: hidden; border-radius: 0.5rem; background: #e2e8f0; }
+        .ui-skeleton::after { display: block; width: 45%; height: 100%; content: ''; background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.65), transparent); animation: ui-skeleton-slide 1.25s ease-in-out infinite; }
+        .ui-loading-overlay { position: absolute; inset: 0; z-index: 10; background: rgb(255 255 255 / 0.96); }
+        @keyframes ui-skeleton-slide { from { transform: translateX(-120%); } to { transform: translateX(260%); } }
+        main :is(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+        main [aria-invalid='true'] { border-color: #ef4444 !important; box-shadow: 0 0 0 3px rgb(239 68 68 / 0.12) !important; }
+        .ui-destructive-zone { margin-left: auto; padding-left: 1rem; border-left: 1px solid #e2e8f0; }
         .ui-loading-bar { position: fixed; inset: 0 0 auto 0; z-index: 80; height: 3px; overflow: hidden; background: transparent; }
         .ui-loading-bar::before { content: ''; display: block; height: 100%; width: 40%; background: linear-gradient(90deg, #6366f1, #22c55e); animation: ui-loading-slide 1s ease-in-out infinite; }
         @keyframes ui-loading-slide { 0% { transform: translateX(-110%); } 100% { transform: translateX(260%); } }
@@ -110,6 +120,10 @@
     $roleLabel = null;
     $activeMemberRouteParams = [];
     $activeLeadRouteParams = [];
+    $workspaceContexts = collect();
+    $activeWorkspaceContext = null;
+    $memberOpenTaskCount = 0;
+    $leadJournalTodayCount = 0;
     $navActive = 'bg-indigo-500 text-white shadow-sm shadow-indigo-950/20';
     $navIdle = 'text-slate-300 hover:bg-white/10 hover:text-white';
     $navClass = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition';
@@ -168,6 +182,61 @@
         if ($showTeamLeadNav) { $contextRoles->push('Team Lead'); }
         if ($showMemberNav) { $contextRoles->push('Member'); }
         $roleLabel = $activeRoleLabel ?? ($contextRoles->join(' / ') ?: $authUser->roleName());
+
+        if (! $isAdmin && ! $isClient) {
+            $workspaceContexts = $authUser->teams()
+                ->withPivot('role')
+                ->with(['project', 'projects'])
+                ->wherePivotIn('role', ['lead', 'member'])
+                ->orderBy('teams.name')
+                ->get()
+                ->flatMap(function ($team) {
+                    return $team->assignedProjects()->map(function ($project) use ($team) {
+                        $role = $team->pivot->role;
+
+                        return [
+                            'key' => $project->id.':'.$team->id.':'.$role,
+                            'project' => $project,
+                            'team' => $team,
+                            'role' => $role,
+                        ];
+                    });
+                })
+                ->unique('key')
+                ->sortBy(fn ($context) => $context['project']->name.' '.$context['team']->name.' '.$context['role'])
+                ->values();
+            $activeWorkspaceContext = $activeProjectId && $activeTeamId
+                ? $activeProjectId.':'.$activeTeamId.':'.($activeProjectRole ?: 'member')
+                : null;
+
+            if ($showMemberNav) {
+                $memberOpenTaskCount = \App\Models\Task::query()
+                    ->where(fn ($query) => $query
+                        ->where('assigned_to', $authUser->id)
+                        ->orWhereHas('assignees', fn ($assignees) => $assignees->whereKey($authUser->id)))
+                    ->when($activeProjectId, fn ($query) => $query->where('project_id', $activeProjectId))
+                    ->when($activeMemberTeamId, fn ($query) => $query->where('team_id', $activeMemberTeamId))
+                    ->where(function ($query) use ($authUser) {
+                        $query->whereHas('memberProgress', fn ($progress) => $progress
+                            ->where('user_id', $authUser->id)
+                            ->where('status', '!=', 'done'))
+                            ->orWhere(function ($fallback) use ($authUser) {
+                                $fallback->whereDoesntHave('memberProgress', fn ($progress) => $progress->where('user_id', $authUser->id))
+                                    ->where('status', '!=', 'done');
+                            });
+                    })
+                    ->count();
+            }
+
+            if ($showTeamLeadNav && $activeLeadTeamId) {
+                $leadJournalTodayCount = \App\Models\JournalLog::query()
+                    ->whereDate('log_date', now()->toDateString())
+                    ->where(fn ($query) => $query
+                        ->where('team_id', $activeLeadTeamId)
+                        ->orWhereHas('task', fn ($task) => $task->where('team_id', $activeLeadTeamId)))
+                    ->count();
+            }
+        }
     }
 ?>
 
@@ -265,7 +334,10 @@
                     </a>
                     <a href="<?= e(route('lead.journals', $activeLeadRouteParams)) ?>" class="<?= e($navClass) ?> <?= e(request()->routeIs('lead.journals') ? $navActive : $navIdle) ?>">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v14l-4-2-4 2-4-2-4 2V6a2 2 0 012-2z"/></svg>
-                        Journal Review
+                        <span>Journal Review</span>
+                        <?php if ($leadJournalTodayCount > 0) { ?>
+                            <span class="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-400/15 px-1.5 py-0.5 text-[11px] font-bold text-emerald-300" title="Journal logs added today"><?= e($leadJournalTodayCount) ?></span>
+                        <?php } ?>
                     </a>
                     <a href="<?= e(route('lead.evaluations', $activeLeadRouteParams)) ?>" class="<?= e($navClass) ?> <?= e(request()->routeIs('lead.evaluations') ? $navActive : $navIdle) ?>">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.161c.969 0 1.371 1.24.588 1.81l-3.366 2.445a1 1 0 00-.364 1.118l1.286 3.957c.3.921-.755 1.688-1.539 1.118l-3.366-2.445a1 1 0 00-1.176 0l-3.366 2.445c-.784.57-1.838-.197-1.539-1.118l1.286-3.957a1 1 0 00-.364-1.118L4.062 9.384c-.783-.57-.38-1.81.588-1.81h4.161a1 1 0 00.95-.69l1.288-3.957z"/></svg>
@@ -277,7 +349,10 @@
                     <p class="<?= e($sectionClass) ?>">Member</p>
                     <a href="<?= e(route('member.dashboard', $activeMemberRouteParams)) ?>" class="<?= e($navClass) ?> <?= e(request()->routeIs('member.dashboard') ? $navActive : $navIdle) ?>">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                        My Tasks
+                        <span>My Tasks</span>
+                        <?php if ($memberOpenTaskCount > 0) { ?>
+                            <span class="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-indigo-400/20 px-1.5 py-0.5 text-[11px] font-bold text-indigo-200" title="Open tasks in this workspace"><?= e($memberOpenTaskCount) ?></span>
+                        <?php } ?>
                     </a>
                     <a href="<?= e(route('member.logs', $activeMemberRouteParams)) ?>" class="<?= e($navClass) ?> <?= e(request()->routeIs('member.logs') ? $navActive : $navIdle) ?>">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6h8M8 10h8M8 14h5M5 4h14a1 1 0 011 1v14l-4-2-4 2-4-2-4 2V5a1 1 0 011-1z"/></svg>
@@ -335,6 +410,24 @@
                 </div>
                 @if($isAuthed)
                     <div class="flex items-center gap-3">
+                        @if($workspaceContexts->isNotEmpty())
+                            <form method="POST" action="{{ route('workspace.context.switch') }}" class="flex min-w-0 items-center gap-2">
+                                @csrf
+                                <input type="hidden" name="return_route" value="{{ request()->route()?->getName() }}">
+                                <label for="workspace-context" class="sr-only">Active project and team</label>
+                                <select id="workspace-context"
+                                        name="context"
+                                        onchange="this.form.submit()"
+                                        class="max-w-[9rem] rounded-lg border-slate-200 bg-slate-50 py-1.5 pl-3 pr-9 text-xs font-semibold text-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:max-w-[18rem]"
+                                        title="Switch active project and team">
+                                    @foreach($workspaceContexts as $context)
+                                        <option value="{{ $context['key'] }}" @selected($activeWorkspaceContext === $context['key'])>
+                                            {{ $context['project']->name }} / {{ $context['team']->name }} - {{ $context['role'] === 'lead' ? 'Team Lead' : 'Member' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </form>
+                        @endif
                         <span class="hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 md:inline-flex">
                             {{ $roleLabel ?? $authUser->roleName() }}
                         </span>
@@ -359,6 +452,19 @@
 
 </div>
 
+<script>
+    window.unsavedFormGuard = () => ({
+        dirty: false,
+        markDirty() { this.dirty = true; },
+        clearDirty() { this.dirty = false; },
+        confirmLeave() { return !this.dirty || window.confirm('Discard your unsaved changes?'); },
+        warn(event) {
+            if (!this.dirty) return;
+            event.preventDefault();
+            event.returnValue = '';
+        }
+    });
+</script>
 @livewireScripts
 @stack('scripts')
 </body>

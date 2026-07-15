@@ -51,17 +51,69 @@
                     @endif
                 </div>
                 @php
-                    $statusBadge = match($project->status) {
-                        'active'    => 'bg-green-100 text-green-700',
-                        'on_hold'   => 'bg-yellow-100 text-yellow-700',
-                        'completed' => 'bg-blue-100 text-blue-700',
-                        default     => 'bg-gray-100 text-gray-500',
-                    };
+                    $effectiveProjectStatus = $project->effectiveStatus();
+                    $isCreator = (int) $project->created_by === (int) auth()->id();
                 @endphp
-                <span class="inline-flex flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold {{ $statusBadge }}">
-                    {{ ucfirst(str_replace('_', ' ', $project->status)) }}
-                </span>
+                <div class="flex flex-shrink-0 items-center gap-2">
+                    <x-status-badge :status="$effectiveProjectStatus" :label="$project->effectiveStatusLabel()" class="px-3 py-1" />
+                    <button type="button"
+                            wire:click="openProjectStatusForm"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+                            title="{{ $isCreator ? 'Change project status' : 'Request a project status change' }}"
+                            aria-label="{{ $isCreator ? 'Change project status' : 'Request a project status change' }}">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h10m0 0l-3-3m3 3l-3 3m9 7H10m0 0l3-3m-3 3l3 3"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
+
+            @if($pendingStatusRequest)
+                <div class="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <span>
+                        Pending request by <strong>{{ $pendingStatusRequest->requester?->name ?? 'another team lead' }}</strong>:
+                        {{ ucwords(str_replace('_', ' ', $pendingStatusRequest->requested_status)) }}
+                    </span>
+                    <span class="shrink-0 text-amber-600">Awaiting admin review</span>
+                </div>
+            @endif
+
+            @if($showProjectStatusForm)
+                <div class="mb-4 rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+                    <div class="grid gap-3 sm:grid-cols-[12rem_1fr_auto] sm:items-end">
+                        <label class="block text-xs font-semibold text-gray-700">
+                            <span class="mb-1 block">Requested status</span>
+                            <select wire:model="requestedProjectStatus" class="w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-sm font-normal focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="active">Active</option>
+                                <option value="on_hold">On Hold</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                            @error('requestedProjectStatus') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                        </label>
+                        <label class="block text-xs font-semibold text-gray-700">
+                            <span class="mb-1 block">Reason</span>
+                            <textarea wire:model="projectStatusReason"
+                                      rows="2"
+                                      maxlength="500"
+                                      placeholder="Briefly explain why this status should change"
+                                      class="w-full resize-y rounded-lg border-gray-300 bg-white px-3 py-2 text-sm font-normal focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+                            @error('projectStatusReason') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                        </label>
+                        <div class="flex gap-2">
+                            <button type="button"
+                                    wire:click="submitProjectStatusChange"
+                                    wire:loading.attr="disabled"
+                                    wire:target="submitProjectStatusChange"
+                                    class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-75">
+                                {{ $isCreator ? 'Apply' : 'Send request' }}
+                            </button>
+                            <button type="button" wire:click="cancelProjectStatusForm" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition hover:bg-gray-50">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             {{-- Date range + days remaining --}}
             <div class="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-4">
@@ -296,6 +348,9 @@
                 </span>
                 <span class="flex items-center gap-1.5">
                     <span class="w-4 h-3 rounded bg-gray-300"></span> No journal/log
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="h-1 w-4 rounded bg-indigo-600"></span> Task progress
                 </span>
             </div>
         </div>
@@ -850,5 +905,3 @@
 
     @endif
 </div>
-
-
