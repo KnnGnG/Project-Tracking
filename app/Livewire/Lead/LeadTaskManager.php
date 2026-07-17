@@ -437,10 +437,10 @@ class LeadTaskManager extends Component
 
     private function syncMemberProgressRows(Task $task, $assigneeIds, ?string $status = null): void
     {
-        TaskMemberProgress::where('task_id', $task->id)
-            ->whereNotIn('user_id', $assigneeIds)
-            ->delete();
-
+        // Progress rows for members no longer assigned are kept (not deleted) so
+        // their logged time/progress history survives a temporary unassignment;
+        // derivedStatusFor() excludes them from the task's overall status via
+        // Task::activeMemberProgress().
         foreach ($assigneeIds as $userId) {
             $progress = TaskMemberProgress::firstOrCreate(
                 ['task_id' => $task->id, 'user_id' => $userId],
@@ -449,7 +449,15 @@ class LeadTaskManager extends Component
 
             if ($status) {
                 $progress->status = $status;
-                $progress->progress = $this->progressValueForStatus($status);
+
+                // Journal logs are the source of truth for the progress percentage;
+                // a lead-driven status change alone should not overwrite what the
+                // member has actually reported. "Done" is the one exception, since
+                // it means fully complete.
+                if ($status === 'done') {
+                    $progress->progress = 100;
+                }
+
                 if (in_array($status, ['in_progress', 'review', 'done'], true) && ! $progress->started_at) {
                     $progress->started_at = now();
                 }
@@ -459,22 +467,15 @@ class LeadTaskManager extends Component
         }
     }
 
-    private function progressValueForStatus(string $status): int
-    {
-        return match ($status) {
-            'done' => 100,
-            'in_progress' => 50,
-            'review' => 75,
-            default => 0,
-        };
-    }
-
     private function syncOverallTaskStatus(Task $task): string
     {
         $status = $this->derivedStatusFor($task);
 
         if ($task->status !== $status) {
-            $task->update(['status' => $status]);
+            $task->update([
+                'status' => $status,
+                'completed_at' => $status === 'done' ? ($task->completed_at ?? now()) : null,
+            ]);
         }
 
         return $status;
@@ -482,7 +483,7 @@ class LeadTaskManager extends Component
 
     private function derivedStatusFor(Task $task): string
     {
-        $progress = $task->memberProgress;
+        $progress = $task->activeMemberProgress();
 
         if ($progress->isEmpty()) {
             return $task->status;

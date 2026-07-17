@@ -154,7 +154,6 @@
                                                         @foreach($newTaskItems->take(3) as $taskItem)
                                                             @php
                                                                 $task = $taskItem['task'];
-                                                                $taskProgress = $task->memberProgress->first()?->progress ?? 0;
                                                             @endphp
                                                             <div class="project-task-preview-item">
                                                                 <form method="POST" action="{{ route('projects.new-tasks.open', $taskItem['notification']) }}" class="project-task-preview-open-form">
@@ -167,7 +166,6 @@
                                                                         <span class="project-task-preview-team"><span>Team</span>{{ $task->team?->name ?? 'No team' }}</span>
                                                                         <span class="project-task-preview-meta">
                                                                             <span>{{ $task->start_date?->format('M d') ?? 'TBD' }} - {{ $task->due_date?->format('M d, Y') ?? 'No due date' }}</span>
-                                                                            <strong>{{ $taskProgress }}%</strong>
                                                                         </span>
                                                                     </button>
                                                                 </form>
@@ -226,17 +224,15 @@
                                                             @foreach($statusTaskItems->take(3) as $taskItem)
                                                                 @php
                                                                     $task = $taskItem['task'];
-                                                                    $taskProgress = $task->memberProgress->first()?->progress ?? 0;
                                                                 @endphp
                                                                 <div class="project-task-preview-item">
                                                                     <div class="project-task-preview-title-row">
                                                                         <strong>{{ $task->title }}</strong>
                                                                         <span class="project-task-preview-priority project-task-preview-priority-{{ $task->priority }}">{{ ucfirst($task->priority) }}</span>
                                                                     </div>
-                                                                    <p><span>Team</span>{{ $task->team?->name ?? 'No team' }}</p>
+                                                                    <div class="project-task-preview-team"><span>Team</span>{{ $task->team?->name ?? 'No team' }}</div>
                                                                     <div class="project-task-preview-meta">
                                                                         <span>{{ $task->start_date?->format('M d') ?? 'TBD' }} - {{ $task->due_date?->format('M d, Y') ?? 'No due date' }}</span>
-                                                                        <strong>{{ $taskProgress }}%</strong>
                                                                     </div>
                                                                 </div>
                                                             @endforeach

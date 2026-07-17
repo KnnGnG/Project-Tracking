@@ -48,12 +48,16 @@ class NotificationBell extends Component
             ->get();
 
         $overdueTasks = $this->overdueTasks();
+        $overdueTasksTotal = $this->overdueTasksCount();
+        $overdueOverflowCount = max(0, $overdueTasksTotal - $overdueTasks->count());
         $unreadNotificationsCount = InAppNotification::where('user_id', $user->id)
             ->whereNull('read_at')
             ->count();
-        $unreadCount = $unreadNotificationsCount + $this->overdueTasksCount();
+        $unreadCount = $unreadNotificationsCount + $overdueTasksTotal;
 
-        return view('livewire.notification-bell', compact('notifications', 'overdueTasks', 'unreadCount', 'unreadNotificationsCount'));
+        return view('livewire.notification-bell', compact(
+            'notifications', 'overdueTasks', 'overdueOverflowCount', 'unreadCount', 'unreadNotificationsCount'
+        ));
     }
 
     private function overdueTasksQuery()

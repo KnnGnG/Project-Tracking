@@ -144,6 +144,7 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
             'team_id' => $team->id,
             'log_date' => now()->toDateString(),
             'minutes' => 45,
+            'progress' => 80,
             'notes' => 'Connected from member journal.',
         ]);
 
@@ -153,6 +154,7 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
             'team_id' => $team->id,
             'log_date' => $earlierDate,
             'minutes' => 15,
+            'progress' => 20,
             'notes' => 'Earlier journal entry.',
         ]);
 
@@ -167,9 +169,11 @@ class ProjectAccessAndRoleRoutingTest extends TestCase
             ->assertSee('Write integration notes')
             ->assertSee('Connected from member journal.')
             ->assertDontSee('Earlier journal entry.')
+            ->assertSee('Progress: 80%')
             ->assertSee('0h 45m')
             ->set('dateFrom', $earlierDate)
             ->assertSee('Earlier journal entry.')
+            ->assertSee('Progress: 20%')
             ->assertSee('1h 0m');
     }
     public function test_team_lead_can_open_member_dashboard_for_same_project_member_role(): void

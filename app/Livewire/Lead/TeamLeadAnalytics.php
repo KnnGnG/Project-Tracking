@@ -177,7 +177,7 @@ class TeamLeadAnalytics extends Component
 
         $completed = $tasks
             ->filter(fn (Task $task) => $task->status === 'done')
-            ->filter(fn (Task $task) => Carbon::parse($task->updated_at)->betweenIncluded($start, $end->copy()->endOfDay()));
+            ->filter(fn (Task $task) => $this->completionDate($task)->betweenIncluded($start, $end->copy()->endOfDay()));
 
         if ($memberId !== 0) {
             $completed = $completed->filter(function (Task $task) use ($memberId) {
@@ -195,7 +195,7 @@ class TeamLeadAnalytics extends Component
             $completed = $completed->where('priority', $priority);
         }
 
-        $byDate = $completed->groupBy(fn (Task $task) => Carbon::parse($task->updated_at)->format('M j'));
+        $byDate = $completed->groupBy(fn (Task $task) => $this->completionDate($task)->format('M j'));
 
         $labels = collect(CarbonPeriod::create($start, $end))
             ->map(fn (Carbon $date) => $date->format('M j'))
@@ -414,7 +414,17 @@ class TeamLeadAnalytics extends Component
     }
 
     /**
-     * Approximate CFD band per task-day using created/start/review timestamps and completion (updated_at).
+     * A task's completion date. `completed_at` is set precisely when a task's
+     * status transitions to done; fall back to `updated_at` only for legacy
+     * rows that were marked done outside that flow (e.g. direct writes).
+     */
+    private function completionDate(Task $task): Carbon
+    {
+        return Carbon::parse($task->completed_at ?? $task->updated_at);
+    }
+
+    /**
+     * Approximate CFD band per task-day using created/start/review timestamps and completion (completed_at).
      *
      * @return 'outside'|'todo'|'in_progress'|'review'|'done'
      */
@@ -426,7 +436,7 @@ class TeamLeadAnalytics extends Component
         }
 
         if ($task->status === 'done') {
-            $doneDay = Carbon::parse($task->updated_at)->startOfDay();
+            $doneDay = $this->completionDate($task)->startOfDay();
             if ($doneDay->lte($day)) {
                 return 'done';
             }
@@ -492,7 +502,7 @@ class TeamLeadAnalytics extends Component
             }
 
             if ($task->status === 'done') {
-                $closed = Carbon::parse($task->updated_at)->toDateString();
+                $closed = $this->completionDate($task)->toDateString();
                 if ($closed <= $task->due_date->toDateString()) {
                     $onTime++;
                 } else {

@@ -76,7 +76,7 @@ class ProjectTaskAssignmentPopupTest extends TestCase
         $this->assertStringContainsString('New assignments', $firstCard);
         $this->assertStringContainsString('Popup Team', $firstCard);
         $this->assertStringContainsString('Jul 14 - Jul 20, 2026', $firstCard);
-        $this->assertStringContainsString('0%', $firstCard);
+        $this->assertStringNotContainsString('0%', $firstCard);
         $this->assertStringContainsString('Overdue', $firstCard);
         $this->assertStringContainsString('Pending', $firstCard);
         $this->assertLessThan(

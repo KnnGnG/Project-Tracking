@@ -120,8 +120,6 @@
     $roleLabel = null;
     $activeMemberRouteParams = [];
     $activeLeadRouteParams = [];
-    $workspaceContexts = collect();
-    $activeWorkspaceContext = null;
     $memberOpenTaskCount = 0;
     $leadJournalTodayCount = 0;
     $navActive = 'bg-indigo-500 text-white shadow-sm shadow-indigo-950/20';
@@ -184,31 +182,6 @@
         $roleLabel = $activeRoleLabel ?? ($contextRoles->join(' / ') ?: $authUser->roleName());
 
         if (! $isAdmin && ! $isClient) {
-            $workspaceContexts = $authUser->teams()
-                ->withPivot('role')
-                ->with(['project', 'projects'])
-                ->wherePivotIn('role', ['lead', 'member'])
-                ->orderBy('teams.name')
-                ->get()
-                ->flatMap(function ($team) {
-                    return $team->assignedProjects()->map(function ($project) use ($team) {
-                        $role = $team->pivot->role;
-
-                        return [
-                            'key' => $project->id.':'.$team->id.':'.$role,
-                            'project' => $project,
-                            'team' => $team,
-                            'role' => $role,
-                        ];
-                    });
-                })
-                ->unique('key')
-                ->sortBy(fn ($context) => $context['project']->name.' '.$context['team']->name.' '.$context['role'])
-                ->values();
-            $activeWorkspaceContext = $activeProjectId && $activeTeamId
-                ? $activeProjectId.':'.$activeTeamId.':'.($activeProjectRole ?: 'member')
-                : null;
-
             if ($showMemberNav) {
                 $memberOpenTaskCount = \App\Models\Task::query()
                     ->where(fn ($query) => $query
@@ -410,24 +383,6 @@
                 </div>
                 @if($isAuthed)
                     <div class="flex items-center gap-3">
-                        @if($workspaceContexts->isNotEmpty())
-                            <form method="POST" action="{{ route('workspace.context.switch') }}" class="flex min-w-0 items-center gap-2">
-                                @csrf
-                                <input type="hidden" name="return_route" value="{{ request()->route()?->getName() }}">
-                                <label for="workspace-context" class="sr-only">Active project and team</label>
-                                <select id="workspace-context"
-                                        name="context"
-                                        onchange="this.form.submit()"
-                                        class="max-w-[9rem] rounded-lg border-slate-200 bg-slate-50 py-1.5 pl-3 pr-9 text-xs font-semibold text-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:max-w-[18rem]"
-                                        title="Switch active project and team">
-                                    @foreach($workspaceContexts as $context)
-                                        <option value="{{ $context['key'] }}" @selected($activeWorkspaceContext === $context['key'])>
-                                            {{ $context['project']->name }} / {{ $context['team']->name }} - {{ $context['role'] === 'lead' ? 'Team Lead' : 'Member' }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </form>
-                        @endif
                         <span class="hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 md:inline-flex">
                             {{ $roleLabel ?? $authUser->roleName() }}
                         </span>

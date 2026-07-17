@@ -39,6 +39,7 @@ class Task extends Model
         return [
             'start_date' => 'date',
             'due_date' => 'date',
+            'completed_at' => 'datetime',
         ];
     }
 
@@ -144,5 +145,17 @@ class Task extends Model
         }
 
         return $assignees;
+    }
+
+    /**
+     * Progress rows for members currently assigned to this task. History for a
+     * member who was later unassigned is kept in `memberProgress` but must not
+     * count toward the task's derived overall status.
+     */
+    public function activeMemberProgress(): Collection
+    {
+        $assigneeIds = $this->getAllAssignees()->pluck('id');
+
+        return $this->memberProgress->whereIn('user_id', $assigneeIds);
     }
 }

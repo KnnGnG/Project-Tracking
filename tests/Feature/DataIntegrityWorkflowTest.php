@@ -6,6 +6,7 @@ use App\Livewire\Admin\TeamManager;
 use App\Livewire\Admin\UserManager;
 use App\Livewire\Member\MemberLeadEvaluation;
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\Team;
 use App\Models\TeamLeadEvaluation;
 use App\Models\User;
@@ -40,6 +41,49 @@ class DataIntegrityWorkflowTest extends TestCase
 
         $this->assertNotNull($owner->fresh());
         $this->assertNotNull($project->fresh());
+    }
+
+    public function test_admin_cannot_delete_a_user_who_is_only_a_secondary_task_assignee(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $owner = User::factory()->create(['role' => 'team_lead']);
+        $primaryAssignee = User::factory()->create(['role' => 'member']);
+        $secondaryAssignee = User::factory()->create(['role' => 'member']);
+        $project = Project::create([
+            'name' => 'Shared Task Project',
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-07-31',
+            'status' => 'active',
+            'created_by' => $owner->id,
+        ]);
+        $team = Team::create([
+            'name' => 'Shared Task Team',
+            'project_id' => $project->id,
+            'lead_id' => $owner->id,
+        ]);
+        $task = Task::create([
+            'title' => 'Pair task',
+            'project_id' => $project->id,
+            'team_id' => $team->id,
+            'assigned_to' => $primaryAssignee->id,
+            'created_by' => $owner->id,
+            'due_date' => '2026-07-20',
+            'status' => 'pending',
+            'priority' => 'medium',
+        ]);
+        // Only ever added via the multi-assignee pivot, never the primary `assigned_to` FK.
+        $task->assignees()->attach($secondaryAssignee->id);
+
+        $this->actingAs($admin);
+
+        Livewire::test(UserManager::class)
+            ->call('confirmDelete', $secondaryAssignee->id)
+            ->call('deleteConfirmed')
+            ->assertSet('confirmingDelete', true)
+            ->assertSet('deleteError', fn ($message) => str_contains($message, 'Reassign'));
+
+        $this->assertNotNull($secondaryAssignee->fresh());
+        $this->assertTrue($task->fresh()->assignees->contains($secondaryAssignee));
     }
 
     public function test_team_is_reused_only_when_name_lead_and_members_match(): void

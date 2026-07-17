@@ -143,7 +143,7 @@ class TeamLeadDashboard extends Component
             return;
         }
 
-        if ((int) $project->created_by === (int) auth()->id() || auth()->user()->isAdmin()) {
+        if (auth()->user()->isAdmin()) {
             $statusService->change(
                 $project,
                 $requestedStatus,
@@ -845,32 +845,52 @@ class TeamLeadDashboard extends Component
 
         $logsByDate = $logs->groupBy(fn (JournalLog $log) => Carbon::parse($log->log_date)->toDateString());
         $totalMinutes = $logs->sum('minutes');
-        $progressPercentage = $this->activityProgressPercentage($logs, $progress);
-        $scheduledStart = $task->start_date
-            ? $task->start_date->format('M d, Y').($task->start_time ? ' '.Carbon::parse($task->start_time)->format('h:i A') : '')
-            : 'Not scheduled';
         $actualStarted = $startedAt->format('M d, Y');
-        $dueDate = $task->due_date?->format('M d, Y') ?? 'No due date';
         $days = collect();
+
+        // Journal `progress` values are absolute snapshots, not daily deltas, so the
+        // running total tracks the latest known value instead of summing entries.
+        $priorProgress = $logs
+            ->filter(fn (JournalLog $log) => $log->progress !== null
+                && Carbon::parse($log->log_date)->lt($visibleStart))
+            ->sortByDesc(fn (JournalLog $log) => [$log->log_date?->timestamp ?? 0, $log->id])
+            ->first()?->progress;
+        $runningProgress = $priorProgress !== null ? min(100, max(0, (int) $priorProgress)) : 0;
 
         for ($day = $visibleStart->copy(); $day->lte($visibleEnd); $day->addDay()) {
             $date = $day->toDateString();
             $dayLogs = $logsByDate->get($date, collect());
             $hasLog = $dayLogs->isNotEmpty();
             $minutes = $dayLogs->sum('minutes');
+            $dayProgress = $dayLogs
+                ->filter(fn (JournalLog $log) => $log->progress !== null)
+                ->sortByDesc(fn (JournalLog $log) => [$log->log_date?->timestamp ?? 0, $log->id])
+                ->first()?->progress;
+            if ($dayProgress !== null) {
+                $runningProgress = min(100, max(0, (int) $dayProgress));
+            }
+
+            // On the most recent visible day, align with the same value shown on
+            // the activity bar's label/fill (activityProgressPercentage()) so the
+            // bar and its hover text never contradict each other — a manual status
+            // change (e.g. marking done) can move the authoritative progress ahead
+            // of the last journal entry.
+            $displayProgress = $runningProgress;
+            if ($day->isSameDay($visibleEnd) && $progress?->progress !== null) {
+                $displayProgress = min(100, max(0, (int) $progress->progress));
+            }
+
             $stateLabel = $hasLog ? 'Journal/log added' : 'No journal/log entry';
             $tooltipLines = [
                 $stateLabel.' - '.$day->format('M d, Y'),
                 'Project: '.($task->project?->name ?? 'No project'),
-                'Task: '.$task->title,
                 'Member: '.$memberName,
-                'Scheduled start: '.$scheduledStart,
+                'Status: '.ucwords(str_replace('_', ' ', $effectiveStatus)),
                 'Actual started: '.$actualStarted,
                 'Time for this day: '.intdiv($minutes, 60).'h '.($minutes % 60).'m',
                 'Total logged: '.intdiv($totalMinutes, 60).'h '.($totalMinutes % 60).'m',
-                'Progress: '.$progressPercentage.'%',
-                'Due: '.$dueDate,
-                'Status: '.ucwords(str_replace('_', ' ', $effectiveStatus)),
+                'Progress for this day: '.($dayProgress !== null ? $dayProgress : 0).'%',
+                'Total progress: '.$displayProgress.'%',
             ];
 
             $days->push([

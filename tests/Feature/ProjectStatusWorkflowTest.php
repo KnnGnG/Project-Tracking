@@ -63,12 +63,13 @@ class ProjectStatusWorkflowTest extends TestCase
         ]);
     }
 
-    public function test_project_creator_can_change_lifecycle_status_directly(): void
+    public function test_admin_can_change_lifecycle_status_directly_even_if_not_the_creator(): void
     {
-        $lead = User::factory()->create(['role' => 'team_lead']);
-        [$project, $team] = $this->projectContext($lead, $lead);
+        $creator = User::factory()->create(['role' => 'admin']);
+        $admin = User::factory()->create(['role' => 'admin']);
+        [$project, $team] = $this->projectContext($creator, $admin);
 
-        $this->actingAs($lead)->withSession($this->leadSession($project, $team));
+        $this->actingAs($admin)->withSession($this->leadSession($project, $team));
 
         Livewire::test(TeamLeadDashboard::class)
             ->call('openProjectStatusForm')
@@ -81,12 +82,37 @@ class ProjectStatusWorkflowTest extends TestCase
         $this->assertDatabaseCount('project_status_change_requests', 0);
         $this->assertDatabaseHas('project_status_histories', [
             'project_id' => $project->id,
-            'changed_by' => $lead->id,
+            'changed_by' => $admin->id,
             'from_status' => 'active',
             'to_status' => 'completed',
             'source' => 'creator',
             'reason' => 'All project work is complete.',
         ]);
+    }
+
+    public function test_non_admin_project_creator_must_use_approval_workflow(): void
+    {
+        // A lead who created their own project is not exempt from admin
+        // approval: only currently-admin users get the instant-apply bypass,
+        // so this still goes through the same pending-request flow as any
+        // other lead (a plain `created_by` match is not enough, since roles
+        // can change after a project is created).
+        $lead = User::factory()->create(['role' => 'team_lead']);
+        [$project, $team] = $this->projectContext($lead, $lead);
+
+        $this->actingAs($lead)->withSession($this->leadSession($project, $team));
+
+        Livewire::test(TeamLeadDashboard::class)
+            ->call('openProjectStatusForm')
+            ->set('requestedProjectStatus', 'completed')
+            ->set('projectStatusReason', 'All project work is complete.')
+            ->call('submitProjectStatusChange')
+            ->assertHasNoErrors();
+
+        $this->assertSame('active', $project->fresh()->status);
+        $request = ProjectStatusChangeRequest::firstOrFail();
+        $this->assertSame('pending', $request->status);
+        $this->assertSame($lead->id, $request->requested_by);
     }
 
     public function test_stale_request_cannot_overwrite_a_newer_project_status(): void

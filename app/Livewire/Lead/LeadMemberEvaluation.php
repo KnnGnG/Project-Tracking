@@ -200,7 +200,7 @@ class LeadMemberEvaluation extends Component
         TeamMemberEvaluation::query()
             ->where('evaluator_id', auth()->id())
             ->whereHas('team.leads', fn ($query) => $query->whereKey(auth()->id()))
-            ->whereKey($evaluationId)
+            ->findOrFail($evaluationId)
             ->delete();
 
         if ($this->editingId === $evaluationId) {
