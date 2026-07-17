@@ -60,6 +60,23 @@
                 </div>
             @endif
 
+            @php
+                $statusLabels = [
+                    'active' => 'Active',
+                    'overdue' => 'Overdue',
+                    'near_due' => 'Near Due',
+                    'upcoming' => 'Upcoming',
+                    'on_hold' => 'On Hold',
+                    'completed' => 'Completed',
+                    'not_set' => 'Not Set',
+                ];
+                $sortLabels = [
+                    'name' => 'Name (A–Z)',
+                    'status' => 'Status',
+                    'start_date' => 'Start Date',
+                    'end_date' => 'End Date',
+                ];
+            @endphp
             <div class="project-picker-heading">
                 <div>
                     <h1 class="text-2xl font-extrabold tracking-tight text-slate-950">My Projects</h1>
@@ -67,9 +84,40 @@
                         Choose a project to open the dashboard for your role in that project.
                     </p>
                 </div>
-                <span class="project-count-pill">
-                    {{ $projects->count() }} project{{ $projects->count() === 1 ? '' : 's' }}
-                </span>
+                <div class="flex flex-wrap items-end gap-3">
+                    <span class="project-count-pill">
+                        {{ $projects->count() }} project{{ $projects->count() === 1 ? '' : 's' }}
+                    </span>
+                    <form method="GET" action="{{ route('projects.index') }}" class="flex flex-wrap items-end gap-3">
+                        <label class="flex flex-col gap-1 text-xs font-semibold text-slate-500">
+                            <span>Status</span>
+                            <select name="status" onchange="this.form.submit()"
+                                    class="w-48 rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-10 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="all" @selected($statusFilter === 'all')>All statuses</option>
+                                @foreach($statusOptions as $statusOption)
+                                    <option value="{{ $statusOption }}" @selected($statusFilter === $statusOption)>
+                                        {{ $statusLabels[$statusOption] ?? ucfirst(str_replace('_', ' ', $statusOption)) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label class="flex flex-col gap-1 text-xs font-semibold text-slate-500">
+                            <span>Sort by</span>
+                            <select name="sort" onchange="this.form.submit()"
+                                    class="w-48 rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-10 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                @foreach($sortLabels as $sortValue => $sortLabel)
+                                    <option value="{{ $sortValue }}" @selected($sort === $sortValue)>{{ $sortLabel }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        @if($statusFilter !== 'all' || $sort !== 'name')
+                            <a href="{{ route('projects.index') }}"
+                               class="rounded-lg px-3 py-2 text-sm font-semibold text-indigo-600 hover:underline">
+                                Reset
+                            </a>
+                        @endif
+                    </form>
+                </div>
             </div>
 
             @if($projects->isEmpty())
@@ -80,9 +128,15 @@
                                   d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
                         </svg>
                     </div>
-                    <h3 class="mt-4 text-base font-semibold text-slate-900">No assigned projects yet</h3>
+                    <h3 class="mt-4 text-base font-semibold text-slate-900">
+                        {{ $statusFilter !== 'all' ? 'No projects match this filter' : 'No assigned projects yet' }}
+                    </h3>
                     <p class="mt-2 text-sm text-slate-500">
-                        Projects will appear here once you are added as a team lead or member.
+                        @if($statusFilter !== 'all')
+                            Try a different status filter, or <a href="{{ route('projects.index') }}" class="font-semibold text-indigo-600 hover:underline">clear the filter</a>.
+                        @else
+                            Projects will appear here once you are added as a team lead or member.
+                        @endif
                     </p>
                 </div>
             @else

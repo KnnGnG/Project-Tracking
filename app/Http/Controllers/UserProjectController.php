@@ -45,10 +45,46 @@ class UserProjectController extends Controller
             ];
         })->sortBy(fn (array $item) => $item['project']->name)->values();
 
+        $statusOptions = $projects
+            ->map(fn (array $item) => $item['project']->effectiveStatus())
+            ->unique()
+            ->sort()
+            ->values();
+
+        $statusFilter = $request->query('status', 'all');
+        if (! $statusOptions->contains($statusFilter)) {
+            $statusFilter = 'all';
+        }
+
+        if ($statusFilter !== 'all') {
+            $projects = $projects
+                ->filter(fn (array $item) => $item['project']->effectiveStatus() === $statusFilter)
+                ->values();
+        }
+
+        $sort = $request->query('sort', 'name');
+        if (! in_array($sort, ['name', 'status', 'start_date', 'end_date'], true)) {
+            $sort = 'name';
+        }
+
+        $projects = match ($sort) {
+            'status' => $projects->sortBy(fn (array $item) => $item['project']->effectiveStatus())->values(),
+            'start_date' => $projects->sortBy(fn (array $item) => $item['project']->start_date?->timestamp ?? PHP_INT_MAX)->values(),
+            'end_date' => $projects->sortBy(fn (array $item) => $item['project']->end_date?->timestamp ?? PHP_INT_MAX)->values(),
+            default => $projects->sortBy(fn (array $item) => $item['project']->name)->values(),
+        };
+
         $newTaskNotifications = $this->newTaskNotifications($request);
         $projectTaskOverview = $this->projectTaskOverview($request, $newTaskNotifications);
 
-        return view('projects.index', compact('projects', 'newTaskNotifications', 'projectTaskOverview'));
+        return view('projects.index', compact(
+            'projects',
+            'newTaskNotifications',
+            'projectTaskOverview',
+            'statusOptions',
+            'statusFilter',
+            'sort',
+        ));
     }
 
     public function openTaskNotification(Request $request, InAppNotification $notification): RedirectResponse
