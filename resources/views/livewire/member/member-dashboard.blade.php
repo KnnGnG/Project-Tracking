@@ -68,9 +68,9 @@
                                     Review
                                 </button>
                             @elseif($task->personal_status === 'review')
-                                <button type="button" wire:click.stop="setStatus({{ $task->id }}, 'done')" class="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
-                                    Done
-                                </button>
+                                <span class="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+                                    Awaiting approval
+                                </span>
                             @endif
                         </div>
                     </div>
@@ -377,13 +377,17 @@
                                                             class="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition">
                                                         Revise
                                                     </button>
+                                                    <span title="Waiting for your team lead to approve this review"
+                                                          class="px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg">
+                                                        Awaiting approval
+                                                    </span>
+                                                @else
+                                                    <button wire:click="setStatus({{ $task->id }}, 'done')"
+                                                            title="Mark Done"
+                                                            class="px-2.5 py-1 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition">
+                                                        Done
+                                                    </button>
                                                 @endif
-
-                                                <button wire:click="setStatus({{ $task->id }}, 'done')"
-                                                        title="Mark Done"
-                                                        class="px-2.5 py-1 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition">
-                                                    Done
-                                                </button>
                                             @else
                                                 <div class="flex flex-wrap items-center justify-end gap-1.5">
                                                     <span class="inline-flex items-center gap-1 text-xs font-medium text-green-600">
@@ -485,9 +489,11 @@
                                                         @class([
                                                             'px-3 py-1.5 text-xs font-medium rounded-lg border transition',
                                                             'bg-green-600 border-green-600 text-white cursor-default' => $task->personal_status === 'done',
-                                                            'bg-white border-green-200 text-green-600 hover:bg-green-50' => $task->personal_status !== 'done',
+                                                            'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' => $task->personal_status === 'review',
+                                                            'bg-white border-green-200 text-green-600 hover:bg-green-50' => ! in_array($task->personal_status, ['done', 'review'], true),
                                                         ])
-                                                        @disabled($task->personal_status === 'done')>
+                                                        title="{{ $task->personal_status === 'review' ? 'Waiting for your team lead to approve this review' : '' }}"
+                                                        @disabled($task->personal_status === 'done' || $task->personal_status === 'review')>
                                                     Done
                                                 </button>
 

@@ -71,7 +71,7 @@ class UserProjectController extends Controller
             'status' => $projects->sortBy(fn (array $item) => $item['project']->effectiveStatus())->values(),
             'start_date' => $projects->sortBy(fn (array $item) => $item['project']->start_date?->timestamp ?? PHP_INT_MAX)->values(),
             'end_date' => $projects->sortBy(fn (array $item) => $item['project']->end_date?->timestamp ?? PHP_INT_MAX)->values(),
-            default => $projects->sortBy(fn (array $item) => $item['project']->name)->values(),
+            default => $projects,
         };
 
         $newTaskNotifications = $this->newTaskNotifications($request);

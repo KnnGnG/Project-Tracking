@@ -241,78 +241,68 @@ class ProjectTaskAssignmentPopupTest extends TestCase
 
     public function test_my_projects_can_be_filtered_by_status_and_sorted(): void
     {
-        Carbon::setTestNow('2026-07-14 10:00:00');
+        $this->travelTo('2026-07-14 10:00:00');
 
-        try {
-            $lead = User::factory()->create(['role' => 'team_lead']);
-            $member = User::factory()->create(['role' => 'member']);
-            $statuses = [
-                ['Overdue Project', '2026-07-01', '2026-07-13', 'active', 'overdue'],
-                ['Near Due Project', '2026-07-01', '2026-07-18', 'active', 'near_due'],
-                ['Upcoming Project', '2026-07-20', '2026-07-31', 'active', 'upcoming'],
-                ['Completed Project', '2026-06-01', '2026-06-30', 'completed', 'completed'],
-            ];
+        $lead = User::factory()->create(['role' => 'team_lead']);
+        $member = User::factory()->create(['role' => 'member']);
+        $statuses = [
+            ['Overdue Project', '2026-07-01', '2026-07-13', 'active', 'overdue'],
+            ['Near Due Project', '2026-07-01', '2026-07-18', 'active', 'near_due'],
+            ['Upcoming Project', '2026-07-20', '2026-07-31', 'active', 'upcoming'],
+            ['Completed Project', '2026-06-01', '2026-06-30', 'completed', 'completed'],
+        ];
 
-            foreach ($statuses as [$name, $start, $end, $status]) {
-                $project = Project::create([
-                    'name' => $name,
-                    'start_date' => $start,
-                    'end_date' => $end,
-                    'status' => $status,
-                    'created_by' => $lead->id,
-                ]);
-                $team = Team::create([
-                    'name' => $name.' Team',
-                    'project_id' => $project->id,
-                    'lead_id' => $lead->id,
-                ]);
-                $team->members()->attach($member->id, ['role' => 'member']);
-            }
+        foreach ($statuses as [$name, $start, $end, $status]) {
+            $project = Project::create([
+                'name' => $name,
+                'start_date' => $start,
+                'end_date' => $end,
+                'status' => $status,
+                'created_by' => $lead->id,
+            ]);
+            $team = Team::create([
+                'name' => $name.' Team',
+                'project_id' => $project->id,
+                'lead_id' => $lead->id,
+            ]);
+            $team->members()->attach($member->id, ['role' => 'member']);
+        }
 
-            // Filtering by status only shows the matching project.
-            $filtered = $this->actingAs($member)
-                ->get(route('projects.index', ['status' => 'overdue']))
-                ->assertOk();
-            $filtered->assertSee('Overdue Project');
-            foreach (['Near Due Project', 'Upcoming Project', 'Completed Project'] as $hidden) {
-                $filtered->assertDontSee($hidden);
-            }
+        // Filtering by status only shows the matching project.
+        $filtered = $this->actingAs($member)
+            ->get(route('projects.index', ['status' => 'overdue']))
+            ->assertOk();
+        $filtered->assertSee('Overdue Project');
+        foreach (['Near Due Project', 'Upcoming Project', 'Completed Project'] as $hidden) {
+            $filtered->assertDontSee($hidden);
+        }
 
-            $filteredCompleted = $this->actingAs($member)
-                ->get(route('projects.index', ['status' => 'completed']))
-                ->assertOk();
-            $filteredCompleted->assertSee('Completed Project');
-            foreach (['Overdue Project', 'Near Due Project', 'Upcoming Project'] as $hidden) {
-                $filteredCompleted->assertDontSee($hidden);
-            }
+        $filteredCompleted = $this->actingAs($member)
+            ->get(route('projects.index', ['status' => 'completed']))
+            ->assertOk();
+        $filteredCompleted->assertSee('Completed Project');
+        foreach (['Overdue Project', 'Near Due Project', 'Upcoming Project'] as $hidden) {
+            $filteredCompleted->assertDontSee($hidden);
+        }
 
-            // Sorting by end date orders projects from soonest to latest end date.
-            $sortedByEndDate = $this->actingAs($member)
-                ->get(route('projects.index', ['sort' => 'end_date']))
-                ->assertOk();
-            $content = $sortedByEndDate->getContent();
-            $this->assertLessThan(strpos($content, 'Overdue Project'), strpos($content, 'Completed Project'));
-            $this->assertLessThan(strpos($content, 'Near Due Project'), strpos($content, 'Overdue Project'));
-            $this->assertLessThan(strpos($content, 'Upcoming Project'), strpos($content, 'Near Due Project'));
+        // Sorting by end date orders projects from soonest to latest end date.
+        $this->actingAs($member)
+            ->get(route('projects.index', ['sort' => 'end_date']))
+            ->assertOk()
+            ->assertSeeInOrder(['Completed Project', 'Overdue Project', 'Near Due Project', 'Upcoming Project']);
 
-            // Default sort is alphabetical by name.
-            $defaultSort = $this->actingAs($member)
-                ->get(route('projects.index'))
-                ->assertOk();
-            $defaultContent = $defaultSort->getContent();
-            $this->assertLessThan(strpos($defaultContent, 'Near Due Project'), strpos($defaultContent, 'Completed Project'));
-            $this->assertLessThan(strpos($defaultContent, 'Overdue Project'), strpos($defaultContent, 'Near Due Project'));
-            $this->assertLessThan(strpos($defaultContent, 'Upcoming Project'), strpos($defaultContent, 'Overdue Project'));
+        // Default sort is alphabetical by name.
+        $this->actingAs($member)
+            ->get(route('projects.index'))
+            ->assertOk()
+            ->assertSeeInOrder(['Completed Project', 'Near Due Project', 'Overdue Project', 'Upcoming Project']);
 
-            // An unrecognized status value falls back to showing everything.
-            $invalidFilter = $this->actingAs($member)
-                ->get(route('projects.index', ['status' => 'not-a-real-status']))
-                ->assertOk();
-            foreach (['Overdue Project', 'Near Due Project', 'Upcoming Project', 'Completed Project'] as $name) {
-                $invalidFilter->assertSee($name);
-            }
-        } finally {
-            Carbon::setTestNow();
+        // An unrecognized status value falls back to showing everything.
+        $invalidFilter = $this->actingAs($member)
+            ->get(route('projects.index', ['status' => 'not-a-real-status']))
+            ->assertOk();
+        foreach (['Overdue Project', 'Near Due Project', 'Upcoming Project', 'Completed Project'] as $name) {
+            $invalidFilter->assertSee($name);
         }
     }
 

@@ -128,15 +128,9 @@
                                   d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
                         </svg>
                     </div>
-                    <h3 class="mt-4 text-base font-semibold text-slate-900">
-                        {{ $statusFilter !== 'all' ? 'No projects match this filter' : 'No assigned projects yet' }}
-                    </h3>
+                    <h3 class="mt-4 text-base font-semibold text-slate-900">No assigned projects yet</h3>
                     <p class="mt-2 text-sm text-slate-500">
-                        @if($statusFilter !== 'all')
-                            Try a different status filter, or <a href="{{ route('projects.index') }}" class="font-semibold text-indigo-600 hover:underline">clear the filter</a>.
-                        @else
-                            Projects will appear here once you are added as a team lead or member.
-                        @endif
+                        Projects will appear here once you are added as a team lead or member.
                     </p>
                 </div>
             @else

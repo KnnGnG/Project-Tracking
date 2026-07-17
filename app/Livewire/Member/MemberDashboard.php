@@ -152,8 +152,13 @@ class MemberDashboard extends Component
      * Universal status setter – allows full status cycling.
      * Valid transitions a member can initiate:
      *   pending     → in_progress, done
-     *   in_progress → pending, done
+     *   in_progress → pending, done, review
+     *   review      → in_progress (revise)
      *   done        → in_progress, pending
+     *
+     * A task under review can only be marked done by the team lead's approval
+     * (see LeadTaskManager::approveMemberReview) — the member must wait or
+     * revise it back to in_progress themselves.
      */
     public function setStatus(int $id, string $newStatus): void
     {
@@ -164,6 +169,12 @@ class MemberDashboard extends Component
 
         $task = $this->ownedTask($id);
         if (! $task) {
+            return;
+        }
+
+        if ($newStatus === 'done' && $this->personalStatusFor($task) === 'review') {
+            $this->flash = 'This task is awaiting your team lead\'s approval and cannot be marked done yet.';
+
             return;
         }
 

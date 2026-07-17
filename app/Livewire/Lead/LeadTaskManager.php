@@ -304,6 +304,44 @@ class LeadTaskManager extends Component
         $this->refreshActiveSelfAssignedTaskContext();
     }
 
+    /** Lead go-sign: approve a member's review and mark their share of the task done. */
+    public function approveMemberReview(int $taskId, int $userId): void
+    {
+        $task = $this->ownedTask($taskId);
+
+        $progress = TaskMemberProgress::where('task_id', $task->id)
+            ->where('user_id', $userId)
+            ->first();
+
+        if (! $progress || $progress->status !== 'review') {
+            return;
+        }
+
+        $memberName = $progress->user?->name ?? 'Member';
+
+        DB::transaction(function () use ($task, $userId): void {
+            $this->syncMemberProgressRows($task, [$userId], 'done');
+            $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
+        });
+
+        $this->recordActivity($task, 'status_changed', auth()->user()->name." approved {$memberName}'s review and marked it done.");
+
+        InAppNotification::create([
+            'user_id' => $userId,
+            'type' => 'task_review_approved',
+            'title' => 'Review approved',
+            'body' => $task->title.' was approved and marked done.',
+            'url' => route('member.dashboard', array_filter([
+                'team' => $task->team_id,
+                'project' => $task->project_id,
+                'task' => $task->id,
+            ])),
+            'data' => ['task_id' => $task->id, 'team_id' => $task->team_id, 'project_id' => $task->project_id],
+        ]);
+
+        session()->flash('success', "Review approved for {$memberName}.");
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     public function toggleTaskDetails(int $id): void
