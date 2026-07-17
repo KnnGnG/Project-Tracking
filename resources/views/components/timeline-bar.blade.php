@@ -63,9 +63,6 @@
                             class="relative z-10 h-full outline-none {{ $activityDay['state'] === 'logged' ? 'bg-emerald-500' : 'bg-gray-300' }}"
                             tabindex="0" />
                     @endforeach
-                    <div class="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-1 bg-slate-900/15" aria-hidden="true">
-                        <div class="h-full bg-indigo-600" style="width: {{ $activityRow['progress'] ?? 0 }}%;"></div>
-                    </div>
                 </div>
                 <div class="pointer-events-none relative z-40 flex h-5 items-center self-end overflow-hidden px-2 text-[10px] font-semibold text-white drop-shadow-sm"
                      style="grid-column: {{ $activityDays->first()['day'] }} / span {{ $activityDays->count() }}; grid-row: 1; margin-bottom: {{ 0.25 + ($loop->index * 1.35) }}rem;">

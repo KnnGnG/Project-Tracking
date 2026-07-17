@@ -32,6 +32,7 @@ class Task extends Model
         'due_date',
         'status',
         'priority',
+        'completed_at',
     ];
 
     protected function casts(): array
@@ -154,7 +155,10 @@ class Task extends Model
      */
     public function activeMemberProgress(): Collection
     {
-        $assigneeIds = $this->getAllAssignees()->pluck('id');
+        $assigneeIds = $this->getAllAssignees()->pluck('id')
+            ->push($this->assigned_to)
+            ->filter()
+            ->unique();
 
         return $this->memberProgress->whereIn('user_id', $assigneeIds);
     }

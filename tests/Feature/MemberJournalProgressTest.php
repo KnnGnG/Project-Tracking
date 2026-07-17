@@ -316,10 +316,12 @@ class MemberJournalProgressTest extends TestCase
             'status' => 'done',
             'progress' => 100,
         ]);
+        $this->assertNotNull($task->fresh()->completed_at);
 
         Livewire::test(MemberDashboard::class)->call('setStatus', $task->id, 'pending');
 
         $this->assertSame('pending', $task->fresh()->status);
+        $this->assertNull($task->fresh()->completed_at);
         $this->assertDatabaseHas('task_member_progress', [
             'task_id' => $task->id,
             'user_id' => $member->id,

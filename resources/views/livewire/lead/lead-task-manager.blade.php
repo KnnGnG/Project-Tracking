@@ -498,6 +498,7 @@
                                                                 <th class="px-3 py-2 text-left font-semibold">Status</th>
                                                                 <th class="px-3 py-2 text-left font-semibold">Started</th>
                                                                 <th class="px-3 py-2 text-left font-semibold">Completed</th>
+                                                                <th class="px-3 py-2 text-left font-semibold">Actions</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody class="divide-y divide-gray-100 bg-white">
@@ -511,6 +512,19 @@
                                                                     </td>
                                                                     <td class="px-3 py-2 text-gray-500">{{ $progress->started_at?->format('M d, Y h:i A') ?? '—' }}</td>
                                                                     <td class="px-3 py-2 text-gray-500">{{ $progress->completed_at?->format('M d, Y h:i A') ?? '—' }}</td>
+                                                                    <td class="px-3 py-2">
+                                                                        @if($progress->status === 'review')
+                                                                            <button type="button"
+                                                                                    wire:click="approveMemberReview({{ $task->id }}, {{ $progress->user_id }})"
+                                                                                    wire:loading.attr="disabled"
+                                                                                    wire:target="approveMemberReview({{ $task->id }}, {{ $progress->user_id }})"
+                                                                                    class="rounded-lg bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed">
+                                                                                Approve &amp; mark done
+                                                                            </button>
+                                                                        @else
+                                                                            <span class="text-gray-300">—</span>
+                                                                        @endif
+                                                                    </td>
                                                                 </tr>
                                                             @endforeach
                                                         </tbody>

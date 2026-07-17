@@ -835,6 +835,7 @@ class TeamLeadDashboard extends Component
         $startedAt = $window['startedAt'];
         $endedAt = $window['endedAt'];
         $effectiveStatus = $window['effectiveStatus'];
+        $completedAt = $window['completedAt'];
 
         $visibleStart = $startedAt->copy()->max($monthStart);
         $visibleEnd = $endedAt->copy()->min($monthEnd)->min(now()->startOfDay());
@@ -857,6 +858,11 @@ class TeamLeadDashboard extends Component
             ->first()?->progress;
         $runningProgress = $priorProgress !== null ? min(100, max(0, (int) $priorProgress)) : 0;
 
+        // The authoritative $progress->progress value only reflects "now" (or the
+        // completion date for a done task) — apply it solely on that day so past
+        // month boundaries keep showing their own historical running progress.
+        $progressAnchorDay = $effectiveStatus === 'done' ? $completedAt : now()->startOfDay();
+
         for ($day = $visibleStart->copy(); $day->lte($visibleEnd); $day->addDay()) {
             $date = $day->toDateString();
             $dayLogs = $logsByDate->get($date, collect());
@@ -870,13 +876,13 @@ class TeamLeadDashboard extends Component
                 $runningProgress = min(100, max(0, (int) $dayProgress));
             }
 
-            // On the most recent visible day, align with the same value shown on
-            // the activity bar's label/fill (activityProgressPercentage()) so the
-            // bar and its hover text never contradict each other — a manual status
-            // change (e.g. marking done) can move the authoritative progress ahead
-            // of the last journal entry.
+            // On the anchor day, align with the same value shown on the activity
+            // bar's label/fill (activityProgressPercentage()) so the bar and its
+            // hover text never contradict each other — a manual status change
+            // (e.g. marking done) can move the authoritative progress ahead of
+            // the last journal entry.
             $displayProgress = $runningProgress;
-            if ($day->isSameDay($visibleEnd) && $progress?->progress !== null) {
+            if ($progressAnchorDay && $day->isSameDay($progressAnchorDay) && $progress?->progress !== null) {
                 $displayProgress = min(100, max(0, (int) $progress->progress));
             }
 

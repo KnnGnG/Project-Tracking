@@ -125,12 +125,14 @@
                             <div class="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
                                 <button type="button"
                                         @click="saveSession"
-                                        class="px-4 py-2 rounded-lg text-sm font-semibold bg-sky-600 text-white hover:bg-sky-700">
-                                    Add session to log
+                                        :disabled="saving"
+                                        class="px-4 py-2 rounded-lg text-sm font-semibold bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed">
+                                    <span x-text="saving ? 'Saving...' : 'Add session to log'"></span>
                                 </button>
                                 <button type="button"
                                         @click="dismissBreak"
-                                        class="px-4 py-2 rounded-lg text-sm font-semibold bg-white border border-gray-200 text-gray-700 hover:bg-gray-50">
+                                        :disabled="saving"
+                                        class="px-4 py-2 rounded-lg text-sm font-semibold bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed">
                                     Dismiss
                                 </button>
                             </div>
@@ -153,9 +155,9 @@
                             <button type="button"
                                     x-show="!running"
                                     @click="start"
-                                    :disabled="inputDuration() < 1"
+                                    :disabled="inputDuration() < 1 || saving"
                                     :class="breakMode ? 'bg-sky-600 hover:bg-sky-700' : 'bg-indigo-600 hover:bg-indigo-700'"
-                                    class="px-3 py-2 rounded-lg text-sm font-semibold text-white">
+                                    class="px-3 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed">
                                 Start
                             </button>
                             <button type="button"
@@ -166,12 +168,13 @@
                             </button>
                             <button type="button"
                                     @click="reset"
-                                    class="px-3 py-2 rounded-lg text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
+                                    :disabled="saving"
+                                    class="px-3 py-2 rounded-lg text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                 Reset
                             </button>
                             <button type="button"
                                     @click="addToForm"
-                                    :disabled="elapsed < 1"
+                                    :disabled="elapsed < 1 || saving"
                                     class="px-3 py-2 rounded-lg text-sm font-semibold bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed">
                                 Add time
                             </button>
@@ -298,6 +301,7 @@
                 elapsed: 0,
                 running: false,
                 breakMode: false,
+                saving: false,
                 handle: null,
                 originalTitle: '',
                 originalFavicon: '',
@@ -379,9 +383,11 @@
                     this.reset();
                 },
                 async saveSession() {
-                    if (this.elapsed < 1) {
+                    if (this.elapsed < 1 || this.saving) {
                         return;
                     }
+
+                    this.saving = true;
 
                     try {
                         const saved = await this.$wire.saveTimerSession(this.elapsed);
@@ -391,6 +397,8 @@
                         }
                     } catch (error) {
                         // Livewire renders validation errors; keep timer and break state intact.
+                    } finally {
+                        this.saving = false;
                     }
                 },
                 complete() {

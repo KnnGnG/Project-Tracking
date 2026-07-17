@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Lead;
 
+use App\Models\JournalLog;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskAttachment;
@@ -303,6 +304,44 @@ class LeadTaskManager extends Component
         $this->refreshActiveSelfAssignedTaskContext();
     }
 
+    /** Lead go-sign: approve a member's review and mark their share of the task done. */
+    public function approveMemberReview(int $taskId, int $userId): void
+    {
+        $task = $this->ownedTask($taskId);
+
+        $progress = TaskMemberProgress::where('task_id', $task->id)
+            ->where('user_id', $userId)
+            ->first();
+
+        if (! $progress || $progress->status !== 'review') {
+            return;
+        }
+
+        $memberName = $progress->user?->name ?? 'Member';
+
+        DB::transaction(function () use ($task, $userId): void {
+            $this->syncMemberProgressRows($task, [$userId], 'done');
+            $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
+        });
+
+        $this->recordActivity($task, 'status_changed', auth()->user()->name." approved {$memberName}'s review and marked it done.");
+
+        InAppNotification::create([
+            'user_id' => $userId,
+            'type' => 'task_review_approved',
+            'title' => 'Review approved',
+            'body' => $task->title.' was approved and marked done.',
+            'url' => route('member.dashboard', array_filter([
+                'team' => $task->team_id,
+                'project' => $task->project_id,
+                'task' => $task->id,
+            ])),
+            'data' => ['task_id' => $task->id, 'team_id' => $task->team_id, 'project_id' => $task->project_id],
+        ]);
+
+        session()->flash('success', "Review approved for {$memberName}.");
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     public function toggleTaskDetails(int $id): void
@@ -448,14 +487,18 @@ class LeadTaskManager extends Component
             );
 
             if ($status) {
+                $wasDone = $progress->status === 'done';
                 $progress->status = $status;
 
                 // Journal logs are the source of truth for the progress percentage;
                 // a lead-driven status change alone should not overwrite what the
                 // member has actually reported. "Done" is the one exception, since
-                // it means fully complete.
+                // it means fully complete, and reopening a done task restores what
+                // the journal actually shows instead of leaving the 100% behind.
                 if ($status === 'done') {
                     $progress->progress = 100;
+                } elseif ($wasDone) {
+                    $progress->progress = $this->latestJournalProgress($task->id, $userId) ?? 0;
                 }
 
                 if (in_array($status, ['in_progress', 'review', 'done'], true) && ! $progress->started_at) {
@@ -465,6 +508,16 @@ class LeadTaskManager extends Component
                 $progress->save();
             }
         }
+    }
+
+    private function latestJournalProgress(int $taskId, int $userId): ?int
+    {
+        return JournalLog::where('task_id', $taskId)
+            ->where('user_id', $userId)
+            ->whereNotNull('progress')
+            ->orderByDesc('log_date')
+            ->orderByDesc('id')
+            ->value('progress');
     }
 
     private function syncOverallTaskStatus(Task $task): string

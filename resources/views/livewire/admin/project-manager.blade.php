@@ -256,6 +256,7 @@
                 <p class="text-sm">{{ filled($search) ? 'No projects match your search.' : 'No projects have been created yet.' }}</p>
             </div>
         @else
+            <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 border-b border-gray-200">
                     <tr>
@@ -614,6 +615,7 @@
                     @endforeach
                 </tbody>
             </table>
+            </div>
             <div class="border-t border-gray-100 bg-gray-50 px-6 py-4">
                 {{ $projects->links() }}
             </div>
