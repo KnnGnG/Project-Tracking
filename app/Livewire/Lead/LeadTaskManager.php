@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Lead;
 
+use App\Models\JournalLog;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskAttachment;
@@ -448,14 +449,18 @@ class LeadTaskManager extends Component
             );
 
             if ($status) {
+                $wasDone = $progress->status === 'done';
                 $progress->status = $status;
 
                 // Journal logs are the source of truth for the progress percentage;
                 // a lead-driven status change alone should not overwrite what the
                 // member has actually reported. "Done" is the one exception, since
-                // it means fully complete.
+                // it means fully complete, and reopening a done task restores what
+                // the journal actually shows instead of leaving the 100% behind.
                 if ($status === 'done') {
                     $progress->progress = 100;
+                } elseif ($wasDone) {
+                    $progress->progress = $this->latestJournalProgress($task->id, $userId) ?? 0;
                 }
 
                 if (in_array($status, ['in_progress', 'review', 'done'], true) && ! $progress->started_at) {
@@ -465,6 +470,16 @@ class LeadTaskManager extends Component
                 $progress->save();
             }
         }
+    }
+
+    private function latestJournalProgress(int $taskId, int $userId): ?int
+    {
+        return JournalLog::where('task_id', $taskId)
+            ->where('user_id', $userId)
+            ->whereNotNull('progress')
+            ->orderByDesc('log_date')
+            ->orderByDesc('id')
+            ->value('progress');
     }
 
     private function syncOverallTaskStatus(Task $task): string

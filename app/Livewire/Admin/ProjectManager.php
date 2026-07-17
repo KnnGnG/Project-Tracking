@@ -45,7 +45,6 @@ class ProjectManager extends Component
 
     public ?int $progressProjectId = null;
     public ?int $detailsProjectId = null;
-    public $detailsProjectTasks = null;
     public array $requestReviewReasons = [];
 
     protected function rules(): array
@@ -248,12 +247,13 @@ class ProjectManager extends Component
 
     private function reviewStatusRequest(int $requestId, bool $approve, ProjectStatusService $statusService): void
     {
+        $this->authorizeProjectStatusManager();
+
         $reviewReason = trim($this->requestReviewReasons[$requestId] ?? '');
         $outcome = DB::transaction(function () use ($requestId, $approve, $reviewReason, $statusService) {
             $statusRequest = ProjectStatusChangeRequest::with('project')
                 ->lockForUpdate()
                 ->findOrFail($requestId);
-            $this->authorizeProjectStatusManager();
 
             if ($statusRequest->status !== 'pending') {
                 return 'already_reviewed';
@@ -411,17 +411,14 @@ class ProjectManager extends Component
             // Not limit()-ed: the blade computes the panel's completion/status
             // stats from this same collection, so it needs every task for the
             // project. The task list below only ever renders the first 10.
-            $this->detailsProjectTasks = Task::where('project_id', $this->detailsProjectId)
+            $detailsProjectTasks = Task::where('project_id', $this->detailsProjectId)
                 ->with(['team', 'assignee', 'assignees'])
                 ->orderBy('due_date')
                 ->get();
         } else {
             $detailsProject = null;
-            $this->detailsProjectTasks = null;
+            $detailsProjectTasks = null;
         }
-
-        // expose the property as a local variable for compact() and the view
-        $detailsProjectTasks = $this->detailsProjectTasks;
 
         return view('livewire.admin.project-manager', compact(
             'projects',
