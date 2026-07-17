@@ -354,7 +354,14 @@ class MemberJournal extends Component
         if ($latestLog) {
             $percentage = max(1, min(100, (int) ($latestLog->progress ?? 1)));
             $progress->progress = $percentage;
-            $progress->status = $percentage === 100 ? 'done' : 'in_progress';
+            // A task the member has submitted for review should stay in review
+            // when they log more work on it, unless that work completes it —
+            // only an explicit status change should move it back to in_progress.
+            $progress->status = match (true) {
+                $percentage === 100 => 'done',
+                $progress->status === 'review' => 'review',
+                default => 'in_progress',
+            };
             $progress->started_at = Carbon::parse($earliestLog->log_date)->startOfDay();
             $progress->completed_at = $percentage === 100
                 ? ($latestLog->created_at ?? Carbon::parse($latestLog->log_date)->endOfDay())
@@ -373,22 +380,31 @@ class MemberJournal extends Component
 
     private function syncParentTaskStatus(int $taskId): void
     {
-        $task = Task::with('memberProgress')->find($taskId);
+        $task = Task::with(['memberProgress', 'assignees'])->find($taskId);
 
-        if (! $task || $task->memberProgress->isEmpty()) {
+        if (! $task) {
+            return;
+        }
+
+        $progress = $task->activeMemberProgress();
+
+        if ($progress->isEmpty()) {
             return;
         }
 
         $status = match (true) {
-            $task->memberProgress->every(fn ($item) => $item->status === 'done') => 'done',
-            $task->memberProgress->contains(fn ($item) => $item->status === 'review') => 'review',
-            $task->memberProgress->contains(fn ($item) => in_array($item->status, ['in_progress', 'done'], true)) => 'in_progress',
-            $task->memberProgress->every(fn ($item) => $item->status === 'pending') => 'pending',
+            $progress->every(fn ($item) => $item->status === 'done') => 'done',
+            $progress->contains(fn ($item) => $item->status === 'review') => 'review',
+            $progress->contains(fn ($item) => in_array($item->status, ['in_progress', 'done'], true)) => 'in_progress',
+            $progress->every(fn ($item) => $item->status === 'pending') => 'pending',
             default => 'pending',
         };
 
         if ($task->status !== $status) {
-            $task->update(['status' => $status]);
+            $task->update([
+                'status' => $status,
+                'completed_at' => $status === 'done' ? ($task->completed_at ?? now()) : null,
+            ]);
         }
     }
 

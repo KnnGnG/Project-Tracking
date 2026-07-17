@@ -3,6 +3,7 @@
 namespace App\Livewire\Member;
 
 use App\Models\InAppNotification;
+use App\Models\JournalLog;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskActivity;
@@ -254,6 +255,16 @@ class MemberDashboard extends Component
             ->first();
     }
 
+    private function latestJournalProgress(int $taskId): ?int
+    {
+        return JournalLog::where('task_id', $taskId)
+            ->where('user_id', auth()->id())
+            ->whereNotNull('progress')
+            ->orderByDesc('log_date')
+            ->orderByDesc('id')
+            ->value('progress');
+    }
+
     public function dismissFlash(): void
     {
         $this->flash = null;
@@ -294,17 +305,24 @@ class MemberDashboard extends Component
 
     private function updateMemberProgress(Task $task, string $status): void
     {
-        $progress = TaskMemberProgress::updateOrCreate(
-            ['task_id' => $task->id, 'user_id' => auth()->id()],
-            [
-                'status' => $status,
-                'progress' => match ($status) {
-                    'done' => 100,
-                    'in_progress' => 50,
-                    default => 0,
-                },
-            ]
+        $progress = TaskMemberProgress::firstOrNew(
+            ['task_id' => $task->id, 'user_id' => auth()->id()]
         );
+
+        $progress->status = $status;
+
+        // Journal logs are the source of truth for the progress percentage; a
+        // status change alone should not overwrite what the member has actually
+        // reported. "Done" is the one exception, since it means fully complete,
+        // and "pending" (e.g. reopening a done task) resets to what the journal
+        // actually shows instead of leaving a stale percentage behind.
+        if ($status === 'done') {
+            $progress->progress = 100;
+        } elseif ($status === 'pending') {
+            $progress->progress = $this->latestJournalProgress($task->id) ?? 0;
+        } elseif (! $progress->exists) {
+            $progress->progress = 0;
+        }
 
         if (in_array($status, ['in_progress', 'review', 'done'], true) && ! $progress->started_at) {
             $progress->started_at = now();
@@ -316,7 +334,7 @@ class MemberDashboard extends Component
 
     private function syncOverallTaskStatus(Task $task): void
     {
-        $progress = $task->memberProgress;
+        $progress = $task->activeMemberProgress();
 
         if ($progress->isEmpty()) {
             return;
@@ -330,7 +348,10 @@ class MemberDashboard extends Component
             default => 'pending',
         };
 
-        $task->update(['status' => $status]);
+        $task->update([
+            'status' => $status,
+            'completed_at' => $status === 'done' ? ($task->completed_at ?? now()) : null,
+        ]);
     }
 
     private function personalStatusFor(Task $task): string

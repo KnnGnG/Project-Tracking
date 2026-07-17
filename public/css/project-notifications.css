@@ -325,14 +325,9 @@
 }
 
 .project-task-preview-meta {
+    justify-content: flex-start;
     color: #64748b;
     font-size: 0.67rem;
-}
-
-.project-task-preview-meta strong {
-    flex: none;
-    color: #4f46e5;
-    font-size: 0.69rem;
 }
 
 .project-task-preview-priority {

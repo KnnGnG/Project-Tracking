@@ -93,6 +93,13 @@
                 @empty
                 @endforelse
 
+                @if($overdueOverflowCount > 0)
+                    <a href="{{ auth()->user()->isTeamLead() ? route('lead.tasks') : (auth()->user()->isMember() ? route('member.dashboard', ['tab' => 'exceeded']) : route('dashboard')) }}"
+                       class="mb-2 block rounded-lg border border-dashed border-red-200 bg-red-50/40 px-3 py-2 text-center text-xs font-semibold text-red-600 transition hover:bg-red-50">
+                        +{{ $overdueOverflowCount }} more overdue {{ \Illuminate\Support\Str::plural('task', $overdueOverflowCount) }}
+                    </a>
+                @endif
+
                 @forelse($notifications as $notification)
                     <div class="mb-2 rounded-lg border border-gray-100 bg-white px-3 py-3 shadow-sm transition {{ $notification->read_at ? '' : 'ring-1 ring-indigo-100' }}">
                         <div class="flex items-start justify-between gap-3">

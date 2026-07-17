@@ -76,6 +76,7 @@
                     </div>
                     <div class="text-right">
                         <p class="text-sm font-semibold text-gray-800">{{ intdiv($log->minutes, 60) }}h {{ $log->minutes % 60 }}m</p>
+                        <p class="text-xs font-medium text-indigo-600">Progress: {{ $log->progress !== null ? $log->progress.'%' : 'Not set' }}</p>
                         <p class="text-xs text-gray-400">{{ $log->log_date->format('M d, Y') }}</p>
                     </div>
                 </div>

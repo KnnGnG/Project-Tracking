@@ -253,7 +253,7 @@ class ProjectManager extends Component
             $statusRequest = ProjectStatusChangeRequest::with('project')
                 ->lockForUpdate()
                 ->findOrFail($requestId);
-            $this->authorizeProjectStatusManager($statusRequest->project);
+            $this->authorizeProjectStatusManager();
 
             if ($statusRequest->status !== 'pending') {
                 return 'already_reviewed';
@@ -332,12 +332,9 @@ class ProjectManager extends Component
         ]);
     }
 
-    private function authorizeProjectStatusManager(Project $project): void
+    private function authorizeProjectStatusManager(): void
     {
-        abort_unless(
-            auth()->user()->isAdmin() || (int) $project->created_by === (int) auth()->id(),
-            403
-        );
+        abort_unless(auth()->user()->isAdmin(), 403);
     }
 
     public function toggleProgressDetails(int $projectId): void
@@ -411,10 +408,12 @@ class ProjectManager extends Component
                 'statusHistories' => fn ($query) => $query->with('actor:id,name')->limit(10),
             ])->find($this->detailsProjectId);
 
+            // Not limit()-ed: the blade computes the panel's completion/status
+            // stats from this same collection, so it needs every task for the
+            // project. The task list below only ever renders the first 10.
             $this->detailsProjectTasks = Task::where('project_id', $this->detailsProjectId)
                 ->with(['team', 'assignee', 'assignees'])
                 ->orderBy('due_date')
-                ->limit(10)
                 ->get();
         } else {
             $detailsProject = null;

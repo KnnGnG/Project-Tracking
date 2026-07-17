@@ -203,7 +203,10 @@ class User extends Authenticatable
     {
         return $this->createdProjects()->exists()
             || $this->createdTasks()->exists()
-            || $this->assignedTasks()->exists();
+            || $this->assignedTasks()->exists()
+            || $this->assignedTasksMany()->exists()
+            || $this->journalLogs()->exists()
+            || $this->taskMemberProgress()->exists();
     }
 }
 

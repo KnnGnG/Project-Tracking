@@ -265,7 +265,7 @@
                         <th class="px-6 py-3 text-left font-semibold text-gray-600">Status</th>
                         <th class="px-6 py-3 text-left font-semibold text-gray-600">Progress</th>
                         <th class="px-6 py-3 text-left font-semibold text-gray-600">Teams</th>
-                        <th class="w-56 px-4 py-3 text-left font-semibold text-gray-600">Actions</th>
+                        <th class="w-64 px-4 py-3 text-left font-semibold text-gray-600">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -318,8 +318,8 @@
                             <td class="px-6 py-4 text-gray-600">
                                 {{ $project->teams->count() }}
                             </td>
-                            <td class="w-56 px-4 py-4 whitespace-nowrap">
-                                <div class="flex flex-wrap items-center justify-start gap-2">
+                            <td class="w-64 px-4 py-4 whitespace-nowrap">
+                                <div class="flex flex-nowrap items-center justify-start gap-2">
                                     <button wire:click.stop="showDetails({{ $project->id }})"
                                             class="ui-action-button ui-action-primary">
                                         Details
@@ -328,7 +328,7 @@
                                             class="ui-action-button ui-action-primary">
                                         Edit
                                     </button>
-                                    <span class="ml-1 border-l border-slate-200 pl-3">
+                                    <span class="flex-none border-l border-slate-200 pl-2">
                                         <button wire:click.stop="confirmDelete({{ $project->id }})"
                                                 class="ui-action-button ui-action-danger">
                                             Delete
