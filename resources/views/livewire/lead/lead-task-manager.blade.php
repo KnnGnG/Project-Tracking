@@ -1,5 +1,174 @@
 <div class="space-y-6">
 
+    {{-- ── Needs Your Review ─────────────────────────────────────────────────── --}}
+    <div class="ui-soft-panel overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+            <div>
+                <h2 class="text-sm font-semibold text-gray-900">Needs Your Review</h2>
+                <p class="mt-0.5 text-xs text-gray-400">Work submitted by your team, waiting for your go-ahead.</p>
+            </div>
+            <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                {{ $reviewQueue->count() }} task{{ $reviewQueue->count() !== 1 ? 's' : '' }}
+            </span>
+        </div>
+
+        @if($reviewQueue->isEmpty())
+            <div class="px-5 py-8 text-center text-sm text-gray-400">
+                Nothing waiting on you. Submitted work will show up here.
+            </div>
+        @else
+            <div class="divide-y divide-gray-100">
+                @foreach($reviewQueue as $progress)
+                    @php
+                        $reviewTask = $progress->task;
+                        $isReviewExpanded = $expandedReviewId === $progress->id;
+                        $isRevising = $revisingProgressId === $progress->id;
+                    @endphp
+                    <div>
+                        <div class="flex flex-wrap items-center justify-between gap-3 p-4">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-semibold text-gray-900">{{ $reviewTask?->title ?? 'Untitled task' }}</p>
+                                <p class="mt-0.5 truncate text-xs text-gray-400">
+                                    {{ $progress->user?->name ?? 'Unknown member' }}
+                                    <span class="text-gray-300">·</span>
+                                    {{ $reviewTask?->project?->name ?? 'No project' }} / {{ $reviewTask?->team?->name ?? 'No team' }}
+                                </p>
+                            </div>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <button type="button"
+                                        wire:click="toggleReviewDetails({{ $progress->id }})"
+                                        class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">
+                                    {{ $isReviewExpanded ? 'Hide details' : 'Details' }}
+                                </button>
+                                <button type="button"
+                                        wire:click="startRevision({{ $progress->id }})"
+                                        class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100">
+                                    {{ $isRevising ? 'Cancel revise' : 'Revise' }}
+                                </button>
+                                <button type="button"
+                                        wire:click="approveMemberReview({{ $reviewTask?->id }}, {{ $progress->user_id }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="approveMemberReview({{ $reviewTask?->id }}, {{ $progress->user_id }})"
+                                        class="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed">
+                                    Approve &amp; mark done
+                                </button>
+                            </div>
+                        </div>
+
+                        @if($isRevising)
+                            <div class="border-t border-amber-100 bg-amber-50/60 px-4 py-4">
+                                <label for="revision-notes-{{ $progress->id }}" class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                                    What needs to change?
+                                </label>
+                                <textarea id="revision-notes-{{ $progress->id }}"
+                                          wire:model="revisionNotes"
+                                          rows="3"
+                                          placeholder="e.g. Please fix the broken link in the footer and re-test on mobile."
+                                          class="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+                                @error('revisionNotes') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                <div class="mt-2 flex justify-end gap-2">
+                                    <button type="button"
+                                            wire:click="startRevision({{ $progress->id }})"
+                                            class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">
+                                        Cancel
+                                    </button>
+                                    <button type="button"
+                                            wire:click="requestRevision({{ $reviewTask?->id }}, {{ $progress->user_id }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="requestRevision({{ $reviewTask?->id }}, {{ $progress->user_id }})"
+                                            class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed">
+                                        Send back for revision
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
+
+                        @if($isReviewExpanded)
+                            <div class="border-t border-gray-100 bg-gray-50 px-4 py-4 space-y-4">
+                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                    <div>
+                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Priority</p>
+                                        <p class="mt-0.5 text-sm text-gray-800">{{ ucfirst($reviewTask?->priority ?? '—') }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Due</p>
+                                        <p class="mt-0.5 text-sm text-gray-800">{{ $reviewTask?->due_date?->format('M d, Y') ?? 'Not set' }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Reported progress</p>
+                                        <p class="mt-0.5 text-sm text-gray-800">{{ $progress->progress }}%</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Started</p>
+                                        <p class="mt-0.5 text-sm text-gray-800">{{ $progress->started_at?->format('M d, Y') ?? '—' }}</p>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Description</p>
+                                    @if($reviewTask?->description)
+                                        <p class="text-sm text-gray-700 whitespace-pre-line">{{ $reviewTask->description }}</p>
+                                    @else
+                                        <p class="text-sm italic text-gray-400">No description provided.</p>
+                                    @endif
+                                </div>
+
+                                @if($reviewTask?->attachments->isNotEmpty())
+                                    <div>
+                                        <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Attachments</p>
+                                        <div class="flex flex-wrap gap-2">
+                                            @foreach($reviewTask->attachments as $attachment)
+                                                <button type="button"
+                                                        wire:click="downloadAttachment({{ $attachment->id }})"
+                                                        class="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+                                                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828L18 9.828a4 4 0 00-5.657-5.657L5.757 10.757a6 6 0 108.486 8.486L20.5 13"/>
+                                                    </svg>
+                                                    <span class="truncate">{{ $attachment->original_name }}</span>
+                                                    <span class="shrink-0 text-xs font-normal text-gray-400">{{ $attachment->formattedSize() }}</span>
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <div>
+                                    <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                                        Recent journal entries — {{ $progress->user?->name ?? 'member' }}
+                                    </p>
+                                    @if($expandedReviewLogs->isEmpty())
+                                        <p class="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-400">No journal entries logged for this task yet.</p>
+                                    @else
+                                        <div class="space-y-2">
+                                            @foreach($expandedReviewLogs as $log)
+                                                <div class="rounded-lg border border-gray-200 bg-white p-3">
+                                                    <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                                                        <span class="font-semibold text-gray-700">{{ $log->log_date?->format('M d, Y') ?? '—' }}</span>
+                                                        <span>
+                                                            {{ intdiv($log->minutes, 60) }}h {{ $log->minutes % 60 }}m
+                                                            @if(! is_null($log->progress))
+                                                                <span class="text-gray-300">·</span> {{ $log->progress }}%
+                                                            @endif
+                                                        </span>
+                                                    </div>
+                                                    @if($log->notes)
+                                                        <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ $log->notes }}</p>
+                                                    @else
+                                                        <p class="mt-1 text-sm italic text-gray-400">No notes added for this log.</p>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
+
     <div class="ui-toolbar">
         <div class="flex flex-wrap items-center gap-3">
             <select wire:model.live="filterTeamId"

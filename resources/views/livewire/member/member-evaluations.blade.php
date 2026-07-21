@@ -76,12 +76,13 @@
         <div class="space-y-5">
             @foreach($evaluations as $evaluation)
                 @php
+                    $evaluationLabels = $evaluation->resolvedCriteriaLabels();
                     $scores = collect([
-                        'Quality' => $evaluation->quality_score,
-                        'Productivity' => $evaluation->productivity_score,
-                        'Teamwork' => $evaluation->teamwork_score,
-                        'Communication' => $evaluation->communication_score,
-                        'Reliability' => $evaluation->reliability_score,
+                        $evaluationLabels['quality_score'] => $evaluation->quality_score,
+                        $evaluationLabels['productivity_score'] => $evaluation->productivity_score,
+                        $evaluationLabels['teamwork_score'] => $evaluation->teamwork_score,
+                        $evaluationLabels['communication_score'] => $evaluation->communication_score,
+                        $evaluationLabels['reliability_score'] => $evaluation->reliability_score,
                     ]);
                     $highestScore = $scores->max();
                     $lowestScore = $scores->min();

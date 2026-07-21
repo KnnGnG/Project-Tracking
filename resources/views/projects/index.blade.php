@@ -79,6 +79,15 @@
             @endphp
             <div class="project-picker-heading">
                 <div>
+                    @if($backToDashboardRoute)
+                        <a href="{{ $backToDashboardRoute }}"
+                           class="mb-2 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-indigo-600">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                            </svg>
+                            Back to Dashboard
+                        </a>
+                    @endif
                     <h1 class="text-2xl font-extrabold tracking-tight text-slate-950">My Projects</h1>
                     <p class="mt-2 text-sm text-slate-600">
                         Choose a project to open the dashboard for your role in that project.

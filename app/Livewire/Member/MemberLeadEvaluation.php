@@ -4,7 +4,9 @@ namespace App\Livewire\Member;
 
 use App\Models\Team;
 use App\Models\TeamLeadEvaluation;
+use App\Support\EvaluationCriteria;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -29,6 +31,18 @@ class MemberLeadEvaluation extends Component
     public string $improvements = '';
     public ?string $flash = null;
 
+    /** Chosen criteria label for each score slot; keys match the *Score properties above. */
+    public array $criteriaLabels = [];
+
+    /** Maps each score property to its database column. */
+    private const FIELD_COLUMNS = [
+        'leadershipScore' => 'leadership_score',
+        'communicationScore' => 'communication_score',
+        'supportScore' => 'support_score',
+        'organizationScore' => 'organization_score',
+        'fairnessScore' => 'fairness_score',
+    ];
+
     public function mount(): void
     {
         $requestedTeamId = request()->has('team')
@@ -46,6 +60,7 @@ class MemberLeadEvaluation extends Component
 
         $this->periodStart = now()->startOfMonth()->toDateString();
         $this->periodEnd = now()->endOfMonth()->toDateString();
+        $this->criteriaLabels = $this->defaultCriteriaLabels();
     }
 
     public function updatedSelectedTeamId(): void
@@ -73,6 +88,8 @@ class MemberLeadEvaluation extends Component
             'supportScore' => ['required', 'integer', 'min:1', 'max:5'],
             'organizationScore' => ['required', 'integer', 'min:1', 'max:5'],
             'fairnessScore' => ['required', 'integer', 'min:1', 'max:5'],
+            'criteriaLabels' => ['required', 'array', 'size:5'],
+            'criteriaLabels.*' => [Rule::in(array_keys(EvaluationCriteria::LEAD_CRITERIA))],
             'summary' => ['nullable', 'string', 'max:2000'],
             'strengths' => ['nullable', 'string', 'max:2000'],
             'improvements' => ['nullable', 'string', 'max:2000'],
@@ -84,6 +101,16 @@ class MemberLeadEvaluation extends Component
         if (! $team || ! $leadId) {
             $this->addError('selectedTeamId', 'Choose a team with an assigned lead.');
             return;
+        }
+
+        if (count(array_unique($data['criteriaLabels'])) !== count($data['criteriaLabels'])) {
+            $this->addError('criteriaLabels', 'Choose a different criteria for each slot.');
+            return;
+        }
+
+        $criteriaLabels = [];
+        foreach (self::FIELD_COLUMNS as $field => $column) {
+            $criteriaLabels[$column] = $data['criteriaLabels'][$field];
         }
 
         $identity = [
@@ -99,6 +126,7 @@ class MemberLeadEvaluation extends Component
             'support_score' => (int) $data['supportScore'],
             'organization_score' => (int) $data['organizationScore'],
             'fairness_score' => (int) $data['fairnessScore'],
+            'criteria_labels' => $criteriaLabels,
             'summary' => trim($data['summary'] ?? '') ?: null,
             'strengths' => trim($data['strengths'] ?? '') ?: null,
             'improvements' => trim($data['improvements'] ?? '') ?: null,
@@ -141,7 +169,18 @@ class MemberLeadEvaluation extends Component
         $this->summary = '';
         $this->strengths = '';
         $this->improvements = '';
+        $this->criteriaLabels = $this->defaultCriteriaLabels();
         $this->resetValidation();
+    }
+
+    private function defaultCriteriaLabels(): array
+    {
+        $labels = [];
+        foreach (self::FIELD_COLUMNS as $field => $column) {
+            $labels[$field] = EvaluationCriteria::LEAD_DEFAULT_LABELS[$column];
+        }
+
+        return $labels;
     }
 
     private function accessibleTeams()
@@ -182,6 +221,8 @@ class MemberLeadEvaluation extends Component
             ->latest()
             ->get();
 
-        return view('livewire.member.member-lead-evaluation', compact('teams', 'selectedTeam', 'selectedLead', 'formAverage', 'evaluations'));
+        $criteriaPool = EvaluationCriteria::LEAD_CRITERIA;
+
+        return view('livewire.member.member-lead-evaluation', compact('teams', 'selectedTeam', 'selectedLead', 'formAverage', 'evaluations', 'criteriaPool'));
     }
 }

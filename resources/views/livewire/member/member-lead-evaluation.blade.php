@@ -65,16 +65,14 @@
                 </div>
 
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
-                    @foreach([
-                        'leadershipScore' => ['label' => 'Leadership', 'hint' => 'Direction'],
-                        'communicationScore' => ['label' => 'Communication', 'hint' => 'Clarity'],
-                        'supportScore' => ['label' => 'Support', 'hint' => 'Helpfulness'],
-                        'organizationScore' => ['label' => 'Organization', 'hint' => 'Planning'],
-                        'fairnessScore' => ['label' => 'Fairness', 'hint' => 'Consistency'],
-                    ] as $field => $meta)
+                    @foreach(['leadershipScore', 'communicationScore', 'supportScore', 'organizationScore', 'fairnessScore'] as $field)
                         <div class="rounded-xl border border-gray-200 bg-gray-50 p-3">
-                            <label class="text-xs font-semibold text-gray-500">{{ $meta['label'] }}</label>
-                            <p class="mt-0.5 text-[11px] text-gray-400">{{ $meta['hint'] }}</p>
+                            <select wire:model.live="criteriaLabels.{{ $field }}" class="w-full rounded-lg border-gray-300 bg-white text-xs font-semibold text-gray-700 focus:border-indigo-500 focus:ring-indigo-500">
+                                @foreach($criteriaPool as $label => $hint)
+                                    <option value="{{ $label }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-0.5 text-[11px] text-gray-400">{{ $criteriaPool[$criteriaLabels[$field]] ?? '' }}</p>
                             <select wire:model.live="{{ $field }}" class="mt-2 w-full rounded-lg border-gray-300 bg-white text-sm font-semibold text-gray-800 focus:border-indigo-500 focus:ring-indigo-500">
                                 @for($score = 1; $score <= 5; $score++)
                                     <option value="{{ $score }}">{{ $score }}</option>
@@ -82,6 +80,17 @@
                             </select>
                         </div>
                     @endforeach
+                </div>
+                @error('criteriaLabels') <p class="text-xs text-red-500">{{ $message }}</p> @enderror
+
+                <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">Lead-facing score preview</p>
+                            <p class="mt-1 text-sm text-gray-600">Your team lead will see this average plus each category score.</p>
+                        </div>
+                        <p class="text-2xl font-extrabold text-indigo-700">{{ $formAverage }}/5</p>
+                    </div>
                 </div>
 
                 <div>

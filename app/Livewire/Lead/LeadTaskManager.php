@@ -6,6 +6,7 @@ use App\Models\JournalLog;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskAttachment;
+use App\Models\TaskComment;
 use App\Models\TaskMemberProgress;
 use App\Models\Team;
 use App\Livewire\Concerns\ResolvesLeadProjectContext;
@@ -62,6 +63,9 @@ class LeadTaskManager extends Component
 
     public ?int $deleteId = null;
     public ?int $expandedTaskId = null;
+    public ?int $expandedReviewId = null;
+    public ?int $revisingProgressId = null;
+    public string $revisionNotes = '';
 
     public function mount(): void
     {
@@ -340,6 +344,83 @@ class LeadTaskManager extends Component
         ]);
 
         session()->flash('success', "Review approved for {$memberName}.");
+
+        if ($this->expandedReviewId === $progress->id) {
+            $this->expandedReviewId = null;
+        }
+
+        if ($this->revisingProgressId === $progress->id) {
+            $this->revisingProgressId = null;
+            $this->revisionNotes = '';
+        }
+    }
+
+    public function toggleReviewDetails(int $progressId): void
+    {
+        $this->expandedReviewId = $this->expandedReviewId === $progressId ? null : $progressId;
+    }
+
+    /** Open/close the revision-notes composer for a review row. */
+    public function startRevision(int $progressId): void
+    {
+        $this->revisingProgressId = $this->revisingProgressId === $progressId ? null : $progressId;
+        $this->revisionNotes = '';
+        $this->resetValidation('revisionNotes');
+    }
+
+    /** Send a review back to the member with notes on what needs to change. */
+    public function requestRevision(int $taskId, int $userId): void
+    {
+        $data = $this->validate([
+            'revisionNotes' => ['required', 'string', 'min:3', 'max:2000'],
+        ], [], ['revisionNotes' => 'revision notes']);
+
+        $task = $this->ownedTask($taskId);
+
+        $progress = TaskMemberProgress::where('task_id', $task->id)
+            ->where('user_id', $userId)
+            ->first();
+
+        if (! $progress || $progress->status !== 'review') {
+            return;
+        }
+
+        $memberName = $progress->user?->name ?? 'Member';
+
+        DB::transaction(function () use ($task, $userId, $data): void {
+            $this->syncMemberProgressRows($task, [$userId], 'in_progress');
+            $this->syncOverallTaskStatus($task->fresh(['memberProgress']));
+
+            TaskComment::create([
+                'task_id' => $task->id,
+                'user_id' => auth()->id(),
+                'body' => "Revision requested: {$data['revisionNotes']}",
+            ]);
+        });
+
+        $this->recordActivity($task, 'status_changed', auth()->user()->name." requested revisions from {$memberName} and moved it back to in progress.");
+
+        InAppNotification::create([
+            'user_id' => $userId,
+            'type' => 'task_revision_requested',
+            'title' => 'Revisions requested',
+            'body' => $task->title.': '.$data['revisionNotes'],
+            'url' => route('member.dashboard', array_filter([
+                'team' => $task->team_id,
+                'project' => $task->project_id,
+                'task' => $task->id,
+            ])),
+            'data' => ['task_id' => $task->id, 'team_id' => $task->team_id, 'project_id' => $task->project_id],
+        ]);
+
+        session()->flash('success', "Revision requested from {$memberName}.");
+
+        $this->revisingProgressId = null;
+        $this->revisionNotes = '';
+
+        if ($this->expandedReviewId === $progress->id) {
+            $this->expandedReviewId = null;
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -609,8 +690,34 @@ class LeadTaskManager extends Component
             ? $this->ownedTask($this->editingId)->attachments()->latest()->get()
             : collect();
 
+        // Always scoped to every led team (not the table's team/status filters) so
+        // this queue stays visible regardless of what the lead is currently browsing.
+        $reviewQueue = TaskMemberProgress::with(['user', 'task.project', 'task.team', 'task.attachments'])
+            ->where('status', 'review')
+            ->whereHas('task', fn ($q) => $q
+                ->whereIn('team_id', $leadTeams->pluck('id'))
+                ->when((int) session('active_project_id', 0) > 0, fn ($q2) => $q2->where('project_id', (int) session('active_project_id'))))
+            ->oldest('started_at')
+            ->get();
+
+        $expandedReviewLogs = collect();
+        if ($this->expandedReviewId) {
+            $expandedReviewProgress = $reviewQueue->firstWhere('id', $this->expandedReviewId);
+
+            if ($expandedReviewProgress) {
+                $expandedReviewLogs = JournalLog::where('task_id', $expandedReviewProgress->task_id)
+                    ->where('user_id', $expandedReviewProgress->user_id)
+                    ->orderByDesc('log_date')
+                    ->orderByDesc('id')
+                    ->limit(10)
+                    ->get();
+            } else {
+                $this->expandedReviewId = null;
+            }
+        }
+
         return view('livewire.lead.lead-task-manager',
-            compact('leadTeams', 'tasks', 'membersForForm', 'existingAttachments'));
+            compact('leadTeams', 'tasks', 'membersForForm', 'existingAttachments', 'reviewQueue', 'expandedReviewLogs'));
     }
 
     private function membersForSelectedTeam()

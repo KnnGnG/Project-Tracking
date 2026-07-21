@@ -381,12 +381,6 @@
                                                           class="px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg">
                                                         Awaiting approval
                                                     </span>
-                                                @else
-                                                    <button wire:click="setStatus({{ $task->id }}, 'done')"
-                                                            title="Mark Done"
-                                                            class="px-2.5 py-1 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition">
-                                                        Done
-                                                    </button>
                                                 @endif
                                             @else
                                                 <div class="flex flex-wrap items-center justify-end gap-1.5">
