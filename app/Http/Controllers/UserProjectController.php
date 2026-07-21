@@ -76,6 +76,7 @@ class UserProjectController extends Controller
 
         $newTaskNotifications = $this->newTaskNotifications($request);
         $projectTaskOverview = $this->projectTaskOverview($request, $newTaskNotifications);
+        $backToDashboardRoute = $this->backToDashboardRoute($teams);
 
         return view('projects.index', compact(
             'projects',
@@ -84,6 +85,7 @@ class UserProjectController extends Controller
             'statusOptions',
             'statusFilter',
             'sort',
+            'backToDashboardRoute',
         ));
     }
 
@@ -262,6 +264,25 @@ class UserProjectController extends Controller
             ->wherePivotIn('role', ['lead', 'member']);
     }
 
+
+    /** Resolves the dashboard the user was last viewing before navigating to My Projects, if any. */
+    private function backToDashboardRoute(Collection $teams): ?string
+    {
+        $activeTeamId = (int) session('active_team_id', 0);
+        $activeRole = session('active_project_role');
+
+        if ($activeTeamId < 1 || ! in_array($activeRole, ['lead', 'member'], true)) {
+            return null;
+        }
+
+        if (! $teams->contains('id', $activeTeamId)) {
+            return null;
+        }
+
+        return $activeRole === 'lead'
+            ? route('lead.dashboard', ['team' => $activeTeamId])
+            : route('member.dashboard', ['team' => $activeTeamId, 'project' => (int) session('active_project_id', 0)]);
+    }
 
     private function roleForTeam(Team $team): string
     {

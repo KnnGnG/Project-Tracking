@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\EvaluationCriteria;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -21,6 +22,7 @@ class TeamMemberEvaluation extends Model
         'teamwork_score',
         'communication_score',
         'reliability_score',
+        'criteria_labels',
         'summary',
         'strengths',
         'improvements',
@@ -36,7 +38,14 @@ class TeamMemberEvaluation extends Model
             'teamwork_score' => 'integer',
             'communication_score' => 'integer',
             'reliability_score' => 'integer',
+            'criteria_labels' => 'array',
         ];
+    }
+
+    /** Score column labels for this evaluation, falling back to the defaults for any slot not customized. */
+    public function resolvedCriteriaLabels(): array
+    {
+        return array_merge(EvaluationCriteria::MEMBER_DEFAULT_LABELS, $this->criteria_labels ?? []);
     }
 
     public function team(): BelongsTo

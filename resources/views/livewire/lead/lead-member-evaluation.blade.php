@@ -91,12 +91,13 @@
                 <div class="divide-y divide-gray-100">
                     @foreach($leadFeedback as $feedback)
                         @php
+                            $feedbackLabels = $feedback->resolvedCriteriaLabels();
                             $scores = collect([
-                                'Leadership' => $feedback->leadership_score,
-                                'Communication' => $feedback->communication_score,
-                                'Support' => $feedback->support_score,
-                                'Organization' => $feedback->organization_score,
-                                'Fairness' => $feedback->fairness_score,
+                                $feedbackLabels['leadership_score'] => $feedback->leadership_score,
+                                $feedbackLabels['communication_score'] => $feedback->communication_score,
+                                $feedbackLabels['support_score'] => $feedback->support_score,
+                                $feedbackLabels['organization_score'] => $feedback->organization_score,
+                                $feedbackLabels['fairness_score'] => $feedback->fairness_score,
                             ]);
                         @endphp
                         <article class="px-6 py-5">
@@ -265,16 +266,14 @@
                             </div>
 
                             <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
-                                @foreach([
-                                    'qualityScore' => ['label' => 'Quality', 'hint' => 'Output standard'],
-                                    'productivityScore' => ['label' => 'Productivity', 'hint' => 'Work completed'],
-                                    'teamworkScore' => ['label' => 'Teamwork', 'hint' => 'Collaboration'],
-                                    'communicationScore' => ['label' => 'Communication', 'hint' => 'Clarity'],
-                                    'reliabilityScore' => ['label' => 'Reliability', 'hint' => 'Follow-through'],
-                                ] as $field => $meta)
+                                @foreach(['qualityScore', 'productivityScore', 'teamworkScore', 'communicationScore', 'reliabilityScore'] as $field)
                                     <div class="rounded-xl border border-gray-200 bg-gray-50 p-3">
-                                        <label class="text-xs font-semibold text-gray-500">{{ $meta['label'] }}</label>
-                                        <p class="mt-0.5 text-[11px] text-gray-400">{{ $meta['hint'] }}</p>
+                                        <select wire:model.live="criteriaLabels.{{ $field }}" class="w-full rounded-lg border-gray-300 bg-white text-xs font-semibold text-gray-700 focus:border-indigo-500 focus:ring-indigo-500">
+                                            @foreach($criteriaPool as $label => $hint)
+                                                <option value="{{ $label }}">{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                        <p class="mt-0.5 text-[11px] text-gray-400">{{ $criteriaPool[$criteriaLabels[$field]] ?? '' }}</p>
                                         <select wire:model.live="{{ $field }}" class="mt-2 w-full rounded-lg border-gray-300 bg-white text-sm font-semibold text-gray-800 focus:border-indigo-500 focus:ring-indigo-500">
                                             @for($score = 1; $score <= 5; $score++)
                                                 <option value="{{ $score }}">{{ $score }}</option>
@@ -283,6 +282,7 @@
                                     </div>
                                 @endforeach
                             </div>
+                            @error('criteriaLabels') <p class="text-xs text-red-500">{{ $message }}</p> @enderror
 
                             <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
                                 <div class="flex flex-wrap items-center justify-between gap-3">
@@ -337,12 +337,13 @@
                     <div class="divide-y divide-gray-50">
                         @forelse($evaluations as $evaluation)
                             @php
+                                $evaluationLabels = $evaluation->resolvedCriteriaLabels();
                                 $scores = collect([
-                                    'Quality' => $evaluation->quality_score,
-                                    'Productivity' => $evaluation->productivity_score,
-                                    'Teamwork' => $evaluation->teamwork_score,
-                                    'Communication' => $evaluation->communication_score,
-                                    'Reliability' => $evaluation->reliability_score,
+                                    $evaluationLabels['quality_score'] => $evaluation->quality_score,
+                                    $evaluationLabels['productivity_score'] => $evaluation->productivity_score,
+                                    $evaluationLabels['teamwork_score'] => $evaluation->teamwork_score,
+                                    $evaluationLabels['communication_score'] => $evaluation->communication_score,
+                                    $evaluationLabels['reliability_score'] => $evaluation->reliability_score,
                                 ]);
                                 $highestScore = $scores->max();
                                 $lowestScore = $scores->min();

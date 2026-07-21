@@ -88,6 +88,130 @@ class TaskReviewApprovalTest extends TestCase
         ]);
     }
 
+    public function test_lead_task_manager_lists_pending_reviews_and_approves_from_the_panel(): void
+    {
+        [$lead, $member, $team, $task] = $this->reviewContext();
+
+        $this->actingAs($lead)->withSession([
+            'active_project_id' => $task->project_id,
+            'active_team_id' => $team->id,
+            'active_project_role' => 'lead',
+        ]);
+
+        Livewire::test(LeadTaskManager::class)
+            ->assertSee('Needs Your Review')
+            ->assertSee('Ship the review gate')
+            ->assertSee($member->name)
+            ->call('approveMemberReview', $task->id, $member->id)
+            ->assertSee('Nothing waiting on you. Submitted work will show up here.');
+
+        $this->assertSame('done', $task->fresh()->status);
+    }
+
+    public function test_lead_can_expand_review_details_to_see_journal_notes_and_attachments(): void
+    {
+        [$lead, $member, $team, $task] = $this->reviewContext();
+
+        \App\Models\JournalLog::create([
+            'user_id' => $member->id,
+            'task_id' => $task->id,
+            'team_id' => $team->id,
+            'log_date' => now()->toDateString(),
+            'minutes' => 90,
+            'progress' => 80,
+            'notes' => 'Finished the review gate copy and pushed for QA.',
+        ]);
+
+        $progress = TaskMemberProgress::where('task_id', $task->id)->where('user_id', $member->id)->first();
+
+        $this->actingAs($lead)->withSession([
+            'active_project_id' => $task->project_id,
+            'active_team_id' => $team->id,
+            'active_project_role' => 'lead',
+        ]);
+
+        Livewire::test(LeadTaskManager::class)
+            ->assertDontSee('Finished the review gate copy and pushed for QA.')
+            ->call('toggleReviewDetails', $progress->id)
+            ->assertSet('expandedReviewId', $progress->id)
+            ->assertSee('Finished the review gate copy and pushed for QA.')
+            ->assertSee('Hide details')
+            ->call('toggleReviewDetails', $progress->id)
+            ->assertSet('expandedReviewId', null)
+            ->assertDontSee('Finished the review gate copy and pushed for QA.');
+    }
+
+    public function test_expanded_review_details_collapse_after_approval(): void
+    {
+        [$lead, $member, $team, $task] = $this->reviewContext();
+        $progress = TaskMemberProgress::where('task_id', $task->id)->where('user_id', $member->id)->first();
+
+        $this->actingAs($lead)->withSession([
+            'active_project_id' => $task->project_id,
+            'active_team_id' => $team->id,
+            'active_project_role' => 'lead',
+        ]);
+
+        Livewire::test(LeadTaskManager::class)
+            ->call('toggleReviewDetails', $progress->id)
+            ->assertSet('expandedReviewId', $progress->id)
+            ->call('approveMemberReview', $task->id, $member->id)
+            ->assertSet('expandedReviewId', null);
+    }
+
+    public function test_team_lead_can_send_a_review_back_with_revision_notes(): void
+    {
+        [$lead, $member, $team, $task] = $this->reviewContext();
+
+        $this->actingAs($lead)->withSession([
+            'active_project_id' => $task->project_id,
+            'active_team_id' => $team->id,
+            'active_project_role' => 'lead',
+        ]);
+
+        Livewire::test(LeadTaskManager::class)
+            ->set('revisionNotes', 'Please fix the broken link in the footer.')
+            ->call('requestRevision', $task->id, $member->id)
+            ->assertHasNoErrors()
+            ->assertSet('revisionNotes', '')
+            ->assertSet('revisingProgressId', null);
+
+        $this->assertSame('in_progress', $task->fresh()->status);
+        $this->assertDatabaseHas('task_member_progress', [
+            'task_id' => $task->id,
+            'user_id' => $member->id,
+            'status' => 'in_progress',
+        ]);
+        $this->assertDatabaseHas('task_comments', [
+            'task_id' => $task->id,
+            'user_id' => $lead->id,
+            'body' => 'Revision requested: Please fix the broken link in the footer.',
+        ]);
+        $this->assertDatabaseHas('in_app_notifications', [
+            'user_id' => $member->id,
+            'type' => 'task_revision_requested',
+        ]);
+    }
+
+    public function test_requesting_revision_without_notes_fails_validation_and_leaves_task_under_review(): void
+    {
+        [$lead, $member, $team, $task] = $this->reviewContext();
+
+        $this->actingAs($lead)->withSession([
+            'active_project_id' => $task->project_id,
+            'active_team_id' => $team->id,
+            'active_project_role' => 'lead',
+        ]);
+
+        Livewire::test(LeadTaskManager::class)
+            ->set('revisionNotes', '')
+            ->call('requestRevision', $task->id, $member->id)
+            ->assertHasErrors(['revisionNotes' => 'required']);
+
+        $this->assertSame('review', $task->fresh()->status);
+        $this->assertDatabaseMissing('task_comments', ['task_id' => $task->id]);
+    }
+
     public function test_team_lead_cannot_approve_a_review_for_a_task_outside_their_teams(): void
     {
         [, $member, , $task] = $this->reviewContext();

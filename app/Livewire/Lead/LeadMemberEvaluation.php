@@ -11,6 +11,7 @@ use App\Models\Team;
 use App\Models\TeamLeadEvaluation;
 use App\Models\TeamMemberEvaluation;
 use App\Models\User;
+use App\Support\EvaluationCriteria;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
@@ -44,6 +45,18 @@ class LeadMemberEvaluation extends Component
     public string $improvements = '';
     public ?string $flash = null;
 
+    /** Chosen criteria label for each score slot; keys match the *Score properties above. */
+    public array $criteriaLabels = [];
+
+    /** Maps each score property to its database column. */
+    private const FIELD_COLUMNS = [
+        'qualityScore' => 'quality_score',
+        'productivityScore' => 'productivity_score',
+        'teamworkScore' => 'teamwork_score',
+        'communicationScore' => 'communication_score',
+        'reliabilityScore' => 'reliability_score',
+    ];
+
     public function mount(): void
     {
         $requestedTeamId = request()->has('team')
@@ -63,6 +76,7 @@ class LeadMemberEvaluation extends Component
 
         $this->periodStart = now()->startOfMonth()->toDateString();
         $this->periodEnd = now()->endOfMonth()->toDateString();
+        $this->criteriaLabels = $this->defaultCriteriaLabels();
     }
 
     public function selectTeam(int $teamId): void
@@ -108,6 +122,11 @@ class LeadMemberEvaluation extends Component
         $this->summary = $evaluation->summary ?? '';
         $this->strengths = $evaluation->strengths ?? '';
         $this->improvements = $evaluation->improvements ?? '';
+
+        $labels = $evaluation->resolvedCriteriaLabels();
+        foreach (self::FIELD_COLUMNS as $field => $column) {
+            $this->criteriaLabels[$field] = $labels[$column];
+        }
     }
 
     public function save(): void
@@ -122,6 +141,8 @@ class LeadMemberEvaluation extends Component
             'teamworkScore' => ['required', 'integer', 'min:1', 'max:5'],
             'communicationScore' => ['required', 'integer', 'min:1', 'max:5'],
             'reliabilityScore' => ['required', 'integer', 'min:1', 'max:5'],
+            'criteriaLabels' => ['required', 'array', 'size:5'],
+            'criteriaLabels.*' => [Rule::in(array_keys(EvaluationCriteria::MEMBER_CRITERIA))],
             'summary' => ['nullable', 'string', 'max:2000'],
             'strengths' => ['nullable', 'string', 'max:2000'],
             'improvements' => ['nullable', 'string', 'max:2000'],
@@ -131,6 +152,16 @@ class LeadMemberEvaluation extends Component
         if (! $team || ! $this->memberBelongsToSelectedTeam((int) $data['selectedMemberId'])) {
             $this->addError('selectedMemberId', 'Choose a member from one of your teams.');
             return;
+        }
+
+        if (count(array_unique($data['criteriaLabels'])) !== count($data['criteriaLabels'])) {
+            $this->addError('criteriaLabels', 'Choose a different criteria for each slot.');
+            return;
+        }
+
+        $criteriaLabels = [];
+        foreach (self::FIELD_COLUMNS as $field => $column) {
+            $criteriaLabels[$column] = $data['criteriaLabels'][$field];
         }
 
         $payload = [
@@ -144,6 +175,7 @@ class LeadMemberEvaluation extends Component
             'teamwork_score' => (int) $data['teamworkScore'],
             'communication_score' => (int) $data['communicationScore'],
             'reliability_score' => (int) $data['reliabilityScore'],
+            'criteria_labels' => $criteriaLabels,
             'summary' => trim($data['summary'] ?? '') ?: null,
             'strengths' => trim($data['strengths'] ?? '') ?: null,
             'improvements' => trim($data['improvements'] ?? '') ?: null,
@@ -239,7 +271,18 @@ class LeadMemberEvaluation extends Component
         $this->summary = '';
         $this->strengths = '';
         $this->improvements = '';
+        $this->criteriaLabels = $this->defaultCriteriaLabels();
         $this->resetValidation();
+    }
+
+    private function defaultCriteriaLabels(): array
+    {
+        $labels = [];
+        foreach (self::FIELD_COLUMNS as $field => $column) {
+            $labels[$field] = EvaluationCriteria::MEMBER_DEFAULT_LABELS[$column];
+        }
+
+        return $labels;
     }
 
     protected function leadTeamRelations(): array
@@ -426,6 +469,7 @@ class LeadMemberEvaluation extends Component
             ->map(fn ($rows) => $rows->first());
 
         $metrics = $this->memberMetrics($this->selectedMemberId, $this->selectedTeamId);
+        $criteriaPool = EvaluationCriteria::MEMBER_CRITERIA;
 
         return view('livewire.lead.lead-member-evaluation', compact(
             'teams',
@@ -436,6 +480,7 @@ class LeadMemberEvaluation extends Component
             'leadFeedback',
             'latestByMember',
             'metrics',
+            'criteriaPool',
         ));
     }
 }
